@@ -696,11 +696,11 @@ Configuration through environment variables (`.env`, not in Git): DB credentials
 
 ### 12.2 CI/CD
 
-Branching: `feature/*` → `develop` → `main` (tagged). `main` is production; there is no separate `prod` branch. `hotfix/*` branches start from `main` and merge back into both `main` and `develop`. Full rules are in `Master_Task_Breakdown.md` section 2.
+Branching: `feature/*` → `dev` → `main` (tagged). `main` is production; there is no separate `prod` branch. `hotfix/*` branches start from `main` and merge back into both `main` and `dev`. Full rules are in `Master_Task_Breakdown.md` section 2.
 
-1. Pull request (to `develop` or `main`) → GitHub Actions: backend build + unit/integration tests (Testcontainers), frontend lint + type-check + build.
-2. Merge to `develop` → build Docker images (`api`, `web`), push to the registry, deploy to UAT automatically.
-3. Release PR `develop` → `main`, then tag `vX.Y.Z` on `main` → manual approval → deploy to production (`docker compose pull && docker compose up -d`; Flyway migrates on start). Rollback = redeploy the previous tag.
+1. Pull request (to `dev` or `main`) → GitHub Actions: backend build + unit/integration tests (Testcontainers), frontend lint + type-check + build.
+2. Merge to `dev` → build Docker images (`api`, `web`), push to the registry, deploy to UAT automatically.
+3. Release PR `dev` → `main`, then tag `vX.Y.Z` on `main` → manual approval → deploy to production (`docker compose pull && docker compose up -d`; Flyway migrates on start). Rollback = redeploy the previous tag.
 
 ### 12.3 Backup & restore (NFR-06)
 
