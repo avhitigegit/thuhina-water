@@ -1,0 +1,172 @@
+<!doctype html>
+<!-- Sales report also shows customers on agreed prices vs the standard price list (FR-05, client feedback 08/10/2026).
+     BRD: Section 8 – Reports (all filter by date range; export PDF and Excel): Sales, Purchasing, Production, Stock, Bottle movement,
+     Damage and write-off, Outstanding and aging, Profit, Delivery. Accountant sees Sales, Purchasing, Outstanding, Profit and Expenses.
+     Expenses report and running expenses in Profit added at the client's request (08/10/2026). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reports · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="reports/reports">
+<main id="app">
+  <div id="bar"></div>
+  <div class="kpis" id="kpis"></div>
+  <div id="out"></div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today();
+  var fm = function (v) { return UI.num((+v || 0).toFixed(2)); };
+  var n = function (v) { return UI.num(v); };
+  var inR = function (d, f, t) { return d >= f && d <= t; };
+
+  var REPORTS = {
+    sales: { name: 'Sales', roles: 'A C', build: function (f, t) {
+      var tx = db.txns.filter(function (x) { return inR(x.date, f, t) && x.kind !== 'opening' && x.kind !== 'collect'; });
+      var SALE = { first: 'First purchase', exchange: 'Exchange', leftdoor: 'Exchange', extra: 'Extra order', product: 'Product', custdamage: 'Bottle replacement', owedsettle: 'Bottles owed (deposit)' };
+      var by = function (keyFn) { var m = {}; tx.forEach(function (x) { var k = keyFn(x); m[k] = m[k] || { k: k, n: 0, w: 0, d: 0, p: 0 }; m[k].n++; m[k].w += x.split.water; m[k].d += x.split.deposit; m[k].p += x.split.product; }); return Object.keys(m).map(function (k) { var r = m[k]; r.t = r.w + r.d + r.p; return r; }); };
+      var cols = function (h) { return [{ h: h, f: function (r) { return UI.esc(r.k); } }, { h: 'Bills', cls: 'num', k: 'n' }, { h: 'Water', cls: 'num', f: function (r) { return fm(r.w); } }, { h: 'Deposits', cls: 'num', f: function (r) { return fm(r.d); } }, { h: 'Products', cls: 'num', f: function (r) { return fm(r.p); } }, { h: 'Total', cls: 'num', f: function (r) { return '<b>' + fm(r.t) + '</b>'; } }]; };
+      var bySale = by(function (x) { return SALE[x.kind === 'reversal' ? x.origKind : x.kind] || x.kind; }).sort(function (a, b) { return b.t - a.t; });
+      var tot = UI.sum(bySale, function (r) { return r.t; });
+      var days = [];
+      for (var d = f; d <= t && days.length < 92; d = D.add(d, 1)) { var v = UI.sum(tx.filter(function (x) { return x.date === d; }), function (x) { return x.amount; }); days.push({ label: d.slice(8), value: v, title: D.dmy(d) + ': ' + UI.lkr(v) }); }
+      // Agreed customer prices (FR-05): water billed vs the standard price list on the same dates.
+      var ag = {};
+      tx.forEach(function (x) {
+        var c = x.custId && Q.customer(x.custId); if (!c) return;
+        var sg = x.kind === 'reversal' ? -1 : 1;
+        (x.lines || []).forEach(function (l) {
+          if (!l.bt || !l.filled || l.price == null) return;
+          var std = Q.stdPrice(l.bt, c.type, x.date); if (std == null || std === l.price) return;
+          var k = c.id; ag[k] = ag[k] || { c: c, n: 0, billed: 0, std: 0 };
+          ag[k].n += sg * l.filled; ag[k].billed += sg * l.filled * l.price; ag[k].std += sg * l.filled * std;
+        });
+      });
+      var agRows = Object.keys(ag).map(function (k) { return ag[k]; }).sort(function (a, b) { return (b.std - b.billed) - (a.std - a.billed); });
+      var agDiff = UI.sum(agRows, function (r) { return r.std - r.billed; });
+      return { kpis: [['Total sales', UI.lkr(tot)], ['Water', UI.lkr(UI.sum(bySale, function (r) { return r.w; }))], ['Deposits', UI.lkr(UI.sum(bySale, function (r) { return r.d; }))], ['Products', UI.lkr(UI.sum(bySale, function (r) { return r.p; }))], ['Bills', tx.length], ['Below standard (agreed prices)', UI.lkr(agDiff)]], chart: days,
+        tables: [{ title: 'By sale type', columns: cols('Sale type'), rows: bySale },
+          { title: 'By customer type', columns: cols('Customer type'), rows: by(function (x) { return x.custId ? Q.customer(x.custId).type : 'Walk-in'; }).sort(function (a, b) { return b.t - a.t; }) },
+          { title: 'By month', columns: cols('Month'), rows: by(function (x) { return D.monthLabel(D.month(x.date)); }) },
+          { title: 'By customer (top 15)', columns: cols('Customer'), rows: by(function (x) { return x.custId ? Q.customer(x.custId).name : 'Walk-in'; }).sort(function (a, b) { return b.t - a.t; }).slice(0, 15) },
+          { title: 'Customers on agreed prices – water billed vs standard price', columns: [{ h: 'Customer', f: function (r) { return UI.esc(r.c.name) + ' <span class="small muted">' + UI.esc(r.c.type) + '</span>'; } }, { h: 'Bottles', cls: 'num', f: function (r) { return n(r.n); } }, { h: 'Billed', cls: 'num', f: function (r) { return fm(r.billed); } }, { h: 'At standard price', cls: 'num', f: function (r) { return fm(r.std); } }, { h: 'Difference', cls: 'num', f: function (r) { return '<b>' + fm(r.billed - r.std) + '</b>'; } }], rows: agRows }] };
+    } },
+    purchasing: { name: 'Purchasing', roles: 'A C', build: function (f, t) {
+      var pos = db.pos.filter(function (p) { return inR(p.date, f, t); }), lines = [];
+      pos.forEach(function (p) { p.lines.forEach(function (l) { lines.push({ p: p, l: l }); }); });
+      var qr = []; db.qrs.filter(function (q) { return inR(q.date, f, t); }).forEach(function (q) { Q.quotesFor(q.id).forEach(function (x) { qr.push({ q: q, x: x }); }); });
+      return { kpis: [['Purchase orders', pos.length], ['PO value', UI.lkr(UI.sum(pos.filter(function (p) { return p.status !== 'Cancelled'; }), Q.poTotal))], ['Goods received', UI.lkr(UI.sum(db.grns.filter(function (g) { return inR(g.date, f, t); }), function (g) { return g.value; }))], ['Owed to suppliers', UI.lkr(UI.sum(db.suppliers, function (s) { return Q.supplierOwed(s.id); }))]],
+        tables: [{ title: 'Purchase orders – ordered vs received', columns: [{ h: 'PO', f: function (r) { return r.p.id; } }, { h: 'Date', f: function (r) { return D.dmy(r.p.date); } }, { h: 'Supplier', f: function (r) { return UI.esc(Q.supplier(r.p.supplierId).name); } }, { h: 'Item', f: function (r) { return UI.esc(Q.itemName(r.l.item)); } }, { h: 'Ordered', cls: 'num', f: function (r) { return r.l.qty; } }, { h: 'Received', cls: 'num', f: function (r) { return r.l.received; } }, { h: 'Damaged', cls: 'num', f: function (r) { return r.l.damaged || ''; } }, { h: 'Value', cls: 'num', f: function (r) { return fm(r.l.qty * r.l.price); } }, { h: 'Status', f: function (r) { return r.p.status; } }], rows: lines },
+          { title: 'Quotations by request and supplier', columns: [{ h: 'Request', f: function (r) { return r.q.id; } }, { h: 'Supplier', f: function (r) { return UI.esc(Q.supplier(r.x.supplierId).name); } }, { h: 'Total', cls: 'num', f: function (r) { return fm(Q.quoteTotal(r.x)); } }, { h: 'Delivery', cls: 'num', f: function (r) { return r.x.deliveryDays + ' d'; } }, { h: 'Chosen', f: function (r) { return r.x.selected ? 'Yes – ' + UI.esc(r.x.reason) : ''; } }], rows: qr }] };
+    } },
+    production: { name: 'Production', roles: 'A', build: function (f, t) {
+      var bs = db.batches.filter(function (b) { return inR(b.date, f, t); }), R = Q.batchReturned;
+      return { kpis: [['Batches', bs.length], ['Sent', n(UI.sum(bs, function (b) { return b.qty; }))], ['Filled back', n(UI.sum(bs, function (b) { return R(b).filled; }))], ['Rejected', UI.sum(bs, function (b) { return R(b).rejected; })], ['Filling cost', UI.lkr(UI.sum(bs, Q.batchCost))]],
+        tables: [{ title: 'Batches', columns: [{ h: 'Batch', k: 'id' }, { h: 'Sent', f: function (b) { return D.dmy(b.date); } }, { h: 'Bottle', f: function (b) { return Q.btShort(b.bt); } }, { h: 'Qty', cls: 'num', k: 'qty' }, { h: 'Filled', cls: 'num', f: function (b) { return R(b).filled; } }, { h: 'Rejected', cls: 'num', f: function (b) { return R(b).rejected; } }, { h: 'At factory', cls: 'num', f: function (b) { return R(b).outstanding; } }, { h: 'Cost', cls: 'num', f: function (b) { return fm(Q.batchCost(b)); } }], rows: bs }] };
+    } },
+    stock: { name: 'Stock', roles: 'A', build: function (f, t) {
+      var at = function (bt, k) { var v = db.stock[bt][k]; db.movements.forEach(function (m) { if (m.item === bt && m.date > t && m.d[k]) v -= m.d[k]; }); return v; };
+      return { kpis: [], tables: [{ title: 'Bottle stock at ' + D.dmy(t), columns: [{ h: 'Bottle', k: 'name' }].concat(TW.BUCKETS.map(function (k) { return { h: TW.BUCKET_LABEL[k], cls: 'num', f: function (b) { return n(at(b.id, k)); } }; })), rows: Q.activeBottles() },
+        { title: 'Product stock (now)', columns: [{ h: 'Product', k: 'name' }, { h: 'In stock', cls: 'num', k: 'stock' }, { h: 'Cost value', cls: 'num', f: function (p) { return fm(p.stock * p.cost); } }], rows: db.products }] };
+    } },
+    movement: { name: 'Bottle movement', roles: 'A', build: function (f, t) {
+      var ct = Q.custTotals(), fl = { del: 0, col: 0, newc: 0, old: 0, left: 0, owed: 0 };
+      db.txns.forEach(function (x) { if (!inR(x.date, f, t)) return; var s = x.kind === 'reversal' ? -1 : 1, k = x.kind === 'reversal' ? x.origKind : x.kind; (x.lines || []).forEach(function (l) { if (l.bt !== 'B20') return; fl.del += s * (l.filled || 0); fl.col += s * (l.empties || 0); fl.old += s * (l.old || 0); fl.left += s * (l.toCollect || 0); fl.owed += s * (l.owed || 0); if (k === 'first') fl.newc += s * l.filled; if (k === 'extra') fl.newc += s * (l.newBottles || 0); }); });
+      var rows = [['Filled bottles delivered', fl.del], ['Empties collected', fl.col], ['New bottles to customers', fl.newc], ['Old American Water bottles taken in', fl.old], ['Left at door (empties to collect)', fl.left], ['New bottles owed', fl.owed]];
+      return { kpis: [['20L in circulation', n(Q.pool('B20'))], ['With customers', n(db.stock.B20.customers)], ['Empties to collect now', ct.toCollect.B20 || 0], ['Bottles owed now', ct.owed.B20 || 0]],
+        tables: [{ title: '20L bottle flows ' + D.dmy(f) + ' – ' + D.dmy(t), columns: [{ h: 'Flow', f: function (r) { return r[0]; } }, { h: 'Bottles', cls: 'num', f: function (r) { return n(r[1]); } }], rows: rows },
+          { title: 'Customers with empties to collect or bottles owed', columns: [{ h: 'Customer', k: 'name' }, { h: 'Area', k: 'area' }, { h: 'To collect', cls: 'num', f: function (c) { return Q.sumBt(c.toCollect) || ''; } }, { h: 'Owed', cls: 'num', f: function (c) { return Q.sumBt(c.owed) || ''; } }], rows: db.customers.filter(function (c) { return Q.sumBt(c.toCollect) || Q.sumBt(c.owed); }) }] };
+    } },
+    damage: { name: 'Damage and write-off', roles: 'A', build: function (f, t) {
+      var rows = db.damages.filter(function (d) { return inR(d.date, f, t) && !d.reversed; }).map(function (d) { return { date: d.date, bt: d.bt, qty: d.qty, resp: d.resp, loc: d.location, reason: d.reason }; });
+      db.adjustments.filter(function (a) { return a.mode === 'lost' && inR(a.date, f, t); }).forEach(function (a) { rows.push({ date: a.date, bt: a.item, qty: -a.delta, resp: 'Company', loc: 'Lost – ' + TW.BUCKET_LABEL[a.bucket], reason: a.reason }); });
+      var co = UI.sum(rows.filter(function (r) { return r.resp === 'Company'; }), function (r) { return r.qty; }), cu = UI.sum(rows.filter(function (r) { return r.resp === 'Customer'; }), function (r) { return r.qty; });
+      return { kpis: [['Written off', co + cu], ['Company', co], ['Customer', cu]], tables: [{ title: 'Damaged and lost bottles', columns: [{ h: 'Date', f: function (r) { return D.dmy(r.date); } }, { h: 'Bottle', f: function (r) { return Q.btShort(r.bt); } }, { h: 'Qty', cls: 'num', k: 'qty' }, { h: 'Responsibility', k: 'resp' }, { h: 'Where', k: 'loc' }, { h: 'Reason', k: 'reason' }], rows: rows }] };
+    } },
+    outstanding: { name: 'Outstanding and aging', roles: 'A C', build: function (f, t) {
+      var ag = Q.aging(t).sort(function (a, b) { return b.total - a.total; });
+      var bt = TW.PAY_TYPES.map(function (p) { var r = ag.filter(function (a) { return a.cust.payType === p; }); return { p: p, b0: UI.sum(r, function (a) { return a.b0; }), b30: UI.sum(r, function (a) { return a.b30; }), b60: UI.sum(r, function (a) { return a.b60; }), b90: UI.sum(r, function (a) { return a.b90; }), total: UI.sum(r, function (a) { return a.total; }) }; });
+      var c5 = function (g) { return [{ h: '0–30', cls: 'num', f: function (r) { return fm(g(r).b0); } }, { h: '31–60', cls: 'num', f: function (r) { return fm(g(r).b30); } }, { h: '61–90', cls: 'num', f: function (r) { return fm(g(r).b60); } }, { h: '90+', cls: 'num', f: function (r) { return fm(g(r).b90); } }, { h: 'Total', cls: 'num', f: function (r) { return '<b>' + fm(g(r).total) + '</b>'; } }]; };
+      var id = function (r) { return r; };
+      return { kpis: [['Total outstanding at ' + D.dmy(t), UI.lkr(UI.sum(ag, function (a) { return a.total; }))], ['Over 90 days', UI.lkr(UI.sum(ag, function (a) { return a.b90; }))]],
+        tables: [{ title: 'By payment type', columns: [{ h: 'Payment type', k: 'p' }].concat(c5(id)), rows: bt }, { title: 'By customer', columns: [{ h: 'Customer', f: function (a) { return UI.esc(a.cust.name); } }, { h: 'Pays', f: function (a) { return a.cust.payType; } }].concat(c5(id)), rows: ag }] };
+    } },
+    profit: { name: 'Profit', roles: 'A C', build: function (f, t) {
+      var r = {};
+      Q.activeBottles().forEach(function (b) { r[b.id] = { k: b.name, rev: 0, fill: 0, bottle: 0, pc: 0 }; });
+      r.P = { k: 'Other products', rev: 0, fill: 0, bottle: 0, pc: 0 };
+      db.txns.forEach(function (x) {
+        if (!inR(x.date, f, t) || x.kind === 'opening') return;
+        var s = x.kind === 'reversal' ? -1 : 1, k = x.kind === 'reversal' ? x.origKind : x.kind;
+        if (k === 'product') { r.P.rev += s * Math.abs(x.split.product); r.P.pc += s * Math.abs(x.cost || 0); return; }
+        var ls = (x.lines || []).filter(function (l) { return l.bt && r[l.bt]; });
+        ls.forEach(function (l) { r[l.bt].rev += s * (Math.abs(x.split.water) + Math.abs(x.split.deposit)) / ls.length; });
+      });
+      db.batches.forEach(function (b) { b.returns.forEach(function (x) { if (inR(x.date, f, t) && r[b.bt]) r[b.bt].fill += x.cost; }); });
+      db.grns.forEach(function (g) { if (inR(g.date, f, t)) g.lines.forEach(function (l) { if (r[l.item]) r[l.item].bottle += (l.received - l.damaged) * l.price; }); });
+      var rows = Object.keys(r).map(function (k) { var x = r[k]; x.profit = x.rev - x.fill - x.bottle - x.pc; return x; });
+      var T = function (k) { return UI.sum(rows, function (x) { return x[k]; }); };
+      // Running expenses are counted in the month they are for: every month from the From month to the To month.
+      var mf = D.month(f), mt = D.month(t), ex = db.expenseCategories.map(function (c) { return { k: c.id, v: UI.sum(db.expenses.filter(function (e) { return e.category === c.id && e.month >= mf && e.month <= mt; }), function (e) { return e.amount; }) }; }).filter(function (x) { return x.v; });
+      var exT = UI.sum(ex, function (x) { return x.v; }), gross = T('profit');
+      return { kpis: [['Revenue', UI.lkr(T('rev'))], ['Filling cost', UI.lkr(T('fill'))], ['Bottle cost', UI.lkr(T('bottle'))], ['Product cost', UI.lkr(T('pc'))], ['Gross profit', UI.lkr(gross)], ['Running expenses', UI.lkr(exT)], ['Net profit', UI.lkr(gross - exT)]],
+        tables: [{ title: 'By bottle type', columns: [{ h: '', k: 'k' }, { h: 'Revenue', cls: 'num', f: function (x) { return fm(x.rev); } }, { h: 'Filling', cls: 'num', f: function (x) { return fm(-x.fill); } }, { h: 'Bottles bought', cls: 'num', f: function (x) { return fm(-x.bottle); } }, { h: 'Product cost', cls: 'num', f: function (x) { return fm(-x.pc); } }, { h: 'Profit', cls: 'num', f: function (x) { return '<b>' + fm(x.profit) + '</b>'; } }], rows: rows },
+          { title: 'Net profit (' + (mf === mt ? D.monthLabel(mf) : D.monthLabel(mf) + ' – ' + D.monthLabel(mt)) + ' expenses)', columns: [{ h: '', f: function (x) { return x.b ? '<b>' + UI.esc(x.k) + '</b>' : UI.esc(x.k); } }, { h: 'Rs.', cls: 'num', f: function (x) { return x.b ? '<b>' + fm(x.v) + '</b>' : fm(x.v); } }],
+            rows: [{ k: 'Gross profit', v: gross, b: 1 }].concat(ex.map(function (x) { return { k: '− ' + x.k, v: -x.v }; })).concat([{ k: 'Net profit', v: gross - exT, b: 1 }]) }],
+        note: 'Deposits count as revenue (not refundable). Running expenses come from the Expenses page and are counted for whole months (the months of the From and To dates and every month between).' };
+    } },
+    expenses: { name: 'Expenses', roles: 'A C', build: function (f, t) {
+      var mf = D.month(f), mt = D.month(t), ms = [];
+      for (var m = mt; m >= mf; m = D.prevMonth(m)) ms.unshift(m);
+      var ex = db.expenses.filter(function (e) { return e.month >= mf && e.month <= mt; });
+      var cats = db.expenseCategories.filter(function (c) { return ex.some(function (e) { return e.category === c.id; }); });
+      var tot = UI.sum(ex, function (e) { return e.amount; });
+      return { kpis: [['Total expenses', UI.lkr(tot)], ['Months', ms.length], ['Average a month', UI.lkr(ms.length ? tot / ms.length : 0)], ['Entries', ex.length]],
+        chart: ms.map(function (m) { var v = Q.expenseTotal(m); return { label: D.monthLabel(m).slice(0, 3), value: v, title: D.monthLabel(m) + ': ' + UI.lkr(v) }; }),
+        tables: [{ title: 'By type and month', columns: [{ h: 'Type', k: 'id' }].concat(ms.map(function (m) { return { h: D.monthLabel(m).slice(0, 3) + ' ' + m.slice(0, 4), cls: 'num', f: function (c) { return fm(Q.expenseTotal(m, c.id)); } }; })).concat([{ h: 'Total', cls: 'num', f: function (c) { return '<b>' + fm(UI.sum(ex.filter(function (e) { return e.category === c.id; }), function (e) { return e.amount; })) + '</b>'; } }]), rows: cats },
+          { title: 'All expenses', columns: [{ h: 'For month', f: function (e) { return D.monthLabel(e.month); } }, { h: 'Paid on', f: function (e) { return D.dmy(e.date); } }, { h: 'Type', k: 'category' }, { h: 'Description', k: 'description' }, { h: 'Paid to', k: 'paidTo' }, { h: 'Paid by', f: function (e) { return UI.esc(e.mode + (e.ref ? ' ' + e.ref : '')); } }, { h: 'Amount', cls: 'num', f: function (e) { return fm(e.amount); } }],
+            rows: ex.slice().sort(function (a, b) { return a.month < b.month ? -1 : a.month > b.month ? 1 : a.date < b.date ? -1 : 1; }) }],
+        chartTitle: 'By month', note: 'Expenses are counted for whole months (the months of the From and To dates and every month between).' };
+    } },
+    delivery: { name: 'Delivery', roles: 'A', build: function (f, t) {
+      var rows = [];
+      for (var d = f; d <= t; d = D.add(d, 1)) {
+        if (D.dow(d) === 0) continue;
+        var due = db.customers.filter(function (c) { return Q.isDue(c, d) && c.since < d; });
+        var dels = db.txns.filter(function (x) { return x.date === d && (x.kind === 'exchange' || x.kind === 'leftdoor') && !x.reversedBy; });
+        var done = due.filter(function (c) { return dels.some(function (x) { return x.custId === c.id; }); });
+        rows.push({ d: d, due: due.length, done: done.length, missed: due.filter(function (c) { return done.indexOf(c) < 0; }), left: dels.filter(function (x) { return x.kind === 'leftdoor'; }).length });
+      }
+      return { kpis: [['Due', UI.sum(rows, function (r) { return r.due; })], ['Entered', UI.sum(rows, function (r) { return r.done; })], ['Left at door', UI.sum(rows, function (r) { return r.left; })]],
+        tables: [{ title: 'By day', columns: [{ h: 'Date', f: function (r) { return D.dayName(r.d).slice(0, 3) + ' ' + D.dmy(r.d); } }, { h: 'Due', cls: 'num', k: 'due' }, { h: 'Entered', cls: 'num', k: 'done' }, { h: 'Left at door', cls: 'num', k: 'left' }, { h: 'Not entered', f: function (r) { return r.missed.map(function (c) { return UI.esc(c.name); }).join(', '); } }], rows: rows.reverse() }] };
+    } }
+  };
+  var code = { Admin: 'A', Accountant: 'C' }[App.role];
+  var mine = Object.keys(REPORTS).filter(function (k) { return REPORTS[k].roles.indexOf(code) >= 0; });
+  var sel = '<div class="field"><label>Report</label><select name="rep">' + UI.options(mine.map(function (k) { return { v: k, l: REPORTS[k].name }; }), UI.params().r || 'sales') + '</select></div>';
+  var F, T;
+  function run() {
+    var key = UI.$('#bar [name=rep]').value, r = REPORTS[key].build(F, T);
+    document.title = REPORTS[key].name + ' report · Thuhina Water';
+    UI.$('#kpis').innerHTML = (r.kpis || []).map(function (k) { return '<div class="kpi"><div class="label">' + k[0] + '</div><div class="value">' + k[1] + '</div></div>'; }).join('');
+    var h = '<div class="print-only"><h2>' + REPORTS[key].name + ' report – ' + D.dmy(F) + ' to ' + D.dmy(T) + '</h2></div>';
+    if (r.chart) h += '<div class="card"><h2>' + (r.chartTitle || 'By day') + '</h2><div id="chart"></div></div>';
+    (r.tables || []).forEach(function (tb, i) { h += '<div class="card"><h2>' + UI.esc(tb.title) + '</h2><div class="report-table" id="t' + i + '"></div></div>'; });
+    if (r.note) h += '<p class="small muted">' + UI.esc(r.note) + '</p>';
+    UI.$('#out').innerHTML = h;
+    if (r.chart) UI.bars(UI.$('#chart'), r.chart, UI.lkr);
+    (r.tables || []).forEach(function (tb, i) { UI.table('#t' + i, { columns: tb.columns, rows: tb.rows, empty: 'Nothing in this period.' }); });
+  }
+  UI.rangeBar(UI.$('#bar'), D.monthStart(D.prevMonth(D.month(td))), td, function (f, t) { F = f; T = t; run(); }, sel);
+  UI.$('#bar [name=rep]').addEventListener('change', run);
+});
+</script>
+</body>
+</html>

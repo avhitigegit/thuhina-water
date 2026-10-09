@@ -1,0 +1,172 @@
+<!doctype html>
+<!-- BRD: FR-23 (dispatch empties: date, bottle type, quantity – one entry sends every bottle type with its quantity, client request 08/10/2026), FR-24 (return: filled received, rejected), FR-25 (bottles at factory, sent vs received difference),
+     FR-26 (filling cost = bottles filled × charge; amounts owed to factory), FR-28 (stock updates), FR-29 (rejects written off as company damage),
+     BR-11 (fixed price per bottle filled), BR-12 (stock cannot go below zero). Accountant: view only. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Filling Factory · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="production/production">
+<main id="app">
+  <div class="page-actions write-only">
+    <button class="btn primary" id="send">Send empties</button>
+    <button class="btn primary" id="recv">Receive filled bottles</button>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div id="tabs"></div>
+  <div data-pane="batches" class="card">
+    <p class="small muted">Empties go to the factory in batches and come back filled and sealed. The factory charges a fixed price per bottle filled.</p>
+    <div id="list"></div>
+  </div>
+  <div data-pane="payments">
+    <div class="card">
+      <div class="card-head"><h2>Filling cost by month</h2><button class="btn primary write-only" id="pay">+ Record payment</button></div>
+      <div id="months"></div>
+    </div>
+    <div class="card"><h2>Payments made</h2><div id="pays"></div></div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today();
+  var R = function (b) { return Q.batchReturned(b); };
+  function kpis() {
+    UI.$('#kpis').innerHTML = Q.activeBottles().map(function (b) { return '<div class="kpi"><div class="label">Empty ' + b.litres + 'L in store</div><div class="value">' + db.stock[b.id].empty + '</div></div><div class="kpi"><div class="label">' + b.litres + 'L at factory</div><div class="value">' + db.stock[b.id].factory + '</div></div>'; }).join('') +
+      db.factories.filter(function (f) { return f.active || Q.factoryOwed(f.id); }).map(function (f) { return '<div class="kpi"><div class="label">Owed to ' + UI.esc(f.name) + '</div><div class="value">' + UI.lkr(Q.factoryOwed(f.id)) + '</div></div>'; }).join('');
+  }
+  function batches() {
+    UI.table('#list', {
+      columns: [
+        { h: 'Batch', f: function (b) { return '<b class="mono">' + b.id + '</b>' + (b.dispatchNo ? '<div class="small muted mono">' + b.dispatchNo + '</div>' : ''); } }, { h: 'Sent', f: function (b) { return D.dmy(b.date); } }, { h: 'Factory', f: function (b) { return UI.esc((Q.factory(b.factoryId) || {}).name || ''); } }, { h: 'Bottle', f: function (b) { return Q.btShort(b.bt); } },
+        { h: 'Qty sent', cls: 'num', k: 'qty' }, { h: 'Filled back', cls: 'num', f: function (b) { return R(b).filled; } }, { h: 'Rejected', cls: 'num', f: function (b) { return R(b).rejected || ''; } },
+        { h: 'Still at factory', cls: 'num', f: function (b) { var o = R(b).outstanding; return o ? '<b style="color:var(--warn)">' + o + '</b>' : '0'; } },
+        { h: 'Filling cost', cls: 'num', f: function (b) { return UI.lkr(Q.batchCost(b)); } },
+        { h: 'Status', f: function (b) { var r = R(b); return UI.statusBadge(!r.outstanding ? 'Returned' : b.returns.length ? 'Partly returned' : 'At factory'); } },
+        { h: '', cls: 'actions', f: function (b) { return (R(b).outstanding ? '<button class="btn sm write-only" data-recv="' + b.id + '">Receive</button> ' : '') + (b.dispatchNo ? '<button class="btn sm" data-print="' + b.dispatchNo + '" title="Print the dispatch note">Print</button>' : ''); } }
+      ],
+      rows: db.batches.slice().reverse()
+    });
+  }
+  UI.$('#list').addEventListener('click', function (e) { var id = e.target.getAttribute('data-recv'); if (id) receive(id); var dn = e.target.getAttribute('data-print'); if (dn) printDispatch(dn); });
+
+  /* Send empties (FR-23, BR-12) – one entry for every bottle type, each with its own quantity. */
+  function send() {
+    var bts = Q.activeBottles();
+    var m = UI.modal({
+      title: 'Send empties to the factory', wide: true,
+      body: '<div class="form-grid"><div class="field req span2"><label>Filling factory</label><select name="fac">' + UI.options(Q.activeFactories().map(function (f) { return { v: f.id, l: f.name }; })) + '</select></div><div class="field req"><label>Date</label>' + UI.dateInput('date', td) + '</div>' +
+        '<div class="field"><label>Vehicle</label><input name="veh" value="LH-4521"></div><div class="field span2"><label>Note</label><input name="note" placeholder="e.g. Weekly batch"></div></div>' +
+        '<div class="section-title">Bottles sent <span class="small muted" style="text-transform:none;font-weight:400">– fill in every bottle type going in this load; leave 0 for types not sent</span></div>' +
+        '<table><thead><tr><th>Bottle</th><th class="num">Empty in store</th><th class="num">Sent now</th><th class="num">Empty after</th><th class="num">At factory after</th><th class="num">Charge each</th><th class="num">Cost when filled</th></tr></thead><tbody>' +
+        bts.map(function (b) { return '<tr data-bt="' + b.id + '"><td><b>' + UI.esc(b.name) + '</b></td><td class="num">' + db.stock[b.id].empty + '</td><td class="num"><input type="number" min="0" name="q_' + b.id + '" value="' + db.stock[b.id].empty + '" style="width:90px"></td><td class="num" data-c="left"></td><td class="num" data-c="fac"></td><td class="num" data-c="chg"></td><td class="num" data-c="cost"></td></tr>'; }).join('') +
+        '</tbody><tfoot><tr><td colspan="2">Total</td><td class="num" id="tq"></td><td></td><td></td><td></td><td class="num" id="tc"></td></tr></tfoot></table><div id="eff" style="margin-top:10px"></div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Send', cls: 'primary', onClick: function (close, el) {
+        var r = TW.Ops.dispatch({ factoryId: UI.mval(el, 'fac'), date: D.fromDmy(UI.mval(el, 'date')), vehicle: UI.mval(el, 'veh'), note: UI.mval(el, 'note'), lines: bts.map(function (b) { return { bt: b.id, qty: UI.mval(el, 'q_' + b.id) }; }) });
+        if (!UI.result(r)) return false;
+        close(); refresh();
+        UI.modal({ title: 'Dispatch ' + r.dispatchNo + ' sent', body: '<p>Sent to <b>' + UI.esc(Q.factory(r.batches[0].factoryId).name) + '</b> on ' + D.dmy(r.batches[0].date) + ':</p><ul>' + r.batches.map(function (b) { return '<li>' + b.qty + ' × ' + Q.btShort(b.bt) + ' – batch <span class="mono">' + b.id + '</span></li>'; }).join('') + '</ul><p class="small muted">Each bottle type is received back against its own batch.</p>',
+          buttons: [{ label: 'Print dispatch note', onClick: function () { printDispatch(r.dispatchNo); return false; } }, { label: 'Close', cls: 'primary' }] });
+        return false;
+      } }]
+    });
+    function eff() {
+      var fac = Q.factory(UI.mval(m.el, 'fac')) || { charges: {} }, tq = 0, tc = 0, msg = [];
+      bts.forEach(function (b) {
+        var tr = m.el.querySelector('tr[data-bt="' + b.id + '"]'), st = db.stock[b.id], q = +UI.mval(m.el, 'q_' + b.id) || 0, ch = fac.charges[b.id] || 0;
+        var cell = function (k, v, bad) { var x = tr.querySelector('[data-c=' + k + ']'); x.innerHTML = v; x.style.color = bad ? 'var(--bad)' : ''; };
+        cell('left', st.empty - q, q > st.empty); cell('fac', st.factory + q); cell('chg', ch ? UI.lkr(ch) : '<span class="muted">no charge</span>'); cell('cost', q && ch ? UI.lkr(q * ch) : '');
+        if (q > st.empty) msg.push('Only ' + st.empty + ' empty ' + b.litres + 'L in store.');
+        if (q && !ch) msg.push(UI.esc(fac.name) + ' has no filling charge for ' + b.litres + 'L – set it under Suppliers & Factories.');
+        tq += q; tc += q * ch;
+      });
+      m.el.querySelector('#tq').textContent = tq; m.el.querySelector('#tc').textContent = UI.lkr(tc);
+      m.el.querySelector('#eff').innerHTML = msg.length ? '<div class="banner bad">' + msg.join(' ') + ' Stock cannot go below zero – record a stock adjustment if the count is different.</div>' : '<div class="small muted">' + tq + ' empties go out in one dispatch. Filling cost is charged only for bottles that come back filled.</div>';
+    }
+    m.el.addEventListener('input', eff); m.el.addEventListener('change', eff); eff();
+  }
+  /* Printable dispatch note – all bottle types sent together. */
+  function printDispatch(no) {
+    var bs = Q.dispatchBatches(no);
+    if (!bs.length) return;
+    var b0 = bs[0], f = Q.factory(b0.factoryId);
+    UI.printDoc(no, '<div class="doc">' + UI.docHead('DISPATCH NOTE', '<div class="mono"><b>' + no + '</b></div><div>Date: ' + D.dmy(b0.date) + '</div><div>Vehicle: ' + UI.esc(b0.vehicle || '–') + '</div>') +
+      '<p><span class="muted">To filling factory</span><br><b>' + UI.esc(f.name) + '</b><br>' + UI.esc(f.address || '') + (f.contact ? '<br>Attn: ' + UI.esc(f.contact) + ' · ' + UI.esc(f.phone) : '') + '</p>' +
+      '<table><thead><tr><th>#</th><th>Description</th><th>Batch</th><th class="num">Empty bottles</th></tr></thead><tbody>' + bs.map(function (b, i) { return '<tr><td>' + (i + 1) + '</td><td>Empty ' + UI.esc(Q.btName(b.bt)) + '</td><td class="mono">' + b.id + '</td><td class="num">' + b.qty + '</td></tr>'; }).join('') +
+      '</tbody><tfoot><tr><td colspan="3" class="num">Total bottles</td><td class="num">' + UI.sum(bs, function (b) { return b.qty; }) + '</td></tr></tfoot></table>' +
+      (b0.note ? '<p>Note: ' + UI.esc(b0.note) + '</p>' : '') +
+      '<div class="sig-row"><div>Sent by<br>' + UI.esc(b0.user) + '</div><div>Driver</div><div>Received by (factory)</div></div></div>');
+  }
+  /* Receive filled (FR-24, FR-26) */
+  function receive(batchId) {
+    var open = db.batches.filter(function (b) { return R(b).outstanding > 0; });
+    if (!open.length) return UI.toast('No bottles are at the factory', 'warn');
+    batchId = batchId || open[0].id;
+    var m = UI.modal({
+      title: 'Receive filled bottles',
+      body: '<div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="field req full"><label>Batch</label><select name="batch">' + UI.options(open.map(function (b) { return { v: b.id, l: b.id + ' – ' + (Q.factory(b.factoryId) || {}).name + ' – sent ' + D.dmy(b.date) + ' – ' + R(b).outstanding + ' × ' + Q.btShort(b.bt) + ' at factory' }; }), batchId) + '</select></div>' +
+        '<div class="field req"><label>Date</label>' + UI.dateInput('date', td) + '</div><div class="field req"><label>Filled bottles received</label><input name="filled" type="number" min="0"></div>' +
+        '<div class="field"><label>Rejected / damaged</label><input name="rej" type="number" min="0" value="0"></div><div class="field"><label>Reject reason</label><input name="reason" placeholder="e.g. Failed seal test"></div></div><div id="calc" style="margin-top:10px"></div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Save', cls: 'primary', onClick: function (close, el) {
+        var r = TW.Ops.receiveFilled({ batchId: UI.mval(el, 'batch'), date: D.fromDmy(UI.mval(el, 'date')), filled: UI.mval(el, 'filled'), rejected: UI.mval(el, 'rej'), rejectReason: UI.mval(el, 'reason') });
+        if (UI.result(r, r.ok ? 'Received – filling cost ' + UI.money(r.ret.cost) + (r.outstanding ? ', ' + r.outstanding + ' still at the factory' : '') : '')) { close(); refresh(); }
+        return false;
+      } }]
+    });
+    function fill() { m.el.querySelector('[name=filled]').value = R(Q.batch(UI.mval(m.el, 'batch'))).outstanding; calc(); }
+    function calc() {
+      var b = Q.batch(UI.mval(m.el, 'batch')), f = +UI.mval(m.el, 'filled') || 0, rj = +UI.mval(m.el, 'rej') || 0, left = R(b).outstanding - f - rj;
+      m.el.querySelector('#calc').innerHTML = '<div class="summary"><span>Still at factory after this</span><b class="num"' + (left ? ' style="color:var(--warn)"' : '') + '>' + left + '</b><span>Rejected → written off (company)</span><b class="num">' + rj + '</b><span class="total">Filling cost (' + f + ' × ' + UI.lkr(b.charge) + ')</span><b class="num total">' + UI.money(f * b.charge) + '</b></div>';
+    }
+    m.el.querySelector('[name=batch]').addEventListener('change', fill);
+    m.el.addEventListener('input', calc); fill();
+  }
+
+  /* Factory payments (FR-26, BR-11) */
+  function months() {
+    var mm = {};
+    db.batches.forEach(function (b) { b.returns.forEach(function (r) { var k = b.factoryId + '|' + D.month(r.date); mm[k] = mm[k] || { k: D.month(r.date), f: b.factoryId, filled: 0, rej: 0, cost: 0, paid: 0 }; mm[k].filled += r.filled; mm[k].rej += r.rejected; mm[k].cost += r.cost; }); });
+    db.factoryPayments.forEach(function (p) { Object.keys(mm).forEach(function (k) { if (mm[k].f === p.factoryId && p.period === D.monthLabel(mm[k].k)) mm[k].paid += p.amount; }); });
+    return Object.keys(mm).sort(function (a, b) { return mm[a].k < mm[b].k ? -1 : mm[a].k > mm[b].k ? 1 : a < b ? -1 : 1; }).map(function (k) { return mm[k]; });
+  }
+  function payments() {
+    var ms = months();
+    UI.table('#months', {
+      columns: [{ h: 'Month', f: function (m) { return D.monthLabel(m.k); } }, { h: 'Factory', f: function (m) { return UI.esc(Q.factory(m.f).name); } }, { h: 'Bottles filled', cls: 'num', f: function (m) { return UI.num(m.filled); } }, { h: 'Rejected (not charged)', cls: 'num', k: 'rej' },
+        { h: 'Filling cost', cls: 'num', f: function (m) { return UI.lkr(m.cost); } }, { h: 'Paid', cls: 'num', f: function (m) { return UI.lkr(m.paid); } },
+        { h: 'Status', f: function (m) { return UI.statusBadge(m.cost - m.paid <= 0.01 ? 'Paid' : m.paid ? 'Part paid' : 'Unpaid'); } }],
+      rows: ms.slice().reverse()
+    });
+    UI.table('#pays', { columns: [{ h: 'Ref', k: 'id' }, { h: 'Date', f: function (p) { return D.dmy(p.date); } }, { h: 'Factory', f: function (p) { return UI.esc((Q.factory(p.factoryId) || {}).name || ''); } }, { h: 'For', k: 'period' }, { h: 'Method', f: function (p) { return UI.esc(p.mode) + ' ' + UI.esc(p.ref); } }, { h: 'Amount', cls: 'num', f: function (p) { return UI.money(p.amount); } }], rows: db.factoryPayments.slice().reverse(), empty: 'No payments yet.' });
+  }
+  var pb = UI.$('#pay');
+  if (pb) pb.addEventListener('click', function () {
+    var un = months().filter(function (m) { return m.cost - m.paid > 0.01; });
+    UI.modal({
+      title: 'Record factory payment',
+      body: '<div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="field full"><label>Factory and month</label><select name="fm">' + UI.options(un.map(function (m, i) { return { v: i, l: Q.factory(m.f).name + ' – ' + D.monthLabel(m.k) + ' – ' + UI.lkr(m.cost - m.paid) + ' due' }; }), 0) + '</select></div>' +
+        '<div class="field req"><label>Date</label>' + UI.dateInput('date', td) + '</div><div class="field req"><label>Amount (Rs.)</label><input name="amount" type="number" value="' + (un[0] ? (un[0].cost - un[0].paid).toFixed(2) : '') + '"></div>' +
+        '<div class="field req"><label>Method</label><select name="mode">' + UI.options(TW.PAY_MODES, 'Bank transfer') + '</select></div><div class="field"><label>Cheque no. / ref.</label><input name="ref"></div></div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Save', cls: 'primary', onClick: function (close, el) {
+        var sel = un[+UI.mval(el, 'fm')];
+        if (!sel) return UI.toast('Nothing is owed to the factories', 'warn'), false;
+        if (UI.result(TW.Ops.factoryPayment({ factoryId: sel.f, date: D.fromDmy(UI.mval(el, 'date')), amount: UI.mval(el, 'amount'), mode: UI.mval(el, 'mode'), ref: UI.mval(el, 'ref'), period: D.monthLabel(sel.k) }), 'Payment recorded')) { close(); refresh(); }
+        return false;
+      } }]
+    });
+  });
+  var sb = UI.$('#send'); if (sb) sb.addEventListener('click', send);
+  var rb = UI.$('#recv'); if (rb) rb.addEventListener('click', function () { receive(); });
+  function refresh() { kpis(); batches(); payments(); }
+  UI.tabs('#tabs', [{ id: 'batches', label: 'Batches' }, { id: 'payments', label: 'Factory payments' }]);
+  refresh();
+});
+</script>
+</body>
+</html>

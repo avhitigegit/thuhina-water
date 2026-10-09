@@ -1,0 +1,125 @@
+<!doctype html>
+<!-- BRD: FR-42 (daily delivery list from delivery day and cycle), FR-43 (address, phone, bottles held, usual qty, empties left, bottles owed, money outstanding),
+     FR-44 (print the list), FR-45 (filled bottles needed for coming days), FR-46 (next date moves forward after entry). Roles: Admin, Delivery Staff. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delivery Schedule · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="delivery/delivery-schedule">
+<main id="app">
+  <div class="page-actions"><button class="btn primary" id="print">Print delivery sheet</button></div>
+  <div id="tabs"></div>
+  <div data-pane="day">
+    <div class="card">
+      <div class="toolbar" style="margin:0">
+        <button class="btn" id="prev">‹</button>
+        <div class="field"><label>Date</label><input id="date" class="date" maxlength="10"></div>
+        <button class="btn" id="next">›</button>
+        <button class="btn" id="today">Today</button>
+        <div class="field"><label>Area</label><select id="area"><option value="">All areas</option></select></div>
+      </div>
+    </div>
+    <div class="kpis" id="kpis"></div>
+    <div class="card"><div class="card-head"><h2 id="title"></h2><span id="enter"></span></div><div id="list"></div></div>
+  </div>
+  <div data-pane="need" class="card">
+    <h2>Filled bottles needed – next 14 days</h2>
+    <div id="advice"></div>
+    <div id="chart" style="margin:10px 0"></div>
+    <div id="need"></div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today();
+  var canEnter = App.can('sales/enter-bills') === 'full';
+  var bal = Q.balances();
+  UI.$('#area').innerHTML += UI.options(db.areas);
+  UI.$('#date').value = D.dmy(UI.params().date || td);
+  function cur() { return D.fromDmy(UI.$('#date').value) || td; }
+  function usual(c) { return Q.activeBottles().filter(function (b) { return c.usual[b.id]; }).map(function (b) { return c.usual[b.id] + '×' + b.litres + 'L'; }).join(' '); }
+  function held(c) { return Q.activeBottles().filter(function (b) { return c.held[b.id]; }).map(function (b) { return c.held[b.id] + '×' + b.litres + 'L'; }).join(' '); }
+  function list() {
+    var d = cur(), area = UI.$('#area').value;
+    return Q.dueList(d).filter(function (x) { return !area || x.cust.area === area; });
+  }
+  function day() {
+    var d = cur(), l = list(), need = {};
+    l.forEach(function (x) { Q.activeBottles().forEach(function (b) { need[b.id] = (need[b.id] || 0) + (x.cust.usual[b.id] || 0); }); });
+    UI.$('#title').textContent = D.dayName(d) + ' ' + D.dmy(d) + ' – ' + l.length + ' customers';
+    UI.$('#enter').innerHTML = canEnter && d <= td ? '<a class="btn sm" href="' + App.url('sales/enter-bills') + '">Enter bills</a>' : '';
+    UI.$('#kpis').innerHTML = '<div class="kpi"><div class="label">Customers</div><div class="value">' + l.length + '</div><div class="hint">' + l.filter(function (x) { return x.entered.length; }).length + ' done · ' + l.filter(function (x) { return x.overdue; }).length + ' overdue</div></div>' +
+      Q.activeBottles().map(function (b) { return '<div class="kpi"><div class="label">Load ' + b.litres + 'L filled</div><div class="value">' + (need[b.id] || 0) + '</div></div>'; }).join('') +
+      '<div class="kpi"><div class="label">Empties to collect</div><div class="value">' + UI.sum(l, function (x) { return Q.sumBt(x.cust.toCollect); }) + '</div></div>' +
+      '<div class="kpi"><div class="label">Money to collect</div><div class="value">' + UI.lkr(UI.sum(l, function (x) { return Math.max(0, bal[x.cust.id] || 0); })) + '</div></div>';
+    UI.table('#list', {
+      columns: [
+        { h: 'Customer', f: function (x) { return '<b>' + UI.esc(x.cust.name) + '</b><div class="small muted">' + UI.esc(x.cust.address) + ', ' + UI.esc(x.cust.area) + '</div>' + (x.cust.notes ? '<div class="small">' + UI.esc(x.cust.notes) + '</div>' : ''); } },
+        { h: 'Phone', f: function (x) { return '<span class="nowrap">' + UI.esc(x.cust.phone) + '</span>'; } },
+        { h: 'Pays', f: function (x) { return UI.statusBadge(x.cust.payType); } },
+        { h: 'Bottles held', cls: 'num', f: function (x) { return held(x.cust) || UI.badge('New – deposit', 'info'); } },
+        { h: 'Usual', cls: 'num', f: function (x) { return '<b>' + usual(x.cust) + '</b>'; } },
+        { h: 'Empties to collect', cls: 'num', f: function (x) { var n = Q.sumBt(x.cust.toCollect); return n ? UI.badge(n, 'warn') : ''; } },
+        { h: 'Owed', cls: 'num', f: function (x) { var n = Q.sumBt(x.cust.owed); return n ? UI.badge(n, 'bad') : ''; } },
+        { h: 'Balance', cls: 'num', f: function (x) { var b = bal[x.cust.id] || 0; return b > 0 ? UI.lkr(b) : ''; } },
+        { h: 'Status', f: function (x) { return x.entered.length ? UI.statusBadge('Entered') + '<div class="small muted">bill ' + x.entered.map(function (t) { return UI.esc(t.billNo); }).join(', ') + ' · next ' + D.dmy(x.cust.nextDelivery) + '</div>' : x.overdue ? UI.badge('Missed ' + D.dmy(x.cust.nextDelivery), 'bad') : UI.statusBadge('Due'); } }
+      ].concat(canEnter ? [{ h: '', cls: 'actions', f: function (x) { return x.entered.length || d > td ? '' : '<a class="btn sm" href="' + App.url('sales/enter-bills', { cust: x.cust.id }) + '">Enter bill</a>'; } }] : []),
+      rows: l, rowClass: function (x) { return x.entered.length ? 'row-ok' : x.overdue ? 'row-bad' : ''; }, empty: 'No customers due on this day.'
+    });
+  }
+  function shift(n) { UI.$('#date').value = D.dmy(D.add(cur(), n)); day(); }
+  UI.$('#prev').addEventListener('click', function () { shift(-1); });
+  UI.$('#next').addEventListener('click', function () { shift(1); });
+  UI.$('#today').addEventListener('click', function () { UI.$('#date').value = D.dmy(td); day(); });
+  UI.$('#date').addEventListener('change', day);
+  UI.$('#area').addEventListener('change', day);
+
+  /* Print sheet (FR-44) */
+  UI.$('#print').addEventListener('click', function () {
+    var d = cur(), l = list().slice().sort(function (a, b) { return a.cust.area < b.cust.area ? -1 : a.cust.area > b.cust.area ? 1 : a.cust.name < b.cust.name ? -1 : 1; });
+    var drv = App.role === 'Delivery Staff' ? TW.currentUser().name : '';
+    var last = null, n = 0;
+    var rows = l.map(function (x) {
+      var c = x.cust, h = '';
+      if (c.area !== last) { h += '<tr><td colspan="13" style="background:#eef4f7;font-weight:600">' + UI.esc(c.area) + '</td></tr>'; last = c.area; }
+      return h + '<tr><td>' + (++n) + '</td><td><b>' + UI.esc(c.name) + '</b>' + (x.overdue ? ' (missed ' + D.dmy(c.nextDelivery) + ')' : '') + '<br>' + UI.esc(c.address) + '</td><td class="nowrap">' + UI.esc(c.phone) + '</td><td>' + c.payType + '</td><td>' + (held(c) || 'NEW') + '</td><td><b>' + usual(c) + '</b></td><td class="num">' + (Q.sumBt(c.toCollect) || '') + '</td><td class="num">' + (Q.sumBt(c.owed) || '') + '</td><td class="num">' + ((bal[c.id] || 0) > 0 ? UI.num(Math.round(bal[c.id])) : '') + '</td><td></td><td></td><td></td><td style="min-width:120px"></td></tr>';
+    }).join('');
+    UI.printDoc('Delivery sheet ' + D.dmy(d), '<div class="doc" style="max-width:none">' + UI.docHead('DELIVERY SHEET', '<div><b>' + D.dayName(d) + ' ' + D.dmy(d) + '</b></div><div>Driver: ' + UI.esc(drv || '________________') + '</div><div>' + l.length + ' customers</div>') +
+      '<table style="font-size:12px"><thead><tr><th>#</th><th>Customer / address</th><th>Phone</th><th>Pays</th><th>Held</th><th>Usual</th><th>Collect</th><th>Owed</th><th>Balance</th><th>Bill no.</th><th>Filled</th><th>Empties</th><th>Cash / note</th></tr></thead><tbody>' + (rows || '<tr><td colspan="13">No customers due.</td></tr>') + '</tbody></table>' +
+      '<p class="small muted" style="margin-top:8px">Not home? Phone the customer and leave the bottles only if they agree – write a note. Fewer empties for any other reason – write the reason.</p><div class="sig-row"><div>Driver</div><div>Checked by</div></div></div>', true);
+  });
+
+  /* Upcoming requirement (FR-45) */
+  function need() {
+    var bt = 'B20', s = db.stock[bt], rows = [], cum = 0;
+    for (var i = 0; i < 14; i++) {
+      var d = D.add(td, i), due = Q.dueList(d).filter(function (x) { return !x.entered.length; });
+      var n = UI.sum(due, function (x) { return x.cust.usual[bt] || 0; });
+      cum += n;
+      rows.push({ d: d, c: due.length, n: n, cum: cum, left: s.filled - cum, all: s.filled + s.factory - cum });
+    }
+    var out = rows.filter(function (r) { return r.all < 0; })[0];
+    UI.$('#advice').innerHTML = '<p>20L stock now: <b>' + s.filled + '</b> filled in store, <b>' + s.factory + '</b> at the factory, <b>' + s.empty + '</b> empties in store.</p>' +
+      (out ? '<div class="banner bad">Filled bottles run out on <b>' + D.dayName(out.d) + ' ' + D.dmy(out.d) + '</b>. Send more empties to the factory before then.</div>' : '<div class="banner ok">Enough filled bottles for the next 14 days of usual deliveries.</div>');
+    UI.bars(UI.$('#chart'), rows.map(function (r) { return { label: D.dayName(r.d).slice(0, 2) + ' ' + r.d.slice(8), value: r.n, title: D.dmy(r.d) + ': ' + r.n + ' bottles' }; }));
+    UI.table('#need', {
+      columns: [{ h: 'Date', f: function (r) { return D.dayName(r.d) + ' ' + D.dmy(r.d); } }, { h: 'Customers', cls: 'num', k: 'c' }, { h: '20L needed', cls: 'num', f: function (r) { return '<b>' + r.n + '</b>'; } }, { h: 'Running total', cls: 'num', k: 'cum' },
+        { h: 'Filled left', cls: 'num', f: function (r) { return r.left < 0 ? '<b style="color:var(--bad)">' + r.left + '</b>' : r.left; } }, { h: '…plus at factory', cls: 'num', f: function (r) { return r.all < 0 ? '<b style="color:var(--bad)">' + r.all + '</b>' : r.all; } }],
+      rows: rows
+    });
+  }
+  var tabs = [{ id: 'day', label: 'Daily list' }];
+  if (App.role !== 'Delivery Staff') tabs.push({ id: 'need', label: 'Upcoming bottle requirement' });
+  UI.tabs('#tabs', tabs);
+  day(); if (App.role !== 'Delivery Staff') need();
+});
+</script>
+</body>
+</html>

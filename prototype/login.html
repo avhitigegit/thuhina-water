@@ -1,0 +1,71 @@
+<!doctype html>
+<!-- BRD: FR-56 (log in with username and password, access limited by role), NFR-05 (role-based access).
+     Prototype only: no real authentication – any non-empty password is accepted. No public signup. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Log in · Thuhina Water</title>
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body data-page="login">
+<div class="login-page">
+  <div class="login-card">
+    <div class="logo">T</div>
+    <h1 style="margin-bottom:2px">Thuhina Water</h1>
+    <p class="muted">Inventory &amp; Sales Management System</p>
+    <form id="login-form" autocomplete="off" novalidate>
+      <div class="field" style="margin-bottom:10px">
+        <label for="username">Username</label>
+        <input id="username" name="username" placeholder="e.g. nimal.admin" autofocus>
+      </div>
+      <div class="field" style="margin-bottom:10px">
+        <label for="password">Password</label>
+        <input id="password" name="password" type="password" placeholder="Any password works in the prototype">
+      </div>
+      <div id="login-error" class="banner bad hidden"></div>
+      <button class="btn primary" style="width:100%;justify-content:center;padding:9px" type="submit">Log in</button>
+    </form>
+    <p class="small muted" style="margin:12px 0 4px">There is no public signup. Users are created by the Admin under <b>Administration › Users</b>.</p>
+    <hr style="border:0;border-top:1px solid var(--border);margin:14px 0">
+    <div class="small" style="font-weight:600;margin-bottom:4px">Demo users (click to fill)</div>
+    <div class="demo-users" id="demo-users"></div>
+    <p class="small muted" style="margin-top:12px"><a href="index.html">Sitemap of all screens →</a></p>
+  </div>
+</div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/layout.js"></script>
+<script>
+(function () {
+  var params = UI.params();
+  var demo = UI.$('#demo-users');
+  TW.db.users.filter(function (u) { return u.active; }).forEach(function (u) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn';
+    b.innerHTML = '<b>' + UI.esc(u.username) + '</b>&nbsp;<span class="muted">– ' + UI.esc(u.name) + ' (' + UI.esc(u.role) + ')</span>';
+    b.addEventListener('click', function () { UI.$('#username').value = u.username; UI.$('#password').value = 'demo1234'; UI.$('#password').focus(); });
+    demo.appendChild(b);
+  });
+  UI.$('#login-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var err = UI.$('#login-error');
+    var un = UI.$('#username').value.trim().toLowerCase(), pw = UI.$('#password').value;
+    var u = TW.db.users.filter(function (x) { return x.username === un; })[0];
+    var msg = '';
+    if (!un || !pw) msg = 'Enter your username and password.';
+    else if (!u) msg = 'Unknown username. Ask the Admin to create your account.';
+    else if (!u.active) msg = 'This account is deactivated. Contact the Admin.';
+    if (msg) { err.textContent = msg; err.classList.remove('hidden'); return; }
+    TW.setSession({ userId: u.id, role: u.role });
+    u.lastLogin = TW.today();
+    TW.Ops.logEvent('Login', 'Session', u.username, 'Signed in');
+    var next = params.next && App.findItem(params.next) && App.access(App.findItem(params.next).item, u.role) ? params.next : App.HOME[u.role];
+    location.href = App.url(next);
+  });
+})();
+</script>
+</body>
+</html>

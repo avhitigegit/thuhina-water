@@ -1,0 +1,269 @@
+<!doctype html>
+<!-- Client request 08/10/2026: customer quotations, like supplier quotations but going out – for government offices, medium-size
+     factories and other organisations that ask for a price before they buy. A quotation goes to an existing customer or to a new
+     organisation; lines are water per bottle type, bottle deposits, products (dispensers, stands, pumps) or free text. Unit prices
+     start at the price the customer pays now (agreed price, or the standard price for the customer type) and can be changed.
+     When a quotation is accepted its water prices become the customer's agreed prices (FR-05), at registration or with "Apply prices".
+     Flow: Draft → Sent (email / by hand / post / WhatsApp) → Accepted or Not accepted; a sent quotation past its date shows Expired.
+     Print / PDF and email. An accepted quotation to a new organisation can be registered as a customer in one click.
+     Admin: full. Accountant: view only. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Customer Quotations · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="sales/quotations">
+<main id="app">
+  <div class="page-actions write-only">
+    <button class="btn primary" id="add">+ New quotation</button>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="card">
+    <div class="toolbar">
+      <div class="field grow"><label>Search</label><input id="q" placeholder="Quotation no., organisation, contact or subject"></div>
+      <div class="field"><label>Status</label><select id="st"><option value="">All</option></select></div>
+    </div>
+    <div id="list"></div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today();
+  var canEdit = !App.viewOnly;
+  var SHOWN = ['Draft', 'Sent', 'Expired', 'Accepted', 'Rejected'];
+  var LABEL = { Rejected: 'Not accepted' };
+  var stLabel = function (s) { return LABEL[s] || s; };
+  var badge = function (q) { var s = Q.cquoteStatus(q); return UI.statusBadge(s).replace('>' + s + '<', '>' + stLabel(s) + '<'); };
+  UI.$('#st').innerHTML += UI.options(SHOWN.map(function (s) { return { v: s, l: stLabel(s) }; }));
+
+  /* ---------- items that can be quoted ---------- */
+  function itemOpts() {
+    var o = [];
+    Q.activeBottles().forEach(function (b) { o.push({ v: 'water|' + b.id, l: b.litres + 'L water (refill, delivered)' }); });
+    Q.activeBottles().forEach(function (b) { o.push({ v: 'deposit|' + b.id, l: b.litres + 'L bottle deposit' }); });
+    db.products.filter(function (p) { return p.active; }).forEach(function (p) { o.push({ v: p.id, l: p.name }); });
+    o.push({ v: 'other', l: 'Other (type a description)' });
+    return o;
+  }
+  /* Price now, description and unit for an item. For water: the existing customer's price (agreed or standard),
+     otherwise the standard price for the customer type. */
+  function itemInfo(item, type, cust) {
+    var p = item.split('|');
+    if (p[0] === 'water') return { desc: Q.btName(p[1]) + ' – drinking water (refill, delivered)', unit: 'per month', std: cust ? Q.price(cust, p[1]) : Q.stdPrice(p[1], type), agreed: !!cust && Q.isAgreed(cust, p[1]) };
+    if (p[0] === 'deposit') return { desc: Q.btName(p[1]) + ' – bottle deposit (one time)', unit: 'bottles', std: Q.deposit(p[1]) };
+    var pr = Q.product(item);
+    if (pr) return { desc: pr.name, unit: 'units', std: pr.price };
+    return { desc: '', unit: '', std: null };
+  }
+
+  /* ---------- list ---------- */
+  function render() {
+    var s = UI.$('#st').value, t = UI.$('#q').value.trim().toLowerCase();
+    var open = db.cquotes.filter(function (q) { return Q.cquoteStatus(q) === 'Sent'; }), acc = db.cquotes.filter(function (q) { return q.status === 'Accepted'; });
+    UI.$('#kpis').innerHTML = '<div class="kpi"><div class="label">Waiting for an answer</div><div class="value">' + open.length + '</div><div class="hint">' + UI.lkr(UI.sum(open, Q.cquoteTotal)) + '</div></div>' +
+      '<div class="kpi"><div class="label">Drafts</div><div class="value">' + db.cquotes.filter(function (q) { return q.status === 'Draft'; }).length + '</div></div>' +
+      '<div class="kpi"><div class="label">Accepted</div><div class="value">' + acc.length + '</div><div class="hint">' + UI.lkr(UI.sum(acc, Q.cquoteTotal)) + '</div></div>' +
+      '<div class="kpi"><div class="label">Expired / not accepted</div><div class="value">' + db.cquotes.filter(function (q) { var x = Q.cquoteStatus(q); return x === 'Expired' || x === 'Rejected'; }).length + '</div></div>';
+    var rows = db.cquotes.filter(function (q) {
+      return (!s || Q.cquoteStatus(q) === s) && (!t || (q.id + ' ' + q.org + ' ' + q.contact + ' ' + q.subject).toLowerCase().indexOf(t) >= 0);
+    }).slice().reverse();
+    UI.table('#list', {
+      columns: [
+        { h: 'Quotation', f: function (q) { return '<b class="mono">' + q.id + '</b><div class="small muted">' + D.dmy(q.date) + '</div>'; } },
+        { h: 'To', f: function (q) { return '<b>' + UI.esc(q.org) + '</b>' + (q.custId ? ' ' + UI.badge(q.custId, 'info') : ' ' + UI.badge('New')) + '<div class="small muted">' + UI.esc(q.contact) + (q.designation ? ', ' + UI.esc(q.designation) : '') + '</div>'; } },
+        { h: 'Subject', f: function (q) { return UI.esc(q.subject || '–') + '<div class="small muted">' + q.lines.length + ' line' + (q.lines.length > 1 ? 's' : '') + ' · ' + UI.esc(q.custType) + ' prices</div>'; } },
+        { h: 'Total', cls: 'num', f: function (q) { return UI.lkr(Q.cquoteTotal(q)); } },
+        { h: 'Valid until', f: function (q) { return D.dmy(q.validUntil); } },
+        { h: 'Status', f: function (q) { return badge(q) + (q.sentVia && q.status === 'Sent' ? '<div class="small muted">' + UI.esc(Q.viaText(q.sentVia)) + '</div>' : ''); } },
+        { h: 'Next step', f: function (q) { var s = Q.cquoteStatus(q); return '<span class="small">' + ({ Draft: 'Send to the customer', Sent: 'Record the answer', Expired: 'Record the answer or make a new copy', Accepted: !q.custId ? 'Register as customer' : !q.pricesApplied && q.lines.some(function (l) { return /^water\|/.test(l.item); }) ? 'Apply prices to customer' : '–' }[s] || '–') + '</span>'; } },
+        { h: '', cls: 'actions', f: function (q) { return '<button class="btn sm primary" data-open="' + q.id + '">Open</button>'; } }
+      ],
+      rows: rows, empty: 'No quotations match.'
+    });
+  }
+  UI.$('#list').addEventListener('click', function (e) { var id = e.target.getAttribute('data-open'); if (id) openQ(id); });
+
+  /* ---------- view one quotation ---------- */
+  function openQ(id) {
+    var q = Q.cquote(id), s = Q.cquoteStatus(q);
+    var STEPS = ['Draft', 'Sent', q.status === 'Rejected' ? 'Not accepted' : 'Accepted'];
+    var cur = q.status === 'Draft' ? 0 : q.status === 'Sent' ? 1 : 2;
+    var h = '<div class="steps-bar">' + STEPS.map(function (x, i) { return '<span class="' + (i < cur || i === 2 && cur === 2 ? 'done' : i === cur ? 'now' : '') + '">' + (i + 1) + '. ' + x + '</span>'; }).join('') + '</div>';
+    if (s === 'Expired') h += '<div class="banner warn">Valid until ' + D.dmy(q.validUntil) + ' – this quotation has expired. Record the answer, or make a copy with new dates.</div>';
+    if (q.status === 'Rejected') h += '<div class="banner bad">Not accepted: ' + UI.esc(q.rejectReason) + '</div>';
+    if (q.status === 'Accepted') h += '<div class="banner ok">Accepted on ' + D.dmy(q.acceptedOn) + '.' + (q.custId ? ' Customer ' + App.link('master-data/customers', { id: q.custId }, q.custId + ' – ' + UI.esc(Q.customer(q.custId).name)) + '.' + (q.pricesApplied ? ' Water prices applied as agreed prices from ' + D.dmy(q.pricesApplied) + '.' : ' <b>Quoted water prices are not applied to the customer yet.</b>') : ' Not yet registered as a customer – registering applies the quoted water prices.') + '</div>';
+    h += '<div class="summary" style="margin-bottom:10px"><span class="muted">To</span><b>' + UI.esc(q.org) + (q.custId ? ' (' + q.custId + ')' : '') + '</b>' +
+      '<span class="muted">Contact</span><b>' + UI.esc([q.contact, q.designation].filter(Boolean).join(', ') || '–') + '</b>' +
+      '<span class="muted">Address</span><b>' + UI.esc(q.address || '–') + '</b>' +
+      '<span class="muted">Phone / email</span><b>' + UI.esc([q.phone, q.email].filter(Boolean).join(' · ') || '–') + '</b>' +
+      '<span class="muted">Subject</span><b>' + UI.esc(q.subject || '–') + '</b>' +
+      '<span class="muted">Date · valid until</span><b>' + D.dmy(q.date) + ' · ' + D.dmy(q.validUntil) + '</b>' +
+      '<span class="muted">Delivery</span><b>' + UI.esc(q.delivery || '–') + '</b>' +
+      '<span class="muted">Payment terms</span><b>' + Q.termsLabel(q.terms) + '</b>' +
+      '<span class="muted">Status</span><b>' + badge(q) + (q.sentVia ? ' <span class="small muted">sent ' + D.dmy(q.sentOn) + ' ' + UI.esc(Q.viaText(q.sentVia)) + '</span>' : '') + '</b></div>';
+    h += linesTable(q, true);
+    h += '<div class="section-title">History</div><div class="small">' + q.history.map(function (x) { return D.dmyt(x.ts) + ' – ' + UI.esc(stLabel(x.status)) + ' by ' + UI.esc(x.user) + (x.note ? ' (' + UI.esc(x.note) + ')' : ''); }).join('<br>') + '</div>';
+
+    var btns = [{ label: 'Print / PDF', onClick: function () { printQ(q); return false; } }];
+    if (q.email) btns.push({ label: 'Email', onClick: function () { emailQ(q); return false; } });
+    if (canEdit) {
+      btns.push({ label: 'Make a copy', onClick: function (close) { close(); edit(q, true); } });
+      if (q.status === 'Draft') {
+        btns.push({ label: 'Edit', onClick: function (close) { close(); edit(q); } });
+        btns.push({ label: 'Next: Mark as sent', cls: 'primary', onClick: function (close) { close(); markSent(q); } });
+      }
+      if (q.status === 'Sent') {
+        btns.push({ label: 'Not accepted', cls: 'danger', onClick: function (close) { close(); UI.prompt(q.id + ' not accepted', 'Reason (e.g. price too high, chose another supplier):', 'Save', 'danger').then(function (r) { if (r && UI.result(TW.Ops.setCQuoteStatus(q.id, 'Rejected', { note: r }), 'Marked as not accepted')) render(); openQ(q.id); }); } });
+        btns.push({ label: 'Next: Accepted', cls: 'primary', onClick: function (close) { if (UI.result(TW.Ops.setCQuoteStatus(q.id, 'Accepted'), 'Quotation accepted')) { close(); render(); openQ(q.id); } } });
+      }
+      if (q.status === 'Accepted' && q.custId && !q.pricesApplied && q.lines.some(function (l) { return /^water\|/.test(l.item); })) btns.push({ label: 'Apply prices to customer', cls: 'primary', onClick: function (close) {
+        UI.confirm('Apply quoted prices?', '<p>The water prices in ' + q.id + ' become the agreed prices of <b>' + UI.esc(Q.customer(q.custId).name) + '</b> from today (' + D.dmy(td) + '). Bills already saved keep their price.</p>', 'Apply prices').then(function (y) {
+          if (y && UI.result(TW.Ops.applyCQuotePrices(q.id, td), 'Agreed prices updated')) { render(); }
+          openQ(q.id);
+        }); close(); } });
+      if (q.status === 'Accepted' && !q.custId && App.can('master-data/customers') === 'full') btns.push({ label: 'Register as customer', cls: 'primary', onClick: function () { App.go('master-data/customers', { fromQuote: q.id }); } });
+    }
+    btns.push({ label: 'Close' });
+    UI.modal({ title: 'Quotation ' + q.id, wide: true, body: h, buttons: btns });
+  }
+  function linesTable(q, showStd) {
+    return '<table><thead><tr><th>#</th><th>Description</th><th class="num">Qty</th><th>Unit</th><th class="num">Unit price</th><th class="num">Amount</th></tr></thead><tbody>' +
+      q.lines.map(function (l, i) { return '<tr><td>' + (i + 1) + '</td><td>' + UI.esc(l.desc) + '</td><td class="num">' + UI.num(l.qty) + '</td><td>' + UI.esc(l.unit) + '</td><td class="num">' + UI.num(l.price.toFixed(2)) + (showStd && l.std != null && l.price !== l.std ? '<div class="small muted">standard ' + UI.lkr(l.std) + '</div>' : '') + '</td><td class="num">' + UI.num((l.qty * l.price).toFixed(2)) + '</td></tr>'; }).join('') +
+      '</tbody><tfoot><tr><td colspan="5" class="num">Total</td><td class="num">' + UI.money(Q.cquoteTotal(q)) + '</td></tr></tfoot></table>';
+  }
+
+  /* ---------- send ---------- */
+  function markSent(q) {
+    UI.modal({
+      title: 'Mark ' + q.id + ' as sent',
+      body: '<div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="field req"><label>Sent by</label><select name="via">' + UI.options(TW.SENT_VIA, q.email ? 'Email' : 'By hand') + '</select></div><div class="field req"><label>Date sent</label>' + UI.dateInput('date', td) + '</div></div>' +
+        '<p class="small muted">Print it or save it as PDF first. For email, the Email button opens your email program with the message ready – attach the PDF.</p>',
+      buttons: [{ label: 'Cancel', onClick: function (close) { close(); openQ(q.id); } }, { label: 'Print / PDF', onClick: function () { printQ(q); return false; } }].concat(q.email ? [{ label: 'Email', onClick: function () { emailQ(q); return false; } }] : [])
+        .concat([{ label: 'Mark as sent', cls: 'primary', onClick: function (close, el) {
+          if (UI.result(TW.Ops.setCQuoteStatus(q.id, 'Sent', { via: UI.mval(el, 'via'), date: D.fromDmy(UI.mval(el, 'date')) }), 'Marked as sent')) { close(); render(); openQ(q.id); }
+          return false;
+        } }])
+    });
+  }
+  function emailQ(q) {
+    var co = db.settings.company;
+    var body = 'Dear ' + (q.contact || 'Sir/Madam') + ',\n\nPlease find attached our quotation ' + q.id + ' dated ' + D.dmy(q.date) + (q.subject ? ' for ' + q.subject : '') + '.\n\n' +
+      q.lines.map(function (l) { return '- ' + l.desc + ': ' + l.qty + ' ' + l.unit + ' × Rs. ' + UI.num(l.price.toFixed(2)) + ' = Rs. ' + UI.num((l.qty * l.price).toFixed(2)); }).join('\n') +
+      '\n\nTotal: ' + UI.money(Q.cquoteTotal(q)) + '\nValid until: ' + D.dmy(q.validUntil) + '\nPayment terms: ' + Q.termsLabel(q.terms) + '\n\nPlease contact us on ' + co.phone + ' for any questions.\n\nThank you,\n' + TW.currentUser().name + '\n' + co.name;
+    location.href = 'mailto:' + encodeURIComponent(q.email) + '?subject=' + encodeURIComponent('Quotation ' + q.id + ' – ' + co.name) + '&body=' + encodeURIComponent(body);
+  }
+  function printQ(q) {
+    var co = db.settings.company;
+    UI.printDoc(q.id, '<div class="doc">' + (q.status === 'Draft' ? '<div class="banner warn">DRAFT – not yet sent</div>' : '') +
+      UI.docHead('QUOTATION', '<div class="mono"><b>' + q.id + '</b></div><div>Date: ' + D.dmy(q.date) + '</div><div>Valid until: ' + D.dmy(q.validUntil) + '</div>') +
+      '<p><span class="muted">To</span><br>' + (q.contact ? UI.esc(q.contact) + (q.designation ? ', ' + UI.esc(q.designation) : '') + '<br>' : '') + '<b>' + UI.esc(q.org) + '</b><br>' + UI.esc(q.address) + (q.phone || q.email ? '<br>' + UI.esc([q.phone, q.email].filter(Boolean).join(' · ')) : '') + '</p>' +
+      (q.subject ? '<p><b>Subject: ' + UI.esc(q.subject) + '</b></p>' : '') +
+      '<p>Thank you for your enquiry. We are pleased to quote as follows:</p>' + linesTable(q, false) +
+      '<p style="margin-top:12px">' + (q.delivery ? '<b>Delivery:</b> ' + UI.esc(q.delivery) + '<br>' : '') + '<b>Payment terms:</b> ' + Q.termsLabel(q.terms) + '</p>' +
+      (q.conditions ? '<p><b>Terms and conditions</b></p><ol class="small">' + q.conditions.split('\n').filter(Boolean).map(function (x) { return '<li>' + UI.esc(x) + '</li>'; }).join('') + '</ol>' : '') +
+      '<p>We look forward to serving you. For any questions please call ' + UI.esc(co.phone) + '.</p>' +
+      '<div class="sig-row"><div>Prepared by<br>' + UI.esc(q.user) + '</div><div>Authorised signature<br>' + UI.esc(co.name) + '</div><div>Customer acceptance<br>(signature &amp; date)</div></div></div>');
+  }
+
+  /* ---------- new / edit / copy ---------- */
+  function edit(src, copy) {
+    var x = src && src.id && !copy ? src : null; // the quotation being edited (null = new or copy)
+    var f = src || {};
+    var line = function (l) {
+      l = l || {};
+      return '<tr><td><select name="item">' + UI.options(itemOpts(), l.item || '', { blank: 'Select item' }) + '</select></td><td><input name="desc" value="' + UI.esc(l.desc || '') + '" style="min-width:220px"></td>' +
+        '<td><input name="qty" type="number" min="1" value="' + (l.qty || '') + '" style="width:80px"></td><td><input name="unit" value="' + UI.esc(l.unit || '') + '" style="width:90px"></td>' +
+        '<td><input name="price" type="number" min="0" step="0.01" value="' + (l.price != null ? l.price : '') + '" style="width:110px"' + (l.std != null && l.price !== l.std ? ' data-touched="1"' : '') + '><div class="small muted" data-std></div></td>' +
+        '<td class="num" data-amt></td><td><button type="button" class="btn sm danger" data-del>×</button></td></tr>';
+    };
+    var exist = f.custId ? Q.customer(f.custId) : null;
+    var lines = (f.lines || [{ item: 'water|B20', qty: 40 }, { item: 'deposit|B20', qty: 10 }]).map(function (l) {
+      if (!l.item) return Object.assign({ item: 'other' }, l);
+      if (l.desc) return l;
+      var info = itemInfo(l.item, f.custType || 'Office', exist);
+      return { item: l.item, qty: l.qty, desc: info.desc, unit: info.unit, price: info.std, std: info.std };
+    });
+    var m = UI.modal({
+      title: x ? 'Edit quotation ' + x.id : copy ? 'New quotation – copy of ' + src.id : 'New quotation', wide: true,
+      body: '<div class="form-grid"><div class="field"><label>Quotation no.</label><input value="' + (x ? x.id : 'Generated on save') + '" readonly></div>' +
+        '<div class="field req"><label>Date</label>' + UI.dateInput('date', x ? x.date : td) + '</div><div class="field req"><label>Valid until</label>' + UI.dateInput('valid', x ? x.validUntil : D.add(td, 30)) + '</div>' +
+        '<div class="section-title full">To</div>' +
+        '<div class="field full"><div style="display:flex;gap:18px"><label class="check"><input type="radio" name="to" value="new"' + (exist ? '' : ' checked') + '> New organisation (government office, factory, hotel…)</label><label class="check"><input type="radio" name="to" value="cust"' + (exist ? ' checked' : '') + '> Existing customer</label></div></div>' +
+        '<div class="field req span2 to-cust"><label>Customer</label><input name="cust" list="cq-cust" value="' + (exist ? UI.esc(UI.custLabel(exist)) : '') + '" placeholder="Code, name or phone">' + UI.custDatalist('cq-cust') + '</div>' +
+        '<div class="field req span2 to-new"><label>Organisation / name</label><input name="org" value="' + UI.esc(exist ? '' : f.org || '') + '" placeholder="e.g. Divisional Secretariat – Maharagama"></div>' +
+        '<div class="field req"><label>Customer type (for prices)</label><select name="ctype">' + UI.options(db.customerTypes.filter(function (t) { return t.active; }).map(function (t) { return t.id; }), f.custType || 'Office') + '</select></div>' +
+        '<div class="field"><label>Contact person</label><input name="contact" value="' + UI.esc(f.contact || '') + '"></div><div class="field"><label>Designation</label><input name="designation" value="' + UI.esc(f.designation || '') + '" placeholder="e.g. Administrative Officer"></div>' +
+        '<div class="field"><label>Email</label><input name="email" type="email" value="' + UI.esc(f.email || '') + '"></div>' +
+        '<div class="field span2 to-new"><label>Address</label><input name="address" value="' + UI.esc(exist ? '' : f.address || '') + '"></div>' +
+        '<div class="field to-new"><label>Area</label><select name="area">' + UI.options(db.areas, exist ? '' : f.area || '', { blank: 'Outside our areas / not known' }) + '</select></div>' +
+        '<div class="field to-new"><label>Phone</label><input name="phone" value="' + UI.esc(exist ? '' : f.phone || '') + '" placeholder="011 234 5678"></div>' +
+        '<div class="section-title full">Quotation</div>' +
+        '<div class="field full"><label>Subject</label><input name="subject" value="' + UI.esc(f.subject || '') + '" placeholder="e.g. Supply of drinking water – 20L bottles, monthly (tender ref. …)"></div></div>' +
+        '<div class="table-wrap"><table><thead><tr><th>Item</th><th>Description (printed)</th><th>Qty</th><th>Unit</th><th>Unit price (Rs.)</th><th class="num">Amount</th><th></th></tr></thead><tbody id="cq-lines">' + lines.map(line).join('') + '</tbody>' +
+        '<tfoot><tr><td colspan="5" class="num">Total</td><td class="num" id="cq-tot"></td><td></td></tr></tfoot></table></div><button type="button" class="btn sm" id="cq-add" style="margin-top:6px">+ Add line</button>' +
+        '<div class="form-grid" style="margin-top:12px"><div class="field span2"><label>Delivery</label><input name="delivery" value="' + UI.esc(f.delivery || '') + '" placeholder="e.g. Every Monday, about 10 bottles a week"></div>' +
+        '<div class="field"><label>Payment terms</label><select name="terms">' + UI.options(TW.TERMS, f.terms != null ? f.terms : 30) + '</select></div>' +
+        '<div class="field full"><label>Terms and conditions (one per line)</label><textarea name="conditions" rows="4">' + UI.esc(f.conditions != null ? f.conditions : TW_DATA.quoteConditions) + '</textarea></div></div>' +
+        '<p class="small muted" id="cq-note"></p>',
+      buttons: [{ label: 'Cancel' }, { label: x ? 'Save' : 'Save as draft', cls: 'primary', onClick: function (close, el) {
+        var to = el.querySelector('[name=to]:checked').value, c = to === 'cust' ? UI.findCustomer(UI.mval(el, 'cust')) : null;
+        if (to === 'cust' && !c) return UI.toast('Select the customer from the list', 'bad'), false;
+        var r = TW.Ops.saveCQuote({ id: x && x.id, copyOf: copy ? src.id : '', custId: c ? c.id : '', org: UI.mval(el, 'org'), contact: UI.mval(el, 'contact'), designation: UI.mval(el, 'designation'), address: UI.mval(el, 'address'), area: UI.mval(el, 'area'), phone: UI.mval(el, 'phone'), email: UI.mval(el, 'email').trim(),
+          custType: UI.mval(el, 'ctype'), date: D.fromDmy(UI.mval(el, 'date')), validUntil: D.fromDmy(UI.mval(el, 'valid')), subject: UI.mval(el, 'subject'), delivery: UI.mval(el, 'delivery'), terms: UI.mval(el, 'terms'), conditions: UI.mval(el, 'conditions'), lines: readLines() }, !x);
+        if (UI.result(r, x ? 'Quotation saved' : r.quote.id + ' saved as Draft')) { close(); render(); openQ(r.quote.id); }
+        return false;
+      } }]
+    });
+    var tb = m.el.querySelector('#cq-lines');
+    function curCust() { return m.el.querySelector('[name=to]:checked').value === 'cust' ? UI.findCustomer(UI.mval(m.el, 'cust')) : null; }
+    function readLines() {
+      return UI.$$('tr', tb).map(function (tr) {
+        var g = function (n) { return tr.querySelector('[name=' + n + ']').value; }, item = g('item');
+        return { item: item === 'other' ? '' : item, desc: g('desc'), qty: g('qty'), unit: g('unit'), price: g('price'), std: item && item !== 'other' ? itemInfo(item, UI.mval(m.el, 'ctype'), curCust()).std : null };
+      });
+    }
+    function upd(e) {
+      var to = m.el.querySelector('[name=to]:checked').value, type = UI.mval(m.el, 'ctype');
+      UI.$$('.to-cust', m.el).forEach(function (n) { n.style.display = to === 'cust' ? '' : 'none'; });
+      UI.$$('.to-new', m.el).forEach(function (n) { n.style.display = to === 'cust' ? 'none' : ''; });
+      if (e && e.target.name === 'cust') { var c = UI.findCustomer(e.target.value); if (c) m.el.querySelector('[name=ctype]').value = type = c.type; }
+      var tot = 0, below = 0;
+      UI.$$('tr', tb).forEach(function (tr) {
+        var sel = tr.querySelector('[name=item]'), pr = tr.querySelector('[name=price]'), info = sel.value ? itemInfo(sel.value, type, curCust()) : { std: null };
+        if (e && e.target === sel) { // new item chosen: fill description, unit and the standard price
+          tr.querySelector('[name=desc]').value = info.desc; tr.querySelector('[name=unit]').value = info.unit; pr.removeAttribute('data-touched');
+          if (sel.value === 'other') tr.querySelector('[name=desc]').focus();
+        }
+        if (e && e.target === pr) pr.setAttribute('data-touched', '1');
+        if (!pr.hasAttribute('data-touched') && info.std != null) pr.value = info.std; // follows the customer type until changed by hand
+        var p = +pr.value || 0, q = +tr.querySelector('[name=qty]').value || 0;
+        tr.querySelector('[data-std]').innerHTML = info.std != null ? (p !== info.std ? '<span style="color:' + (p < info.std ? 'var(--warn)' : 'inherit') + '">' + (info.agreed ? 'agreed now ' : 'standard ') + UI.lkr(info.std) + '</span>' : info.agreed ? 'agreed price now' : 'standard price') : '';
+        if (info.std != null && p < info.std) below++;
+        tr.querySelector('[data-amt]').textContent = q && p ? UI.lkr(q * p) : '';
+        tot += q * p;
+      });
+      m.el.querySelector('#cq-tot').textContent = UI.money(tot);
+      m.el.querySelector('#cq-note').innerHTML = (curCust() ? 'Prices start at what ' + UI.esc(curCust().name) + ' pays now.' : 'Prices start at the standard ' + UI.esc(type) + ' price list.') + ' They can be changed for this quotation; when it is accepted, the water prices become the customer\'s agreed prices.' + (below ? ' <b>' + below + ' line' + (below > 1 ? 's are' : ' is') + ' below the current price.</b>' : '');
+    }
+    m.el.querySelector('#cq-add').addEventListener('click', function () { tb.insertAdjacentHTML('beforeend', line({})); upd(); });
+    m.el.addEventListener('click', function (e) { if (e.target.hasAttribute('data-del')) { e.target.closest('tr').remove(); upd(); } });
+    m.el.addEventListener('input', upd); m.el.addEventListener('change', upd); upd();
+  }
+
+  var ab = UI.$('#add'); if (ab) ab.addEventListener('click', function () { edit(null); });
+  UI.$('#q').addEventListener('input', render);
+  UI.$('#st').addEventListener('change', render);
+  render();
+  var p = UI.params();
+  if (p.id && Q.cquote(p.id)) openQ(p.id);
+  if (p['new'] && ab) edit(p.cust && Q.customer(p.cust) ? { custId: p.cust, custType: Q.customer(p.cust).type } : null);
+});
+</script>
+</body>
+</html>

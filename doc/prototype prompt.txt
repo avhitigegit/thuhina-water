@@ -1,0 +1,62 @@
+I have a Business Requirements Document (BRD) at BRD_Water_Distribution_System_v2.0_Final.pdf
+for the Water Distribution Inventory & Sales Management System. Please read it fully,
+including the business rules (BR-01 to BR-15), before starting.
+
+Build a static, clickable HTML/CSS/JS prototype (no backend, no database, no real
+authentication) covering every screen implied by the BRD.
+
+First, list the screens you plan to build, grouped by module, with the BRD requirement
+IDs each screen covers. Confirm with me before writing any code.
+
+Include a Login screen and a Dashboard as the landing page after login. There is no
+public signup: users are created by the Admin under Administration. Add a role switcher
+(Admin / Accountant / Delivery Staff) so I can show how the sidebar and access change
+for each role, as described in section 5 of the BRD.
+
+Build one screen per requirement/sub-module, using realistic Sri Lankan placeholder data
+(customer names, addresses, phone numbers, prices in LKR, dates in DD/MM/YYYY). Every
+screen must be clickable and reachable through a persistent sidebar covering all
+modules:
+  1. Dashboard
+  2. Master Data – bottle types, other products, customer types, pricing and deposits,
+     accepted old-bottle brands (American Water), price history
+  3. Customers – list, register/edit, customer profile (bottles held, empties to collect,
+     bottles owed, outstanding balance, history), delivery day and cycle, payment type
+  4. Purchasing – suppliers, quotation requests, record quotations, side-by-side
+     comparison with manual selection, create PO from quotation, PO list and status,
+     goods receipt against PO, supplier payments
+  5. Production (Filling Factory) – factory setup with charge per bottle, dispatch
+     empties, receive filled bottles and rejects, bottles at factory, factory payments
+  6. Inventory – stock by bottle type and status (Empty in store, At factory, Filled in
+     store, With customers, Written off), damage entry with responsibility (company or
+     customer), stock adjustments, low-stock alerts
+  7. Sales & Deliveries – first purchase (deposit + water, with old American Water bottle
+     intake), paper bill entry for scheduled exchanges designed for fast keyboard entry,
+     "Left at door" delivery with phone-confirmation and note, clearing empties collected
+     on the next trip, customer-damaged bottle, bottles owed, extra orders, product sales,
+     duplicate bill check
+  8. Delivery Schedule – daily delivery list (printable), upcoming bottle requirement
+     for factory planning
+  9. Billing & Payments – Cash, Credit and Monthly bill; monthly invoice generation,
+     receive payments (cash, bank transfer, cheque, part-payments), aging report,
+     customer statement and invoice (print/PDF view)
+  10. Data Migration – import customers and opening stock from Excel/CSV, with a
+      validation preview of rejected rows
+  11. Reports – sales, purchasing, production, stock, bottle movement, damage and
+      write-off, outstanding and aging, profit, delivery
+  12. Administration & Security – users and roles, audit log
+
+Make the forms behave believably with in-memory JavaScript only: for example, entering
+an exchange should update the shown bottle balances and totals on that screen. Show the
+bottle exchange logic correctly: filled given vs empties returned, empties to collect
+for "Left at door", and bottles owed for any other shortage.
+
+Organize the project into one folder per module, plus a shared /assets folder for common
+styling, layout, sidebar and placeholder data. Create an index.html at the root as a
+sitemap linking to every screen, grouped by module, with the BRD requirement IDs shown
+beside each link.
+
+Add a short comment at the top of each screen noting which BRD requirement ID(s) it covers.
+
+When done, tell me exactly which file to open first, and list any BRD requirements that
+are not covered by a screen.

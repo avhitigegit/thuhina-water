@@ -1,0 +1,133 @@
+<!doctype html>
+<!-- BRD: FR-53 (import customers incl. payment type, bottles held, empties to collect, bottles owed, money outstanding; optional agreed price per bottle – FR-05),
+     FR-54 (import opening stock by bottle type and status), FR-55 (validate and show rejected rows before confirming). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data Migration · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="migration/data-migration">
+<main id="app">
+  <div id="tabs"></div>
+  <div data-pane="customers" class="card">
+    <h2>Import customers</h2>
+    <p class="small muted">Steps: 1) choose the file → 2) check the preview → 3) confirm. Rows with problems are listed with the reason and are not imported.</p>
+    <div class="toolbar"><div class="field"><label>Customer file (CSV)</label><input type="file" id="c-file" accept=".csv,.xlsx,.xls"></div><button class="btn" id="c-sample">Use sample file</button><span style="flex:1"></span><button class="btn" id="c-tpl">Download template</button></div>
+    <div id="c-out"></div>
+  </div>
+  <div data-pane="stock" class="card">
+    <h2>Import opening stock</h2>
+    <p class="small muted">Sets store and factory quantities. Bottles with customers come from the customer import.</p>
+    <div class="toolbar"><div class="field"><label>Stock file (CSV)</label><input type="file" id="s-file" accept=".csv,.xlsx,.xls"></div><button class="btn" id="s-sample">Use sample file</button><span style="flex:1"></span><button class="btn" id="s-tpl">Download template</button></div>
+    <div id="s-out"></div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script src="../assets/js/csv.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D;
+
+  /* ---------- Customers (FR-53, FR-55) ---------- */
+  var CH = ['Name', 'Address', 'Area', 'Phone', 'Customer type', 'Delivery day', 'Cycle (weeks)', 'Next delivery', 'Usual 20L', 'Usual 10L', 'Payment type', 'Credit limit', 'Terms (days)', 'Bottles held 20L', 'Bottles held 10L', 'Empties to collect 20L', 'Bottles owed 20L', 'Outstanding (Rs.)'];
+  // Optional columns: an agreed price per bottle for customers who do not pay the standard price (FR-05). Blank = standard.
+  var OPT = ['Agreed price 20L', 'Agreed price 10L'];
+  var CS = [CH.concat(OPT),
+    ['Lalith Gunasekara', '14, Wijerama Road', 'Nugegoda', '077 314 5590', 'Household', 'Monday', '1', '05/10/2026', '2', '0', 'Cash', '', '', '2', '0', '0', '0', '0', '', ''],
+    ['Ceylon Bites Bakery', '88, Main Street', 'Maharagama', '011 283 6611', 'Shop', 'Tuesday', '1', '06/10/2026', '3', '0', 'Credit', '20000', '30', '3', '0', '1', '0', '4650', '', ''],
+    ['Sumudu Jayasekara', '3/2, Temple Lane', 'Kottawa', '071 559 2013', 'Household', 'Wednesday', '2', '07/10/2026', '1', '1', 'Cash', '', '', '1', '1', '0', '0', '0', '', ''],
+    ['Delmon Exports (Pvt) Ltd', 'Unit 4, Export Village', 'Piliyandala', '038 229 4410', 'Factory', 'Thursday', '1', '08/10/2026', '8', '0', 'Monthly bill', '90000', '30', '9', '0', '0', '1', '11800', '285', ''],
+    ['K. Mahendran', '27, Station Avenue', 'Dehiwala', '0771234', 'Household', 'Friday', '1', '09/10/2026', '2', '0', 'Cash', '', '', '2', '0', '0', '0', '0', '', ''],
+    ['Nimesha Fonseka', '9, Lake Crescent', 'Rajagiriya', '076 802 4437', 'Household', 'Saturday', '1', '10/10/2026', '2', '0', 'Cash', '', '', '2', '0', '0', '0', '700', '', ''],
+    ['Royal Hardware', '12, Old Road', 'Kotte', '011 286 4402', 'Shop', 'Tuesday', '1', '06/10/2026', '2', '0', 'Credit', '', '30', '2', '0', '0', '0', '1300', '', ''],
+    ['', '5, Park Road', 'Dehiwala', '077 455 9087', 'Household', 'Wednesday', '1', '07/10/2026', '2', '0', 'Cash', '', '', '2', '0', '0', '0', '0', '', ''],
+    ['Priya Ratnam', '20, Hill Street', 'Dehiwala', '077 908 4415', 'Household', 'Thursday', '1', '08/10/2026', '2', '0', 'Cash', '', '', '2', '0', '0', '0', '0', '', ''],
+    ['Saman Stores', '7, Bazaar Street', 'Battaramulla', '011 287 7710', 'Retail', 'Friday', '1', '09/10/2026', '4', '0', 'Weekly', '', '', '4', '0', '0', '0', '0', '', '']];
+  function validateCustomers(rows) {
+    var head = rows[0].map(function (h) { return h.trim().toLowerCase(); });
+    var miss = CH.filter(function (h) { return head.indexOf(h.toLowerCase()) < 0; });
+    if (miss.length) return { error: 'Missing column(s): ' + miss.join(', ') + '. Please use the template.' };
+    var idx = {}; CH.concat(OPT).forEach(function (h) { idx[h] = head.indexOf(h.toLowerCase()); });
+    var phones = {}; db.customers.forEach(function (c) { phones[c.phone.replace(/\D/g, '')] = c.name; });
+    var ok = [], bad = [];
+    rows.slice(1).forEach(function (r, n) {
+      var g = function (h) { return (r[idx[h]] || '').trim(); }, e = [];
+      var num = function (h) { var v = g(h); if (v === '') return 0; if (!/^\d+(\.\d+)?$/.test(v)) { e.push(h + ' must be a number'); return 0; } return +v; };
+      var o = { line: n + 2, raw: r, name: g('Name'), address: g('Address'), area: g('Area'), phone: g('Phone'), type: g('Customer type'), day: g('Delivery day'), cycle: parseInt(g('Cycle (weeks)'), 10), payType: g('Payment type'), nextDelivery: D.fromDmy(g('Next delivery')) };
+      if (!o.name) e.push('Name is missing');
+      if (!o.address) e.push('Address is missing');
+      if (db.areas.indexOf(o.area) < 0) e.push('Unknown area "' + o.area + '"');
+      var pd = o.phone.replace(/\D/g, '');
+      if (!/^0\d{9}$/.test(pd)) e.push('Phone must have 10 digits');
+      else if (phones[pd]) e.push('Phone already used by ' + phones[pd]); else phones[pd] = 'row ' + o.line;
+      if (!db.customerTypes.some(function (t) { return t.id === o.type; })) e.push('Unknown customer type "' + o.type + '"');
+      if (D.DAYS.indexOf(o.day) < 0) e.push('Delivery day must be a weekday');
+      if (!(o.cycle >= 1 && o.cycle <= 8)) e.push('Cycle must be 1–8 weeks');
+      if (!o.nextDelivery) e.push('Next delivery must be DD/MM/YYYY'); else if (D.dayName(o.nextDelivery) !== o.day) e.push('Next delivery is not a ' + o.day);
+      if (TW.PAY_TYPES.indexOf(o.payType) < 0) e.push('Payment type must be Cash, Credit or Monthly bill');
+      o.limit = num('Credit limit'); o.terms = num('Terms (days)');
+      if ((o.payType === 'Credit' || o.payType === 'Monthly bill') && !o.limit) e.push('Credit limit is required');
+      o.usual20 = num('Usual 20L'); o.usual10 = num('Usual 10L'); o.held20 = num('Bottles held 20L'); o.held10 = num('Bottles held 10L');
+      o.price20 = num('Agreed price 20L'); o.price10 = num('Agreed price 10L');
+      o.toCollect20 = num('Empties to collect 20L'); o.owed20 = num('Bottles owed 20L'); o.outstanding = num('Outstanding (Rs.)');
+      o.errors = e;
+      (e.length ? bad : ok).push(o);
+    });
+    return { ok: ok, bad: bad };
+  }
+  function showCustomers(rows, name) {
+    var v = validateCustomers(rows), out = UI.$('#c-out');
+    if (v.error) { out.innerHTML = '<div class="banner bad">' + UI.esc(v.error) + '</div>'; return; }
+    out.innerHTML = '<div class="banner info"><b>' + UI.esc(name) + '</b>: ' + v.ok.length + ' rows ready, ' + v.bad.length + ' rows with problems.</div>' +
+      '<h3>Ready to import (' + v.ok.length + ')</h3><div id="c-ok"></div><h3 style="margin-top:14px">Problems – not imported (' + v.bad.length + ')</h3><div id="c-bad"></div>' +
+      '<div class="form-actions"><button class="btn primary" id="c-go"' + (v.ok.length ? '' : ' disabled') + '>Import ' + v.ok.length + ' customers</button></div>';
+    UI.table('#c-ok', { columns: [{ h: 'Row', k: 'line' }, { h: 'Name', k: 'name' }, { h: 'Area', k: 'area' }, { h: 'Phone', k: 'phone' }, { h: 'Pays', k: 'payType' }, { h: 'Held 20L', cls: 'num', k: 'held20' }, { h: 'To collect', cls: 'num', k: 'toCollect20' }, { h: 'Owed', cls: 'num', k: 'owed20' }, { h: 'Outstanding', cls: 'num', f: function (o) { return UI.lkr(o.outstanding); } }, { h: 'Agreed price', cls: 'num', f: function (o) { return [o.price20 ? '20L ' + UI.lkr(o.price20) : '', o.price10 ? '10L ' + UI.lkr(o.price10) : ''].filter(Boolean).join('<br>') || '<span class="muted">standard</span>'; } }], rows: v.ok, empty: 'None.' });
+    UI.table('#c-bad', { columns: [{ h: 'Row', k: 'line' }, { h: 'Name', f: function (o) { return UI.esc(o.name || '(blank)'); } }, { h: 'Problem(s)', f: function (o) { return '<span style="color:var(--bad)">' + o.errors.map(UI.esc).join('<br>') + '</span>'; } }], rows: v.bad, empty: 'None.', rowClass: function () { return 'row-bad'; } });
+    UI.$('#c-go').addEventListener('click', function () {
+      var r = TW.Ops.importCustomers(v.ok, name);
+      if (UI.result(r, v.ok.length + ' customers imported')) out.innerHTML = '<div class="banner ok">' + r.ids.length + ' customers imported (' + r.ids[0] + ' – ' + r.ids[r.ids.length - 1] + '). ' + App.link('master-data/customers', null, 'Open customers') + '</div>';
+    });
+  }
+  UI.$('#c-sample').addEventListener('click', function () { showCustomers(CS, 'customers_sample.csv'); });
+  UI.$('#c-tpl').addEventListener('click', function () { UI.downloadCSV('customer_import_template.csv', [CH.concat(OPT), CS[1]]); });
+  UI.$('#c-file').addEventListener('change', function (e) { var f = e.target.files[0]; CSV.readFile(f, function (rows, err) { if (err) return (UI.$('#c-out').innerHTML = '<div class="banner warn">' + UI.esc(err) + '</div>'); showCustomers(rows, f.name); }); });
+
+  /* ---------- Opening stock (FR-54, FR-55) ---------- */
+  var SH = ['Bottle type', 'Status', 'Quantity'];
+  var SS = [SH, ['20L Bottle', 'Empty in store', '42'], ['20L Bottle', 'Filled in store', '160'], ['20L Bottle', 'At factory', '66'], ['20L Bottle', 'With customers', '140'], ['10L Bottle', 'Filled in store', '45'], ['10L Bottle', 'Empty in store', '-3']];
+  var MAP = { 'empty in store': 'empty', 'at factory': 'factory', 'filled in store': 'filled', 'written off': 'writtenOff' };
+  function showStock(rows, name) {
+    var ok = [], bad = [], seen = {};
+    rows.slice(1).forEach(function (r, n) {
+      var e = [], bn = (r[0] || '').trim(), st = (r[1] || '').trim().toLowerCase(), q = (r[2] || '').trim();
+      var bt = db.bottleTypes.filter(function (b) { return b.name.toLowerCase() === bn.toLowerCase() || b.id.toLowerCase() === bn.toLowerCase(); })[0];
+      if (!bt) e.push('Unknown bottle type "' + bn + '"');
+      if (st === 'with customers') e.push('"With customers" comes from the customer import');
+      else if (!MAP[st]) e.push('Status must be Empty in store, At factory, Filled in store or Written off');
+      if (!/^\d+$/.test(q)) e.push('Quantity must be a whole number, 0 or more');
+      var key = bt && MAP[st] ? bt.id + st : null;
+      if (key && seen[key]) e.push('Duplicate row');
+      if (key) seen[key] = 1;
+      var o = { line: n + 2, raw: r, bt: bt && bt.id, bucket: MAP[st], qty: +q, errors: e };
+      (e.length ? bad : ok).push(o);
+    });
+    var out = UI.$('#s-out');
+    out.innerHTML = '<div class="banner info"><b>' + UI.esc(name) + '</b>: ' + ok.length + ' rows ready, ' + bad.length + ' with problems.</div><div id="s-ok"></div><h3 style="margin-top:14px">Problems – not imported</h3><div id="s-bad"></div><div class="form-actions"><button class="btn primary" id="s-go"' + (ok.length ? '' : ' disabled') + '>Import opening stock</button></div>';
+    UI.table('#s-ok', { columns: [{ h: 'Bottle', f: function (o) { return Q.btName(o.bt); } }, { h: 'Status', f: function (o) { return TW.BUCKET_LABEL[o.bucket]; } }, { h: 'Now', cls: 'num', f: function (o) { return db.stock[o.bt][o.bucket]; } }, { h: 'From file', cls: 'num', f: function (o) { return '<b>' + o.qty + '</b>'; } }], rows: ok, empty: 'None.' });
+    UI.table('#s-bad', { columns: [{ h: 'Row', k: 'line' }, { h: 'Data', f: function (o) { return UI.esc(o.raw.join(', ')); } }, { h: 'Problem', f: function (o) { return '<span style="color:var(--bad)">' + UI.esc(o.errors.join('; ')) + '</span>'; } }], rows: bad, empty: 'None.', rowClass: function () { return 'row-bad'; } });
+    UI.$('#s-go').addEventListener('click', function () { if (UI.result(TW.Ops.importStock(ok, name), 'Opening stock imported')) out.innerHTML = '<div class="banner ok">Imported. ' + App.link('inventory/inventory', null, 'Open stock') + '</div>'; });
+  }
+  UI.$('#s-sample').addEventListener('click', function () { showStock(SS, 'opening_stock_sample.csv'); });
+  UI.$('#s-tpl').addEventListener('click', function () { UI.downloadCSV('opening_stock_template.csv', [SH, ['20L Bottle', 'Empty in store', '0'], ['20L Bottle', 'Filled in store', '0'], ['20L Bottle', 'At factory', '0']]); });
+  UI.$('#s-file').addEventListener('change', function (e) { var f = e.target.files[0]; CSV.readFile(f, function (rows, err) { if (err) return (UI.$('#s-out').innerHTML = '<div class="banner warn">' + UI.esc(err) + '</div>'); showStock(rows, f.name); }); });
+
+  UI.tabs('#tabs', [{ id: 'customers', label: 'Customers' }, { id: 'stock', label: 'Opening stock' }]);
+});
+</script>
+</body>
+</html>

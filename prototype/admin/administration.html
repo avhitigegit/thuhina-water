@@ -1,0 +1,108 @@
+<!doctype html>
+<!-- BRD: FR-56 (login with username/password; access by role; users created by Admin – no public signup), Section 5 (roles and access),
+     FR-57 (audit log: who created, changed or deleted records, and when), BR-14 (reversals recorded in the audit log), NFR-05 (role-based access). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Administration · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="admin/administration">
+<main id="app">
+  <div id="tabs"></div>
+  <div data-pane="users" class="card">
+    <div class="card-head"><h2>Users</h2><button class="btn primary" id="add">+ New user</button></div>
+    <p class="small muted">There is no public signup. The Admin creates each user with a temporary password, which the user changes at first login.</p>
+    <div id="users"></div>
+  </div>
+  <div data-pane="roles" class="card">
+    <h2>What each role can do</h2>
+    <div id="roles"></div>
+    <p class="small muted" style="margin-top:8px">Use the Role switcher in the top bar to see the menu for each role.</p>
+  </div>
+  <div data-pane="audit" class="card">
+    <div class="toolbar">
+      <div class="field"><label>From</label><input id="from" class="date" maxlength="10"></div>
+      <div class="field"><label>To</label><input id="to" class="date" maxlength="10"></div>
+      <div class="field"><label>User</label><select id="user"><option value="">All</option></select></div>
+      <div class="field"><label>Action</label><select id="action"><option value="">All</option></select></div>
+      <div class="field grow"><label>Search</label><input id="aq" placeholder="Bill no., customer, PO…"></div>
+    </div>
+    <div id="audit"></div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today(), me = TW.currentUser();
+
+  /* ---------- Users ---------- */
+  function users() {
+    UI.table('#users', {
+      columns: [
+        { h: 'Name', f: function (u) { return '<b>' + UI.esc(u.name) + '</b>' + (u.id === me.id ? ' ' + UI.badge('you', 'info') : ''); } },
+        { h: 'Username', f: function (u) { return '<span class="mono">' + UI.esc(u.username) + '</span>'; } },
+        { h: 'Role', f: function (u) { return UI.badge(u.role, u.role === 'Admin' ? 'dark' : u.role === 'Accountant' ? 'info' : ''); } },
+        { h: 'Phone', k: 'phone' }, { h: 'Last login', f: function (u) { return u.lastLogin ? D.dmy(u.lastLogin) : '–'; } },
+        { h: 'Status', f: function (u) { return UI.statusBadge(u.active ? 'Active' : 'Inactive'); } },
+        { h: '', cls: 'actions', f: function (u) { return '<button class="btn sm" data-a="edit" data-id="' + u.id + '">Edit</button><button class="btn sm" data-a="pw" data-id="' + u.id + '">Reset password</button><button class="btn sm' + (u.active ? ' danger' : '') + '" data-a="toggle" data-id="' + u.id + '">' + (u.active ? 'Deactivate' : 'Activate') + '</button>'; } }
+      ], rows: db.users
+    });
+  }
+  function edit(u) {
+    UI.modal({
+      title: u ? 'Edit ' + u.name : 'New user',
+      body: '<div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="field req full"><label>Full name</label><input name="uname" value="' + UI.esc(u ? u.name : '') + '"></div>' +
+        '<div class="field req"><label>Username</label><input name="username" value="' + UI.esc(u ? u.username : '') + '" placeholder="e.g. saman.d"></div><div class="field req"><label>Role</label><select name="role">' + UI.options(App.ROLES, u ? u.role : 'Delivery Staff') + '</select></div>' +
+        '<div class="field"><label>Phone</label><input name="phone" value="' + UI.esc(u ? u.phone : '') + '"></div>' + (u ? '' : '<div class="field req"><label>Temporary password</label><input name="pw" type="password" placeholder="at least 8 characters"></div>') + '</div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Save', cls: 'primary', onClick: function (close, el) {
+        if (UI.result(TW.Ops.saveUser({ id: u && u.id, name: UI.mval(el, 'uname').trim(), username: UI.mval(el, 'username').trim().toLowerCase(), role: UI.mval(el, 'role'), phone: UI.mval(el, 'phone'), password: UI.mval(el, 'pw') }, !u), u ? 'User updated' : 'User created')) { close(); users(); }
+        return false;
+      } }]
+    });
+  }
+  UI.$('#add').addEventListener('click', function () { edit(null); });
+  UI.$('#users').addEventListener('click', function (e) {
+    var a = e.target.getAttribute('data-a'), u = Q.user(e.target.getAttribute('data-id'));
+    if (a === 'edit') edit(u);
+    if (a === 'pw') UI.confirm('Reset password for ' + u.name + '?', '<p>A new temporary password will be given. The user must change it at next login.</p>', 'Reset').then(function (y) { if (y && UI.result(TW.Ops.resetPassword(u.id))) UI.modal({ title: 'Temporary password', body: '<p>Give this to <b>' + UI.esc(u.name) + '</b>:</p><p class="mono" style="font-size:18px">Tw-' + Math.random().toString(36).slice(2, 8) + '</p><p class="small muted">Prototype only.</p>' }); });
+    if (a === 'toggle' && UI.result(TW.Ops.setUserActive(u.id, !u.active), u.active ? 'User deactivated' : 'User activated')) users();
+  });
+
+  /* ---------- Roles ---------- */
+  var rows = [];
+  App.NAV.forEach(function (g) { if (!g.hidden) g.items.forEach(function (it) { rows.push({ g: g.module, it: it }); }); });
+  UI.table('#roles', {
+    columns: [{ h: 'Menu', f: function (x) { return UI.esc(x.g) + (x.g !== x.it.title ? ' › ' + UI.esc(x.it.title) : ''); } }]
+      .concat(App.ROLES.map(function (r) { return { h: r, cls: 'center', f: function (x) { var a = App.access(x.it, r); return a === 'full' ? UI.badge('Full', 'ok') : a === 'view' ? UI.badge('View only', 'info') : '<span class="muted">–</span>'; } }; })),
+    rows: rows
+  });
+
+  /* ---------- Audit log ---------- */
+  UI.$('#from').value = D.dmy(D.add(td, -7));
+  UI.$('#to').value = D.dmy(td);
+  var uniq = function (k) { var s = {}; db.audit.forEach(function (a) { s[a[k]] = 1; }); return Object.keys(s).sort(); };
+  UI.$('#user').innerHTML += UI.options(uniq('user'));
+  UI.$('#action').innerHTML += UI.options(uniq('action'));
+  var colors = { Create: 'ok', Update: 'info', Reverse: 'bad', Approve: 'warn', Import: 'dark' };
+  function audit() {
+    var f = D.fromDmy(UI.$('#from').value) || '2000-01-01', t = D.fromDmy(UI.$('#to').value) || '2999-01-01', u = UI.$('#user').value, a = UI.$('#action').value, q = UI.$('#aq').value.toLowerCase();
+    var list = db.audit.filter(function (x) { var d = x.ts.slice(0, 10); return d >= f && d <= t && (!u || x.user === u) && (!a || x.action === a) && (!q || (x.entity + ' ' + x.ref + ' ' + x.details).toLowerCase().indexOf(q) >= 0); }).slice().reverse().slice(0, 400);
+    UI.table('#audit', {
+      columns: [{ h: 'When', f: function (x) { return '<span class="nowrap">' + D.dmyt(x.ts) + '</span>'; } }, { h: 'User', f: function (x) { return UI.esc(x.user) + '<div class="small muted">' + UI.esc(x.role) + '</div>'; } },
+        { h: 'Action', f: function (x) { return UI.badge(x.action, colors[x.action] || ''); } }, { h: 'Record', f: function (x) { return UI.esc(x.entity) + ' <span class="mono small">' + UI.esc(x.ref) + '</span>'; } }, { h: 'Details', f: function (x) { return '<span class="small">' + UI.esc(x.details) + '</span>'; } }],
+      rows: list, empty: 'No entries.', rowClass: function (x) { return x.action === 'Reverse' ? 'row-bad' : ''; }
+    });
+  }
+  ['#from', '#to', '#user', '#action', '#aq'].forEach(function (s) { UI.$(s).addEventListener('input', audit); UI.$(s).addEventListener('change', audit); });
+
+  UI.tabs('#tabs', [{ id: 'users', label: 'Users' }, { id: 'roles', label: 'Roles & access' }, { id: 'audit', label: 'Audit log' }]);
+  users(); audit();
+});
+</script>
+</body>
+</html>

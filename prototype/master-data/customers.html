@@ -1,0 +1,282 @@
+<!doctype html>
+<!-- BRD: FR-08 (register customer: name, address, phone, type, area), FR-09 (delivery day, cycle, next date), FR-10 (payment type, credit limit, terms),
+     FR-11 (bottles held, empties to collect, bottles owed, balance, history – side panel), FR-12 (search and filter),
+     FR-13 (deactivate without deleting history – Status field in the edit popup and a Deactivate/Reactivate button on each row, client request 08/10/2026), FR-03 (customer types – popup), BR-09 (one payment type, credit limit),
+     FR-32/FR-33 (bottles given on the registration date = first purchase),
+     FR-05 / BR-08 (agreed customer prices – client feedback 08/10/2026): standard price by bottle type + customer type unless the customer
+     has an agreed price; set at registration (or from an accepted quotation) and changed later with the Prices popup; dated history. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Customers · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="master-data/customers">
+<main id="app">
+  <div class="page-actions">
+    <button class="btn write-only" id="types">Customer types</button>
+    <button class="btn primary write-only" id="add">+ New customer</button>
+  </div>
+  <div class="card">
+    <div class="toolbar">
+      <div class="field grow"><label>Search</label><input id="q" placeholder="Name, phone, code or address" autofocus></div>
+      <div class="field"><label>Area</label><select id="area"><option value="">All</option></select></div>
+      <div class="field"><label>Delivery day</label><select id="day"><option value="">All</option></select></div>
+      <div class="field"><label>Type</label><select id="type"><option value="">All</option></select></div>
+      <div class="field"><label>Payment</label><select id="pay"><option value="">All</option></select></div>
+      <div class="field"><label>Price</label><select id="price"><option value="">All</option><option>Standard</option><option>Agreed</option></select></div>
+      <div class="field"><label>Status</label><select id="status"><option>Active</option><option>Inactive</option><option value="">All</option></select></div>
+    </div>
+    <div class="small muted" id="count" style="margin-bottom:6px"></div>
+    <div id="list"></div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script src="../assets/js/customer-panel.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today();
+  UI.$('#area').innerHTML += UI.options(db.areas);
+  UI.$('#day').innerHTML += UI.options(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']);
+  UI.$('#pay').innerHTML += UI.options(TW.PAY_TYPES);
+  function typeOpts() { UI.$('#type').innerHTML = '<option value="">All</option>' + UI.options(db.customerTypes.map(function (t) { return t.id; })); }
+  typeOpts();
+
+  function render() {
+    var q = UI.$('#q').value.trim().toLowerCase(), qd = q.replace(/\D/g, '');
+    var f = { area: UI.$('#area').value, day: UI.$('#day').value, type: UI.$('#type').value, pay: UI.$('#pay').value, status: UI.$('#status').value, price: UI.$('#price').value };
+    var bal = Q.balances();
+    var rows = db.customers.filter(function (c) {
+      if (q && (c.name + ' ' + c.id + ' ' + c.address).toLowerCase().indexOf(q) < 0 && !(qd.length >= 3 && c.phone.replace(/\D/g, '').indexOf(qd) >= 0)) return false;
+      return (!f.area || c.area === f.area) && (!f.day || c.day === f.day) && (!f.type || c.type === f.type) && (!f.pay || c.payType === f.pay) && (!f.status || c.status === f.status) && (!f.price || (f.price === 'Agreed') === Q.hasAgreed(c));
+    });
+    var act = db.customers.filter(function (c) { return c.status === 'Active'; }).length;
+    UI.$('#count').textContent = rows.length + ' of ' + db.customers.length + ' customers (' + act + ' active, ' + (db.customers.length - act) + ' inactive) · click a row to see details';
+    UI.table('#list', {
+      columns: [
+        { h: 'Customer', f: function (c) { return '<b>' + UI.esc(c.name) + '</b><div class="small muted">' + c.id + ' · ' + UI.esc(c.address) + '</div>'; } },
+        { h: 'Phone', f: function (c) { return '<span class="nowrap">' + UI.esc(c.phone) + '</span>'; } },
+        { h: 'Area', k: 'area' },
+        { h: 'Type', f: function (c) { return UI.esc(c.type) + (Q.hasAgreed(c) ? '<div><span class="badge info" title="' + UI.esc(Q.activeBottles().filter(function (b) { return Q.isAgreed(c, b.id); }).map(function (b) { return b.litres + 'L ' + UI.lkr(Q.price(c, b.id)); }).join(', ')) + '">agreed price</span></div>' : ''); } },
+        { h: 'Delivery', f: function (c) { return c.day.slice(0, 3) + ', ' + (c.cycle === 1 ? 'weekly' : c.cycle + ' wks') + '<div class="small muted">next ' + D.dmy(c.nextDelivery) + '</div>'; } },
+        { h: 'Payment', f: function (c) { return UI.statusBadge(c.payType); } },
+        { h: 'Bottles', cls: 'num', f: function (c) { var s = Q.activeBottles().filter(function (b) { return c.held[b.id]; }).map(function (b) { return c.held[b.id] + '×' + b.litres + 'L'; }).join(' ') || '0'; var tc = Q.sumBt(c.toCollect), ow = Q.sumBt(c.owed); return s + (tc ? ' <span class="badge warn" title="Empties to collect">' + tc + ' collect</span>' : '') + (ow ? ' <span class="badge bad" title="Bottles owed">' + ow + ' owed</span>' : ''); } },
+        { h: 'Balance', cls: 'num', f: function (c) { var b = bal[c.id] || 0; return b ? (c.payType !== 'Cash' && b > c.limit ? '<b style="color:var(--bad)">' + UI.lkr(b) + '</b>' : UI.lkr(b)) : ''; } },
+        { h: 'Status', f: function (c) { return UI.statusBadge(c.status) + (c.status !== 'Active' ? '<div class="small muted" title="' + UI.esc(c.statusReason || '') + '">' + (c.statusDate ? 'since ' + D.dmy(c.statusDate) : '') + '</div>' : ''); } },
+        { h: '', cls: 'actions', f: function (c) { return '<button class="btn sm write-only" data-edit="' + c.id + '">Edit</button> <button class="btn sm write-only' + (c.status === 'Active' ? ' danger' : '') + '" data-st="' + c.id + '">' + (c.status === 'Active' ? 'Deactivate' : 'Reactivate') + '</button>'; } }
+      ],
+      rows: rows, empty: 'No customers match.', rowClass: function () { return 'clickable'; }, rowAttr: function (c) { return 'data-id="' + c.id + '"'; }
+    });
+  }
+  function open(id) { UI.customerPanel(id, { onEdit: edit, onChange: render }); }
+  UI.$('#list').addEventListener('click', function (e) {
+    var ed = e.target.getAttribute('data-edit');
+    if (ed) { e.stopPropagation(); edit(Q.customer(ed)); return; }
+    var st = e.target.getAttribute('data-st');
+    if (st) { e.stopPropagation(); UI.customerStatus(Q.customer(st), render); return; }
+    var tr = e.target.closest('tr[data-id]');
+    if (tr) open(tr.getAttribute('data-id'));
+  });
+
+  /* Add / edit popup (FR-05, FR-08, FR-09, FR-10) */
+  /* pre = details copied from an accepted customer quotation (?fromQuote=QT-…) for a new customer. */
+  function edit(c, pre) {
+    pre = c ? null : pre;
+    var v = function (k) { return c ? UI.esc(c[k] || '') : pre && pre[k] ? UI.esc(pre[k]) : ''; };
+    var DAYS7 = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+    var termOpts = TW.TERMS.filter(function (x) { return x.v > 0; }).map(function (x) { return { v: x.v, l: x.l }; });
+    var body = '<div id="cf" class="form-grid">' +
+      '<div class="field"><label>Customer code</label><input value="' + (c ? c.id : 'Generated on save') + '" readonly></div>' +
+      '<div class="field req span2"><label>Name</label><input name="cname" value="' + v('name') + '"></div>' +
+      '<div class="field req"><label>Phone</label><input name="phone" value="' + v('phone') + '" placeholder="077 123 4567"></div>' +
+      '<div class="field req span2"><label>Address</label><input name="address" value="' + v('address') + '"></div>' +
+      '<div class="field req"><label>Area</label><select name="area">' + UI.options(db.areas, c ? c.area : pre ? pre.area : '', { blank: 'Select' }) + '</select></div>' +
+      '<div class="field req"><label>Customer type</label><select name="type">' + UI.options(db.customerTypes.filter(function (t) { return t.active || (c && t.id === c.type); }).map(function (t) { return t.id; }), c ? c.type : pre ? pre.type : 'Household') + '</select></div>' +
+      '<div class="section-title full">Delivery</div>' +
+      (c ? '' : '<div class="field req"><label>Registration date</label>' + UI.dateInput('reg', td) + '</div>') +
+      '<div class="field req"><label>Delivery day</label><select name="day">' + UI.options(DAYS7, c ? c.day : 'Monday') + '</select></div>' +
+      '<div class="field req"><label>Cycle</label><select name="cycle">' + UI.options([{ v: 1, l: 'Every week' }, { v: 2, l: 'Every 2 weeks' }, { v: 3, l: 'Every 3 weeks' }, { v: 4, l: 'Every 4 weeks' }], c ? c.cycle : 1) + '</select></div>' +
+      '<div class="field req"><label>Next delivery</label>' + UI.dateInput('next', c ? c.nextDelivery : '') + '<span class="help" id="next-help"></span></div>' +
+      Q.activeBottles().map(function (b) { return '<div class="field"><label>Usual ' + b.litres + 'L per delivery</label><input type="number" min="0" name="u_' + b.id + '" value="' + (c ? c.usual[b.id] || 0 : (b.id === 'B20' ? 2 : 0)) + '"></div>'; }).join('') +
+      /* Water price (FR-05): standard by bottle type + customer type, or an agreed price for this customer. */
+      '<div class="section-title full">Water price</div>' +
+      (c ? '<div class="field span2"><label>Price now</label><div id="price-now" style="padding:6px 0"></div></div><div class="field" style="align-self:end">' + (App.role === 'Admin' ? '<button type="button" class="btn" id="chg-price">Change prices…</button>' : '') + '</div>'
+        : Q.activeBottles().map(function (b) { return '<div class="field"><label>' + b.litres + 'L agreed price (Rs.)</label><input type="number" min="1" step="0.5" name="ap_' + b.id + '" placeholder="standard" value="' + (pre && pre.prices && pre.prices[b.id] ? pre.prices[b.id] : '') + '"><span class="help" data-std="' + b.id + '"></span></div>'; }).join('') +
+          '<div class="field span2 ap-why"><label>Reason for the agreed price</label><input name="apwhy" value="' + (pre && pre.prices ? 'Quotation ' + UI.esc(pre.quoteId) + ' accepted' : '') + '" placeholder="e.g. Volume price – about 3,500 bottles a month"></div>') +
+      '<div class="section-title full">Payment</div>' +
+      '<div class="field req"><label>Payment type</label><select name="payType">' + UI.options(TW.PAY_TYPES, c ? c.payType : 'Cash') + '</select></div>' +
+      '<div class="field cr"><label>Credit limit (Rs.)</label><input type="number" min="0" step="500" name="limit" value="' + (c && c.limit ? c.limit : '') + '"></div>' +
+      '<div class="field cr"><label>Payment terms</label><select name="terms">' + UI.options(termOpts, c && c.terms ? c.terms : 30) + '</select></div>' +
+      (c ? '' :
+        '<div class="section-title full">Bottles given on the registration date</div>' +
+        Q.activeBottles().map(function (b) { return '<div class="field"><label>Filled ' + b.litres + 'L bottles given</label><input type="number" min="0" name="g_' + b.id + '" value="' + (b.id === 'B20' ? 2 : 0) + '"></div>'; }).join('') +
+        '<div class="field"><label>Old American Water bottles handed in</label><input type="number" min="0" name="old" value="0"></div>' +
+        '<div class="field"><label>Cash paid now (Rs.)</label><input type="number" min="0" name="paid"></div>' +
+        '<div class="full" id="first-calc"></div>') +
+      '<div class="field full"><label>Notes</label><input name="notes" value="' + v('notes') + '" placeholder="e.g. call before delivery"></div>' +
+      /* Status (FR-13): a new customer is always Active; an existing one can be made Inactive here or from the list. */
+      '<div class="section-title full">Status</div>' +
+      (c ? '<div class="field req"><label>Status</label><select name="status">' + UI.options(['Active', 'Inactive'], c.status) + '</select></div>' +
+        '<div class="field req st-in"><label>Inactive from</label>' + UI.dateInput('sdate', c.status === 'Inactive' && c.statusDate ? c.statusDate : td) + '</div>' +
+        '<div class="field req st-in"><label>Reason</label><select name="sreason">' + UI.options(UI.DEACT_REASONS, c.status === 'Inactive' ? (UI.DEACT_REASONS.filter(function (r) { return (c.statusReason || '').indexOf(r) === 0; })[0] || 'Other') : '', { blank: 'Select' }) + '</select></div>' +
+        '<div class="field span2 st-in"><label>Details</label><input name="snote" value="' + UI.esc(c.status === 'Inactive' ? (c.statusReason || '').replace(/^[^–]*– /, '') : '') + '" placeholder="e.g. Moved to Kandy"></div>' +
+        '<div class="full st-in" id="st-warn"></div>'
+        : '<div class="field"><label>Status</label><input value="Active" readonly></div><div class="field span2 small muted" style="align-self:end">New customers start as Active. Deactivate later from this popup or the list when they stop buying.</div>') +
+      '<div class="full small muted" id="cf-help"></div></div>';
+    var m = UI.modal({
+      title: c ? 'Edit ' + c.name : 'New customer' + (pre ? ' – from quotation ' + pre.quoteId : ''), wide: true, body: body,
+      buttons: [{ label: 'Cancel' }, { label: 'Save', cls: 'primary', onClick: function (close, el) { save(el, close, false); return false; } }]
+    });
+    var form = m.el.querySelector('#cf'), paidTouched = false;
+    /* First delivery = the very next delivery day after the registration date (cycle applies after that). Still editable. */
+    function autoNext() {
+      var start = c ? td : (D.fromDmy(UI.mval(form, 'reg')) || td);
+      var d = D.add(start, 1);
+      while (D.dayName(d) !== UI.mval(form, 'day')) d = D.add(d, 1);
+      form.querySelector('[name=next]').value = D.dmy(d);
+    }
+    function firstCalc() {
+      if (c) return null;
+      var type = UI.mval(form, 'type'), old = +UI.mval(form, 'old') || 0, water = 0, deposits = 0, dep = 0, lines = [];
+      Q.activeBottles().forEach(function (b) {
+        var q = +UI.mval(form, 'g_' + b.id) || 0;
+        if (!q) return;
+        var o = b.id === 'B20' ? Math.min(old, q) : 0, p = +UI.mval(form, 'ap_' + b.id) || Q.stdPrice(b.id, type), d = Q.deposit(b.id);
+        water += q * p; deposits += (q - o) * d;
+        lines.push(q + ' × ' + b.litres + 'L: water ' + UI.lkr(q * p) + ' + deposit ' + (q - o) + ' × ' + UI.lkr(d) + (o ? ' (' + o + ' old bottle' + (o > 1 ? 's' : '') + ' – no deposit)' : ''));
+      });
+      return { total: water + deposits, lines: lines };
+    }
+    function upd(e) {
+      if (e && e.target.name === 'paid') paidTouched = true;
+      if (c) {
+        var inact = UI.mval(form, 'status') === 'Inactive';
+        UI.$$('.st-in', form).forEach(function (x) { x.style.display = inact ? '' : 'none'; });
+        UI.$('#st-warn', m.el).innerHTML = inact && c.status === 'Active' ? UI.openItems(c) : '';
+      }
+      var pt = UI.mval(form, 'payType'), type = UI.mval(form, 'type');
+      UI.$$('.cr', form).forEach(function (x) { x.style.display = pt === 'Cash' ? 'none' : ''; });
+      var n = D.fromDmy(UI.mval(form, 'next'));
+      UI.$('#next-help', m.el).innerHTML = n ? D.dayName(n) + (D.dayName(n) !== UI.mval(form, 'day') ? ' – <b style="color:var(--bad)">not the delivery day</b>' : '') : '';
+      if (c) UI.$('#price-now', m.el).innerHTML = Q.activeBottles().map(function (b) { return b.litres + 'L ' + (type !== c.type && !Q.isAgreed(c, b.id) ? UI.lkr(Q.stdPrice(b.id, type)) + ' <span class="small muted">(' + UI.esc(type) + ' standard after saving)</span>' : UI.priceText(c, b.id)); }).join('<br>');
+      else {
+        var anyAp = false;
+        Q.activeBottles().forEach(function (b) {
+          var ap = +UI.mval(form, 'ap_' + b.id), std = Q.stdPrice(b.id, type), h = form.querySelector('[data-std="' + b.id + '"]');
+          if (ap) anyAp = true;
+          h.innerHTML = 'Standard ' + UI.esc(type) + ': ' + (std ? UI.lkr(std) : '–') + (ap && std && ap !== std ? ' · <span style="color:' + (ap < std ? 'var(--warn)' : 'inherit') + '">' + (ap < std ? UI.lkr(std - ap) + ' below' : UI.lkr(ap - std) + ' above') + '</span>' : '');
+        });
+        form.querySelector('.ap-why').style.display = anyAp ? '' : 'none';
+      }
+      UI.$('#cf-help', m.el).innerHTML = 'Standard water price for ' + UI.esc(type) + ': ' + Q.activeBottles().map(function (b) { var p = Q.stdPrice(b.id, type); return b.litres + 'L ' + (p ? UI.lkr(p) : '–'); }).join(', ') + '. Leave the agreed price blank to use the standard price.' +
+        (pt !== 'Cash' ? ' · ' + pt + ' customers cannot go over the credit limit without Admin approval.' : '');
+      var fc = firstCalc();
+      if (fc) {
+        if (!paidTouched) form.querySelector('[name=paid]').value = pt === 'Cash' ? fc.total : 0;
+        var paid = +UI.mval(form, 'paid') || 0;
+        UI.$('#first-calc', m.el).innerHTML = fc.lines.length ? '<div class="banner info" style="margin:0">' + fc.lines.join('<br>') + '<br><b>Total ' + UI.lkr(fc.total) + '</b> · paid ' + UI.lkr(paid) + (fc.total - paid > 0 ? ' · ' + UI.lkr(fc.total - paid) + ' to the account' : '') + '</div>' : '<p class="small muted">No bottles given now – you can record the first purchase later from Sales &amp; Bills.</p>';
+      }
+    }
+    ['day', 'reg'].forEach(function (n) { var el = form.querySelector('[name=' + n + ']'); if (el) el.addEventListener('change', function () { autoNext(); upd(); }); });
+    if (!c) autoNext();
+    form.addEventListener('input', upd); form.addEventListener('change', upd); upd();
+    var cp = m.el.querySelector('#chg-price');
+    if (cp) cp.addEventListener('click', function () { UI.custPriceDialog(c, function () { upd(); render(); }); });
+    function save(el, close, allowDup) {
+      var usual = {};
+      Q.activeBottles().forEach(function (b) { usual[b.id] = UI.mval(form, 'u_' + b.id); });
+      var reg = c ? null : D.fromDmy(UI.mval(form, 'reg'));
+      if (!c && !reg) return UI.toast('Select the registration date', 'bad');
+      if (!c && reg > td) return UI.toast('Registration date cannot be in the future', 'bad');
+      // Status (edit only): check the reason before anything is saved.
+      var oldSt = c && c.status, newSt = c && UI.mval(form, 'status'), why = '', sdate = null;
+      if (c && newSt === 'Inactive') {
+        var rs = UI.mval(form, 'sreason'), nt = UI.mval(form, 'snote').trim();
+        why = rs ? rs + (nt ? ' – ' + nt : '') : nt; sdate = D.fromDmy(UI.mval(form, 'sdate'));
+        if (!rs || (rs === 'Other' && !nt)) return UI.toast('Select the reason (and enter details for "Other") to make the customer inactive.', 'bad');
+        if (!sdate || sdate > td) return UI.toast('Enter the inactive-from date (not in the future).', 'bad');
+      }
+      var apWhy = !c && UI.mval(form, 'apwhy').trim(), apAny = !c && Q.activeBottles().some(function (b) { return +UI.mval(form, 'ap_' + b.id) > 0; });
+      if (apAny && !apWhy) return UI.toast('Enter the reason for the agreed price.', 'bad');
+      // Check stock before creating the customer, so a failed first purchase does not leave half a registration.
+      if (!c) {
+        var short = Q.activeBottles().filter(function (b) { return (+UI.mval(form, 'g_' + b.id) || 0) > db.stock[b.id].filled; })[0];
+        if (short) return UI.toast('Only ' + db.stock[short.id].filled + ' filled ' + short.litres + 'L bottles in store.', 'bad');
+        if ((+UI.mval(form, 'old') || 0) > (+UI.mval(form, 'g_B20') || 0)) return UI.toast('Old bottles cannot be more than the 20L bottles given.', 'bad');
+      }
+      var r = TW.Ops.saveCustomer({ id: c && c.id, name: UI.mval(form, 'cname'), address: UI.mval(form, 'address'), phone: UI.mval(form, 'phone'), area: UI.mval(form, 'area'), type: UI.mval(form, 'type'), day: UI.mval(form, 'day'), cycle: UI.mval(form, 'cycle'), nextDelivery: D.fromDmy(UI.mval(form, 'next')), usual: usual, payType: UI.mval(form, 'payType'), limit: UI.mval(form, 'limit'), terms: UI.mval(form, 'terms'), since: reg, notes: UI.mval(form, 'notes'), allowDupPhone: allowDup }, !c);
+      if (r.code === 'DUP_PHONE') { UI.confirm('Phone already used', '<p>' + UI.esc(r.error) + '</p><p>Save anyway?</p>', 'Save anyway').then(function (y) { if (y) save(el, close, true); }); return; }
+      if (!UI.result(r)) return;
+      if (c) {
+        if (newSt === 'Inactive' && (oldSt !== 'Inactive' || why !== c.statusReason || sdate !== c.statusDate)) TW.Ops.setCustomerStatus(c.id, false, why, sdate);
+        if (newSt === 'Active' && oldSt !== 'Active') TW.Ops.setCustomerStatus(c.id, true);
+        UI.toast(newSt !== oldSt ? 'Customer updated – now ' + newSt : 'Customer updated', 'ok'); close(); render(); return;
+      }
+      // Bottles given on the registration date = first purchase (deposit + water)
+      // Agreed prices from the registration date, before the first purchase is billed (FR-05).
+      Q.activeBottles().forEach(function (b) {
+        var ap = +UI.mval(form, 'ap_' + b.id);
+        if (ap && ap !== Q.stdPrice(b.id, r.customer.type, reg)) TW.Ops.setCustPrice({ custId: r.customer.id, bt: b.id, price: ap, from: reg, reason: apWhy, quoteId: pre ? pre.quoteId : '' });
+      });
+      if (pre) { TW.Ops.linkCQuoteCustomer(pre.quoteId, r.customer.id); TW.Ops.applyCQuotePrices(pre.quoteId, reg); }
+      var nc = r.customer, paid = +UI.mval(form, 'paid') || 0, old = +UI.mval(form, 'old') || 0, msgs = [], bills = [];
+      Q.activeBottles().forEach(function (b) {
+        var q = +UI.mval(form, 'g_' + b.id) || 0;
+        if (!q) return;
+        var o = b.id === 'B20' ? Math.min(old, q) : 0;
+        var amt = TW.Ops.previewFirst({ custId: nc.id, bt: b.id, qty: q, oldBottles: o, date: reg }).amount;
+        var pay = Math.min(paid, amt); paid -= pay;
+        var fr = TW.Ops.firstPurchase({ custId: nc.id, date: reg, bt: b.id, qty: q, oldBottles: o, brandId: o ? 'OB1' : '', paid: pay, approveOverLimit: App.role === 'Admin', note: 'Bottles given at registration' });
+        msgs.push(fr.ok ? q + ' × ' + b.litres + 'L – bill ' + fr.txn.billNo + ' (' + UI.lkr(fr.txn.amount) + ')' : 'Could not record ' + b.litres + 'L bottles: ' + fr.error);
+        if (fr.ok) bills.push(fr.txn);
+      });
+      // keep the chosen next delivery date (the first purchase may have moved it)
+      nc.nextDelivery = D.fromDmy(UI.mval(form, 'next')) || nc.nextDelivery;
+      TW.save();
+      close(); render();
+      UI.modal({ title: 'Customer registered', body: '<p><b>' + UI.esc(nc.name) + '</b> saved as <b>' + nc.id + '</b>.</p>' + (msgs.length ? '<p>Bottles given:<br>' + msgs.join('<br>') + '</p>' : '<p>No bottles given yet.</p>') + '<p>Next delivery: <b>' + D.dayName(nc.nextDelivery) + ' ' + D.dmy(nc.nextDelivery) + '</b></p>',
+        buttons: (bills.length ? [{ label: 'Print bill', onClick: function () { bills.forEach(UI.printBill); return false; } }] : []).concat([{ label: 'Close', cls: 'primary' }]) });
+    }
+  }
+
+  /* Customer types popup (FR-03) */
+  function types() {
+    function body() {
+      return '<div class="table-wrap"><table><thead><tr><th>Type</th><th>Description</th><th class="num">Customers</th><th>Status</th><th></th></tr></thead><tbody>' +
+        db.customerTypes.map(function (t) { var n = db.customers.filter(function (c) { return c.type === t.id && c.status === 'Active'; }).length; return '<tr><td><b>' + UI.esc(t.id) + '</b></td><td>' + UI.esc(t.desc) + '</td><td class="num">' + n + '</td><td>' + UI.statusBadge(t.active ? 'Active' : 'Inactive') + '</td><td><button class="btn sm" data-tt="' + UI.esc(t.id) + '">' + (t.active ? 'Deactivate' : 'Activate') + '</button></td></tr>'; }).join('') +
+        '</tbody></table></div><div class="form-grid" style="margin-top:12px;grid-template-columns:1fr 2fr auto"><div class="field"><label>New type</label><input name="tname" placeholder="e.g. Hotel"></div><div class="field"><label>Description</label><input name="tdesc"></div><button class="btn" data-addtype style="align-self:end">Add</button></div><p class="small muted">Set prices for a new type on Bottles &amp; Products → Prices.</p>';
+    }
+    var m = UI.modal({ title: 'Customer types', wide: true, body: body() });
+    m.el.addEventListener('click', function (e) {
+      var id = e.target.getAttribute('data-tt');
+      if (id) {
+        var t = db.customerTypes.filter(function (x) { return x.id === id; })[0];
+        if (t.active && db.customers.some(function (c) { return c.type === id && c.status === 'Active'; })) return UI.toast('Active customers use this type. Move them first.', 'bad');
+        TW.Ops.saveCustomerType({ id: t.id, desc: t.desc, active: !t.active }, false);
+      } else if (e.target.hasAttribute('data-addtype')) {
+        if (!UI.result(TW.Ops.saveCustomerType({ id: UI.mval(m.el, 'tname').trim(), desc: UI.mval(m.el, 'tdesc').trim() }, true), 'Type added')) return;
+      } else return;
+      m.el.querySelector('.body').innerHTML = body();
+      typeOpts();
+    });
+  }
+  var add = UI.$('#add'); if (add) add.addEventListener('click', function () { edit(null); });
+  var tb = UI.$('#types'); if (tb) tb.addEventListener('click', types);
+  UI.$('#q').addEventListener('input', render);
+  ['#area', '#day', '#type', '#pay', '#status', '#price'].forEach(function (s) { UI.$(s).addEventListener('change', render); });
+  render();
+  var p = UI.params();
+  if (p.id && Q.customer(p.id)) open(p.id);
+  var fq = p.fromQuote && Q.cquote(p.fromQuote);
+  var qp = {};
+  if (fq) fq.lines.forEach(function (l) { var mm = /^water\|(.+)$/.exec(l.item || ''); if (mm && l.price !== Q.stdPrice(mm[1], fq.custType)) qp[mm[1]] = l.price; });
+  if (fq && add) edit(null, { quoteId: fq.id, prices: Object.keys(qp).length ? qp : null, name: fq.org, phone: fq.phone, address: fq.address, area: fq.area, type: fq.custType, notes: 'From quotation ' + fq.id + (fq.contact ? ' · contact ' + fq.contact : '') + (fq.email ? ' · ' + fq.email : '') });
+  else if (p['new'] && add) edit(null);
+});
+</script>
+</body>
+</html>

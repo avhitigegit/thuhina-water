@@ -1,0 +1,147 @@
+<!doctype html>
+<!-- BRD: FR-27 (five statuses per bottle type), FR-28 (automatic stock movements), FR-29 (damage with responsibility: company / customer),
+     FR-30 (lost bottles and physical count adjustments with reason and user), FR-31 (low filled stock alert, minimum level),
+     BR-05, BR-06, BR-12 (no negative stock), BR-15 (quantities by type, not individual bottles). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Stock · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="inventory/inventory">
+<main id="app">
+  <div class="page-actions">
+    <button class="btn" id="dmg">Record damage</button>
+    <button class="btn" id="adj">Stock adjustment</button>
+  </div>
+  <div id="alerts"></div>
+  <div id="tabs"></div>
+  <div data-pane="stock">
+    <div class="card">
+      <h2>Bottles</h2>
+      <div id="bottles"></div>
+      <p class="small muted" style="margin-top:8px">Stock changes automatically from goods receipts, factory batches, deliveries, collections, old bottles handed in and write-offs. Change the minimum level in the table to set the low-stock alert.</p>
+    </div>
+    <div class="card"><h2>Other products</h2><div id="products"></div></div>
+  </div>
+  <div data-pane="damage" class="card"><h2>Damaged and lost bottles</h2><div id="damages"></div></div>
+  <div data-pane="moves" class="card">
+    <div class="toolbar"><div class="field"><label>Item</label><select id="m-item"><option value="">All</option></select></div><div class="field grow"><label>Search</label><input id="m-q" placeholder="Bill no., customer, batch…"></div></div>
+    <div id="moves"></div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today(), L = TW.BUCKET_LABEL;
+  function render() {
+    var low = Q.lowStock();
+    UI.$('#alerts').innerHTML = low.map(function (l) { return '<div class="banner bad"><b>Low stock:</b> ' + Q.btName(l.bt) + ' – ' + l.filled + ' filled in store, minimum ' + l.min + '. ' + db.stock[l.bt].factory + ' are at the factory. ' + App.link('production/production', null, 'Send empties to the factory') + '</div>'; }).join('');
+    UI.table('#bottles', {
+      columns: [{ h: 'Bottle', f: function (b) { return '<b>' + UI.esc(b.name) + '</b>'; } }]
+        .concat(TW.BUCKETS.map(function (k) { return { h: L[k], cls: 'num', f: function (b) { var v = db.stock[b.id][k]; return k === 'filled' && v < (db.minLevels[b.id] || 0) ? '<b style="color:var(--bad)">' + v + '</b>' : UI.num(v); } }; }))
+        .concat([{ h: 'In circulation', cls: 'num', f: function (b) { return '<b>' + UI.num(Q.pool(b.id)) + '</b>'; } },
+          { h: 'Min. filled', cls: 'num', f: function (b) { return '<input type="number" min="0" style="width:80px" data-min="' + b.id + '" value="' + (db.minLevels[b.id] == null ? '' : db.minLevels[b.id]) + '">'; } }]),
+      rows: Q.activeBottles()
+    });
+    var ct = Q.custTotals();
+    UI.$('#bottles').insertAdjacentHTML('beforeend', '<p class="small muted" style="margin-top:6px">With customers (20L) = held ' + (ct.held.B20 || 0) + ' + empties to collect ' + (ct.toCollect.B20 || 0) + ' + bottles owed ' + (ct.owed.B20 || 0) + '.</p>');
+    UI.table('#products', {
+      columns: [{ h: 'Product', k: 'name' }, { h: 'In stock', cls: 'num', f: function (p) { return p.stock <= 3 ? '<b style="color:var(--bad)">' + p.stock + '</b>' : p.stock; } }, { h: 'Cost value', cls: 'num', f: function (p) { return UI.lkr(p.stock * p.cost); } }],
+      rows: db.products.filter(function (p) { return p.active || p.stock; })
+    });
+    var rows = db.damages.map(function (d) { return { date: d.date, bt: d.bt, qty: d.qty, resp: d.resp, loc: d.location, reason: d.reason, cust: d.custId, by: d.user, kind: 'Damaged', rev: d.reversed }; });
+    db.adjustments.forEach(function (a) { rows.push({ date: a.date, bt: a.item, qty: a.mode === 'lost' ? -a.delta : a.delta, resp: a.mode === 'lost' ? 'Company' : '', loc: L[a.bucket] || 'Product stock', reason: a.reason, by: a.user, kind: a.mode === 'lost' ? 'Lost' : 'Count adjustment' }); });
+    rows.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+    UI.table('#damages', {
+      columns: [{ h: 'Date', f: function (r) { return D.dmy(r.date); } }, { h: 'Type', f: function (r) { return UI.badge(r.kind, r.kind === 'Damaged' ? 'bad' : r.kind === 'Lost' ? 'warn' : 'info') + (r.rev ? ' ' + UI.badge('reversed') : ''); } },
+        { h: 'Item', f: function (r) { return Q.bt(r.bt) ? Q.btShort(r.bt) : UI.esc((Q.product(r.bt) || {}).name || r.bt); } }, { h: 'Qty', cls: 'num', k: 'qty' }, { h: 'Responsibility', f: function (r) { return r.resp ? UI.statusBadge(r.resp) : ''; } },
+        { h: 'Where', k: 'loc' }, { h: 'Customer', f: function (r) { return r.cust ? UI.esc(Q.customer(r.cust).name) : ''; } }, { h: 'Reason', k: 'reason' }, { h: 'By', k: 'by' }],
+      rows: rows
+    });
+    moves();
+  }
+  UI.$('#bottles').addEventListener('change', function (e) { var bt = e.target.getAttribute('data-min'); if (bt && UI.result(TW.Ops.setMinLevel(bt, e.target.value), 'Minimum level saved')) render(); });
+  UI.$('#m-item').innerHTML += UI.options(Q.activeBottles().map(function (b) { return { v: b.id, l: b.name }; }).concat(db.products.map(function (p) { return { v: p.id, l: p.name }; })));
+  function sign(v) { return v ? '<span style="color:' + (v > 0 ? 'var(--ok)' : 'var(--bad)') + '">' + (v > 0 ? '+' : '') + v + '</span>' : ''; }
+  function moves() {
+    var it = UI.$('#m-item').value, q = UI.$('#m-q').value.toLowerCase();
+    UI.table('#moves', {
+      columns: [{ h: 'Date', f: function (m) { return D.dmy(m.date); } }, { h: 'Movement', f: function (m) { return UI.esc(m.desc) + '<div class="small muted mono">' + UI.esc(m.ref) + '</div>'; } },
+        { h: 'Item', f: function (m) { return Q.bt(m.item) ? Q.btShort(m.item) : UI.esc((Q.product(m.item) || {}).name || m.item); } }]
+        .concat(TW.BUCKETS.map(function (k) { return { h: L[k], cls: 'num', f: function (m) { return sign(m.d[k]); } }; }))
+        .concat([{ h: 'Product', cls: 'num', f: function (m) { return sign(m.d.stock); } }]),
+      rows: db.movements.filter(function (m) { return (!it || m.item === it) && (!q || (m.ref + ' ' + m.desc).toLowerCase().indexOf(q) >= 0); }).slice().reverse().slice(0, 200)
+    });
+  }
+  UI.$('#m-item').addEventListener('change', moves);
+  UI.$('#m-q').addEventListener('input', moves);
+
+  /* Record damage (FR-29, BR-05, BR-06) */
+  UI.$('#dmg').addEventListener('click', function () {
+    var m = UI.modal({
+      title: 'Record damaged bottles', wide: true,
+      body: '<div class="radio-row" style="margin-bottom:10px"><label class="check"><input type="radio" name="resp" value="Company" checked> <b>Company</b> – in store, at factory or during delivery (written off at company cost)</label><label class="check"><input type="radio" name="resp" value="Customer"> <b>Customer</b> – customer pays for a new bottle</label></div>' +
+        UI.custDatalist('dmg-dl', function (c) { return c.status === 'Active' && Q.sumBt(c.held); }) +
+        '<div class="form-grid"><div class="field req"><label>Date</label>' + UI.dateInput('date', td) + '</div><div class="field req"><label>Bottle</label><select name="bt">' + UI.btOptions('B20') + '</select></div><div class="field req"><label>Quantity</label><input name="qty" type="number" min="1" value="1"></div>' +
+        '<div class="field req co"><label>Where</label><select name="loc">' + UI.options(TW.DAMAGE_LOC) + '</select></div>' +
+        '<div class="field req cu span2"><label>Customer</label><input name="cust" list="dmg-dl" placeholder="Code, name or phone"></div>' +
+        '<div class="field cu"><label>Paid now (Rs.)</label><input name="paid" type="number" min="0"></div>' +
+        '<div class="field req full"><label>Reason</label><input name="reason" placeholder="e.g. Dropped while loading"></div></div><div id="eff" style="margin-top:10px"></div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Save', cls: 'primary', onClick: function (close, el) {
+        var date = D.fromDmy(UI.mval(el, 'date'));
+        if (el.querySelector('[name=resp]:checked').value === 'Company') {
+          if (UI.result(TW.Ops.companyDamage({ date: date, bt: UI.mval(el, 'bt'), qty: UI.mval(el, 'qty'), location: UI.mval(el, 'loc'), reason: UI.mval(el, 'reason').trim() }), 'Damage recorded and written off')) { close(); render(); }
+        } else {
+          var c = UI.findCustomer(UI.mval(el, 'cust'));
+          UI.withCreditApproval(function (ok) { return TW.Ops.customerDamage({ custId: c && c.id, date: date, bt: UI.mval(el, 'bt'), qty: UI.mval(el, 'qty'), mode: 'replace', chargeWater: true, reason: UI.mval(el, 'reason').trim(), paid: UI.mval(el, 'paid'), approveOverLimit: ok }); }, 'Customer damage recorded', function () { close(); render(); });
+        }
+        return false;
+      } }]
+    });
+    function upd() {
+      var co = m.el.querySelector('[name=resp]:checked').value === 'Company';
+      UI.$$('.co', m.el).forEach(function (x) { x.classList.toggle('hidden', !co); });
+      UI.$$('.cu', m.el).forEach(function (x) { x.classList.toggle('hidden', co); });
+      var bt = UI.mval(m.el, 'bt'), q = +UI.mval(m.el, 'qty') || 0;
+      if (co) m.el.querySelector('#eff').innerHTML = '<p class="small muted">The bottles are disposed of and written off. Value: ' + UI.lkr(q * (Q.deposit(bt) || 0)) + '.</p>';
+      else { var c = UI.findCustomer(UI.mval(m.el, 'cust')); var p = TW.Ops.previewCustDamage({ custId: c && c.id, bt: bt, qty: q, mode: 'replace', chargeWater: true }); m.el.querySelector('#eff').innerHTML = '<p class="small">Customer pays a new bottle (deposit) ' + UI.lkr(p.depositAmt) + ' + water ' + UI.lkr(p.water) + ' = <b>' + UI.lkr(p.amount) + '</b>. The damaged bottle is written off and a filled replacement is given. For more options use Sales &amp; Bills → Customer-damaged bottle.</p>'; }
+    }
+    m.el.addEventListener('input', upd); m.el.addEventListener('change', upd); upd();
+  });
+
+  /* Stock adjustment (FR-30, BR-12) */
+  UI.$('#adj').addEventListener('click', function () {
+    var m = UI.modal({
+      title: 'Stock adjustment',
+      body: '<div class="radio-row" style="margin-bottom:10px"><label class="check"><input type="radio" name="mode" value="count" checked> Physical count</label><label class="check"><input type="radio" name="mode" value="lost"> Lost bottles</label></div>' +
+        '<div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="field req"><label>Date</label>' + UI.dateInput('date', td) + '</div><div class="field req"><label>Item</label><select name="item">' + UI.options(Q.activeBottles().map(function (b) { return { v: b.id, l: b.name }; }).concat(db.products.map(function (p) { return { v: p.id, l: p.name }; })), 'B20') + '</select></div>' +
+        '<div class="field bo"><label>Status</label><select name="bucket"><option value="empty">Empty in store</option><option value="filled">Filled in store</option><option value="factory">At factory</option></select></div>' +
+        '<div class="field"><label>In system</label><input name="sys" readonly></div><div class="field mc"><label>Counted</label><input name="counted" type="number" min="0"></div><div class="field ml hidden"><label>Bottles lost</label><input name="qty" type="number" min="1"></div>' +
+        '<div class="field req full"><label>Reason</label><input name="reason" placeholder="e.g. Month-end count"></div></div><p class="small muted">Recorded by ' + UI.esc(TW.currentUser().name) + '.</p>',
+      buttons: [{ label: 'Cancel' }, { label: 'Save', cls: 'primary', onClick: function (close, el) {
+        var it = UI.mval(el, 'item'), b = it.charAt(0) === 'B';
+        if (UI.result(TW.Ops.adjustStock({ date: D.fromDmy(UI.mval(el, 'date')), item: it, bucket: b ? UI.mval(el, 'bucket') : '', mode: b ? el.querySelector('[name=mode]:checked').value : 'count', counted: UI.mval(el, 'counted'), qty: UI.mval(el, 'qty'), reason: UI.mval(el, 'reason').trim() }), 'Adjustment saved')) { close(); render(); }
+        return false;
+      } }]
+    });
+    function upd() {
+      var it = UI.mval(m.el, 'item'), b = it.charAt(0) === 'B', mode = b ? m.el.querySelector('[name=mode]:checked').value : 'count';
+      UI.$$('.bo', m.el).forEach(function (x) { x.classList.toggle('hidden', !b); });
+      UI.$$('.mc', m.el).forEach(function (x) { x.classList.toggle('hidden', mode !== 'count'); });
+      UI.$$('.ml', m.el).forEach(function (x) { x.classList.toggle('hidden', mode !== 'lost'); });
+      m.el.querySelector('[name=sys]').value = b ? db.stock[it][UI.mval(m.el, 'bucket')] : Q.product(it).stock;
+    }
+    m.el.addEventListener('change', upd); upd();
+  });
+
+  UI.tabs('#tabs', [{ id: 'stock', label: 'Stock' }, { id: 'damage', label: 'Damage & adjustments' }, { id: 'moves', label: 'Movements' }]);
+  render();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,274 @@
+<!doctype html>
+<!-- BRD: FR-34 (scheduled exchange from the paper bill), FR-35 / BR-04 ("Left at door": phone agreement + note; empties to collect, not a shortage),
+     FR-36 (extra empties returned clear the "to collect" balance), FR-38 / BR-07 (shortage = bottles owed, with a note), FR-41 / BR-13 (duplicate bill check),
+     FR-46 (next delivery date moves forward), FR-47 (cash on the bill), FR-48 / BR-09 (credit limit check), BR-03 (water price only – the customer's agreed price when one is in force, FR-05/BR-08), NFR-04 (keyboard entry). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Enter Bills · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+<style>
+  .bill-grid td.st { font-size: 12px; min-width: 160px; }
+  .bill-grid td.st .ok { color: var(--ok); font-weight: 600; }
+  .bill-grid td.st .err { color: var(--bad); }
+  .bill-grid td.st .warn { color: var(--warn); }
+  .bill-grid .bt-head { text-align: center; border-left: 1px solid var(--border); }
+  .bill-grid .bl { border-left: 1px solid var(--border); }
+  .bill-grid input[data-f=bill] { width: 78px; }
+  .bill-grid input[data-f=date] { width: 124px; }
+  .bill-grid input[data-f=cust] { width: 250px; }
+  .bill-grid input[type=number] { width: 58px; }
+  .bill-grid input[data-f=paid] { width: 86px; }
+  .bill-grid input[data-f=note] { width: 190px; }
+  .bill-grid select { width: 118px; }
+  .keys > span { margin-right: 14px; white-space: nowrap; display: inline-block; }
+</style>
+</head>
+<body data-page="sales/enter-bills">
+<main id="app">
+  <div class="page-actions"><button class="btn primary" id="post">Save bills (Ctrl+S)</button></div>
+  <div class="card no-print">
+    <div class="toolbar" style="margin-bottom:6px">
+      <div class="field"><label>Bill date</label><input id="bdate" class="date" maxlength="10"></div>
+      <button class="btn" id="load-due" title="List the customers due on the bill date again">Refresh list</button>
+      <button class="btn" id="add-row">+ Add row</button>
+    </div>
+    <div id="day-info" class="banner info" style="margin:6px 0"></div>
+    <div class="small muted keys"><span><span class="kbd">Enter</span> next field</span><span><span class="kbd">Enter</span> on the last field → new row</span><span><span class="kbd">Ctrl</span>+<span class="kbd">S</span> save all</span><span>Customer: type code (e.g. <b>17</b>), phone or name</span><span>Type: <b>E</b> Exchange · <b>L</b> Left at door</span></div>
+  </div>
+  <div class="card" style="padding:10px">
+    <div class="table-wrap">
+      <table class="bill-grid" id="grid"><thead id="ghead"></thead><tbody id="gbody"></tbody><tfoot id="gfoot"></tfoot></table>
+    </div>
+  </div>
+  <div class="grid side" style="grid-template-columns:minmax(0,3fr) minmax(280px,2fr)">
+    <div class="card" id="cust-card"><p class="muted">Click a row to see the customer's bottle balances.</p></div>
+    <div class="card">
+      <h3>Rules</h3>
+      <ul class="small" style="padding-left:18px;margin:0">
+        <li>Exchange: the customer pays only the water price.</li>
+        <li>Fewer empties than filled → the difference becomes <b>bottles owed</b> (note required).</li>
+        <li>More empties than filled → clears empties left at the door, then bottles owed.</li>
+        <li><b>Left at door</b>: tick the phone agreement and add a note. The empties are collected next trip – not a shortage.</li>
+        <li>The system gives every bill its own number (B000…). The paper bill number is kept only to stop the same paper bill being entered twice.</li>
+        <li>Saving moves the customer's next delivery date forward.</li>
+      </ul>
+    </div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today();
+  var BTS = Q.activeBottles();
+  var rows = [], activeRow = null;
+  document.querySelector('.content').insertAdjacentHTML('beforeend', UI.custDatalist('cust-dl', function (c) { return c.status === 'Active'; }));
+  UI.$('#bdate').value = D.dmy(td);
+  UI.$('#ghead').innerHTML = '<tr><th rowspan="2">#</th><th rowspan="2" title="Number printed on the paper bill book – used to stop the same bill being entered twice">Paper bill no.</th><th rowspan="2">Date</th><th rowspan="2">Customer</th><th rowspan="2">Type</th>' +
+    BTS.map(function (b) { return '<th colspan="2" class="bt-head">' + b.litres + 'L</th>'; }).join('') +
+    '<th rowspan="2" class="bl">Cash paid</th><th rowspan="2" title="Left at door – customer agreed by phone">Phone ✓</th><th rowspan="2">Note</th><th rowspan="2">Result</th><th rowspan="2"></th></tr><tr>' +
+    BTS.map(function () { return '<th class="num bl">Filled</th><th class="num">Empties</th>'; }).join('') + '</tr>';
+
+  function val(r, f) { return r.el.querySelector('[data-f="' + f + '"]'); }
+  function nextBillNo() {
+    for (var i = rows.length - 1; i >= 0; i--) { var v = val(rows[i], 'bill').value.trim(); if (/^\d+$/.test(v)) return String(+v + 1); }
+    var max = 0;
+    db.txns.forEach(function (t) { if (/^\d+$/.test(t.paperNo || '') && +t.paperNo > max) max = +t.paperNo; });
+    return max ? String(max + 1) : '';
+  }
+  function addRow(pre) {
+    pre = pre || {};
+    var tr = document.createElement('tr');
+    var r = { el: tr, posted: false, paidTouched: false };
+    tr.innerHTML = '<td class="calc idx"></td>' +
+      '<td><input data-f="bill" value="' + UI.esc(pre.bill != null ? pre.bill : nextBillNo()) + '" inputmode="numeric"></td>' +
+      '<td><input data-f="date" class="date" maxlength="10" value="' + UI.esc(pre.date ? D.dmy(pre.date) : UI.$('#bdate').value) + '"></td>' +
+      '<td><input data-f="cust" list="cust-dl" value="' + UI.esc(pre.cust ? UI.custLabel(pre.cust) : '') + '" placeholder="Code / phone / name"></td>' +
+      '<td><select data-f="kind"><option value="exchange">Exchange</option><option value="leftdoor">Left at door</option></select></td>' +
+      BTS.map(function (b) {
+        var u = pre.cust ? (pre.cust.usual[b.id] || '') : '';
+        var e = pre.cust ? (u ? u + (pre.cust.toCollect[b.id] || 0) : '') : '';
+        return '<td class="bl"><input data-f="f_' + b.id + '" type="number" min="0" value="' + u + '"></td><td><input data-f="e_' + b.id + '" type="number" min="0" value="' + e + '"></td>';
+      }).join('') +
+      '<td class="bl"><input data-f="paid" type="number" min="0" step="10"></td><td class="center"><input data-f="phone" type="checkbox" disabled></td>' +
+      '<td><input data-f="note"></td><td class="st"></td><td><button class="btn sm danger" data-del title="Remove row" tabindex="-1">×</button></td>';
+    UI.$('#gbody').appendChild(tr);
+    rows.push(r);
+    if (pre.cust) { r.cust = pre.cust; r.prefilledFor = pre.cust.id; }
+    tr.addEventListener('focusin', function () { setActive(r); });
+    tr.addEventListener('input', function (e) { r.auto = false; if (e.target.getAttribute('data-f') === 'paid') r.paidTouched = true; recalc(r); });
+    tr.addEventListener('change', function (e) { var f = e.target.getAttribute('data-f'); if (f === 'cust') fillUsual(r); if (f === 'kind') r.paidTouched = false; recalc(r); });
+    val(r, 'kind').addEventListener('keydown', function (e) {
+      if (e.key === 'e' || e.key === 'E') { e.target.value = 'exchange'; e.preventDefault(); recalc(r); }
+      if (e.key === 'l' || e.key === 'L') { e.target.value = 'leftdoor'; e.preventDefault(); recalc(r); }
+    });
+    tr.querySelector('[data-del]').addEventListener('click', function () { removeRow(r); });
+    renumber(); recalc(r);
+    return r;
+  }
+  function removeRow(r) {
+    if (r.posted) return UI.toast('Saved bills cannot be deleted. Use Sales & Bills → Reverse.', 'warn');
+    r.el.remove(); rows.splice(rows.indexOf(r), 1); renumber(); totals();
+    if (!rows.length) addRow();
+  }
+  function renumber() { rows.forEach(function (r, i) { r.el.querySelector('.idx').textContent = i + 1; }); }
+  function fillUsual(r) {
+    var c = UI.findCustomer(val(r, 'cust').value);
+    if (c && c.id !== r.prefilledFor) {
+      r.prefilledFor = c.id;
+      val(r, 'cust').value = UI.custLabel(c);
+      BTS.forEach(function (b) {
+        var u = c.usual[b.id] || 0;
+        val(r, 'f_' + b.id).value = u || '';
+        if (val(r, 'kind').value === 'exchange') val(r, 'e_' + b.id).value = u ? u + (c.toCollect[b.id] || 0) : '';
+      });
+      r.paidTouched = false;
+    }
+    r.cust = c;
+  }
+  function input(r) {
+    return { paperNo: val(r, 'bill').value.trim(), date: D.fromDmy(val(r, 'date').value), custId: r.cust ? r.cust.id : null, kind: val(r, 'kind').value,
+      lines: BTS.map(function (b) { return { bt: b.id, filled: val(r, 'f_' + b.id).value, empties: val(r, 'e_' + b.id).value }; }),
+      paid: val(r, 'paid').value, phoneConfirmed: val(r, 'phone').checked, note: val(r, 'note').value };
+  }
+  function recalc(r) {
+    if (r.posted) return;
+    r.cust = UI.findCustomer(val(r, 'cust').value);
+    var inp = input(r), st = r.el.querySelector('.st'), msgs = [], err = false, left = inp.kind === 'leftdoor';
+    val(r, 'phone').disabled = !left;
+    BTS.forEach(function (b) { val(r, 'e_' + b.id).disabled = left; if (left) val(r, 'e_' + b.id).value = ''; });
+    val(r, 'note').placeholder = left ? 'Who agreed, where left' : '';
+    var dupDb = inp.paperNo && Q.billExists(inp.paperNo);
+    var dupGrid = inp.paperNo && rows.some(function (o) { return o !== r && val(o, 'bill').value.trim().toUpperCase() === inp.paperNo.toUpperCase(); });
+    val(r, 'bill').classList.toggle('invalid', !!(dupDb || dupGrid));
+    if (dupDb) { err = true; msgs.push('<span class="err">Paper bill ' + UI.esc(inp.paperNo) + ' already entered (' + D.dmy(dupDb.date) + ', ' + UI.esc((Q.customer(dupDb.custId) || {}).name || '') + ')</span>'); }
+    else if (dupGrid) { err = true; msgs.push('<span class="err">Same bill no. twice</span>'); }
+    val(r, 'date').classList.toggle('invalid', !inp.date);
+    var custEl = val(r, 'cust');
+    custEl.classList.toggle('invalid', !!custEl.value && !r.cust);
+    if (custEl.value && !r.cust) { err = true; msgs.push('<span class="err">Customer not found</span>'); }
+    var pv = r.cust ? TW.Ops.previewBill({ custId: r.cust.id, date: inp.date || td, kind: inp.kind, lines: inp.lines }) : null;
+    if (pv) {
+      if (!r.paidTouched) val(r, 'paid').value = r.cust.payType === 'Cash' && !left ? (pv.amount || '') : '';
+      if (pv.amount) msgs.push('<b>' + UI.lkr(pv.amount) + '</b>' + (r.cust.payType !== 'Cash' ? ' <span class="muted">→ ' + r.cust.payType + '</span>' : ''));
+      // Unit price used for this customer on the bill date – agreed prices are marked (FR-05).
+      pv.lines.forEach(function (l) { if (l.filled && Q.isAgreed(r.cust, l.bt, inp.date || td)) msgs.push('<span class="muted" title="Agreed price for this customer">' + Q.btShort(l.bt) + ' @ ' + UI.lkr(l.price) + ' agreed</span>'); });
+      pv.lines.forEach(function (l) {
+        var b = Q.btShort(l.bt);
+        if (l.owed) msgs.push('<span class="warn">+' + l.owed + ' ' + b + ' owed</span>');
+        if (l.toCollect) msgs.push('<span class="warn">' + l.toCollect + ' ' + b + ' to collect</span>');
+        if (l.fromCollect) msgs.push('<span class="ok">collects ' + l.fromCollect + ' left last trip</span>');
+        if (l.fromOwed) msgs.push('<span class="ok">settles ' + l.fromOwed + ' owed</span>');
+        if (l.excess) { err = true; msgs.push('<span class="err">' + l.excess + ' extra empties – customer does not have them</span>'); }
+        if (l.filled && !(r.cust.held[l.bt] || 0)) { err = true; msgs.push('<span class="err">No ' + b + ' bottles yet – use First purchase</span>'); }
+      });
+      if (pv.owedAdd && !inp.note.trim() && !left) msgs.push('<span class="err">Note needed for the shortage</span>');
+      if (left && !inp.phoneConfirmed) msgs.push('<span class="err">Tick phone agreement</span>');
+      if (left && !inp.note.trim()) msgs.push('<span class="err">Note needed</span>');
+      var chk = Q.creditCheck(r.cust, pv.amount - (+val(r, 'paid').value || 0));
+      if (chk.exceeds) msgs.push('<span class="warn">Over credit limit</span>');
+    }
+    st.innerHTML = msgs.join('<br>');
+    r.el.classList.toggle('err', err);
+    r.pv = pv;
+    if (r === activeRow) showCard(r);
+    totals();
+  }
+  function setActive(r) { if (activeRow) activeRow.el.classList.remove('active-row'); activeRow = r; r.el.classList.add('active-row'); showCard(r); }
+  function showCard(r) {
+    var c = r.cust;
+    if (!c) { UI.$('#cust-card').innerHTML = '<p class="muted">Select a customer to see bottle balances.</p>'; return; }
+    var after = null;
+    if (!r.posted && r.pv) { after = r.pv.after; after.balance = Q.balance(c.id) + r.pv.amount - (+val(r, 'paid').value || 0); }
+    UI.$('#cust-card').innerHTML = (r.posted ? '<div class="banner ok">Saved – balances updated.</div>' : '<div class="small muted" style="margin-bottom:6px">Balances <b>after</b> this bill:</div>') + UI.custCard(c, after);
+  }
+  function totals() {
+    var n = 0, amt = 0, paid = 0, f = {}, e = {};
+    rows.forEach(function (r) {
+      if (!r.cust) return;
+      n++; amt += r.pv ? r.pv.amount : 0; paid += +val(r, 'paid').value || 0;
+      BTS.forEach(function (b) { f[b.id] = (f[b.id] || 0) + (+val(r, 'f_' + b.id).value || 0); e[b.id] = (e[b.id] || 0) + (+val(r, 'e_' + b.id).value || 0); });
+    });
+    UI.$('#gfoot').innerHTML = '<tr><td></td><td colspan="4">' + n + ' bill(s) · ' + rows.filter(function (r) { return r.posted; }).length + ' saved</td>' + BTS.map(function (b) { return '<td class="num bl">' + (f[b.id] || 0) + '</td><td class="num">' + (e[b.id] || 0) + '</td>'; }).join('') +
+      '<td class="num bl">' + UI.lkr(paid) + '</td><td></td><td colspan="3">Total ' + UI.lkr(amt) + '</td></tr>';
+  }
+  UI.$('#gbody').addEventListener('keydown', function (e) {
+    var tr = e.target.closest('tr'), r = rows.filter(function (x) { return x.el === tr; })[0];
+    if (!r || e.key !== 'Enter') return;
+    e.preventDefault();
+    if (e.target.getAttribute('data-f') === 'cust') { fillUsual(r); recalc(r); }
+    var fields = UI.$$('input:not(:disabled), select:not(:disabled)', tr);
+    var i = fields.indexOf(e.target);
+    if (i === fields.length - 1) { var idx = rows.indexOf(r); var next = rows[idx + 1] || addRow(); val(next, 'bill').focus(); val(next, 'bill').select(); }
+    else { fields[i + 1].focus(); if (fields[i + 1].select) fields[i + 1].select(); }
+  });
+  document.addEventListener('keydown', function (e) { if ((e.ctrlKey || e.metaKey) && (e.key === 's' || e.key === 'S')) { e.preventDefault(); postAll(); } });
+  function postRow(r, approve) {
+    var inp = input(r); inp.approveOverLimit = approve;
+    var res = TW.Ops.postBill(inp), st = r.el.querySelector('.st');
+    if (res.ok) {
+      r.posted = true;
+      r.el.classList.remove('err'); r.el.classList.add('posted');
+      UI.$$('input, select', r.el).forEach(function (x) { x.disabled = true; });
+      st.innerHTML = '<span class="ok">✓ Saved as ' + res.txn.billNo + '</span><br><span class="muted">' + UI.lkr(res.txn.amount) + (res.txn.paid ? ', paid ' + UI.lkr(res.txn.paid) : '') + (res.schedule && res.schedule.after !== res.schedule.before ? '<br>next delivery ' + D.dmy(res.schedule.after) : '') + '</span>';
+      r.cust = Q.customer(r.cust.id);
+      if (r === activeRow) showCard(r);
+      return true;
+    }
+    r.el.classList.add('err');
+    st.innerHTML = '<span class="err">' + UI.esc(res.error) + '</span>' + (res.code === 'CREDIT_LIMIT' && App.role === 'Admin' ? '<br><button class="btn sm" data-approve>Approve &amp; save</button>' : '');
+    var btn = st.querySelector('[data-approve]');
+    if (btn) btn.addEventListener('click', function () { if (postRow(r, true)) { UI.toast('Saved with Admin approval', 'ok'); totals(); } });
+    return false;
+  }
+  function postAll() {
+    var pending = rows.filter(function (r) { return !r.posted && (r.cust || val(r, 'cust').value); });
+    if (!pending.length) return UI.toast('Nothing to save yet.', 'warn');
+    var ok = 0, bad = 0;
+    pending.forEach(function (r) { if (postRow(r, false)) ok++; else bad++; });
+    totals();
+    UI.toast(ok + ' bill(s) saved' + (bad ? ', ' + bad + ' need attention (see Result)' : ''), bad ? 'warn' : 'ok');
+    if (!bad) { var nr = addRow(); val(nr, 'bill').focus(); }
+  }
+  UI.$('#post').addEventListener('click', postAll);
+  UI.$('#add-row').addEventListener('click', function () { var r = addRow(); val(r, 'bill').focus(); });
+  /* Selecting a bill date lists the customers due on that date automatically (FR-42). */
+  function loadDate(d) {
+    // drop unsaved rows that were filled in automatically or are still empty; keep rows the user typed
+    rows.slice().forEach(function (r) { if (!r.posted && (r.auto || !val(r, 'cust').value)) { r.el.remove(); rows.splice(rows.indexOf(r), 1); } });
+    var inGrid = rows.map(function (r) { return r.cust && r.cust.id; });
+    var list = Q.dueList(d);
+    var done = list.filter(function (x) { return x.entered.length; });
+    var noBottles = list.filter(function (x) { return !x.entered.length && !Q.sumBt(x.cust.held); });
+    var due = list.filter(function (x) { return !x.entered.length && Q.sumBt(x.cust.held) && inGrid.indexOf(x.cust.id) < 0; });
+    due.forEach(function (x) { var r = addRow({ cust: x.cust, date: d, bill: '' }); r.auto = true; });
+    if (!rows.some(function (r) { return !r.posted; })) addRow({ date: d });
+    renumber();
+    UI.$('#day-info').innerHTML = '<b>' + D.dayName(d) + ' ' + D.dmy(d) + ':</b> ' + list.length + ' customer(s) due' +
+      (due.length ? ' – <b>' + due.length + ' listed below</b> with their usual quantities' : '') +
+      (done.length ? ' · ' + done.length + ' already entered (' + done.map(function (x) { return UI.esc(x.cust.name); }).join(', ') + ')' : '') +
+      (noBottles.length ? ' · ' + noBottles.length + ' new customer(s) without bottles – use First purchase: ' + noBottles.map(function (x) { return UI.esc(x.cust.name); }).join(', ') : '') +
+      (!list.length ? ' – nobody is due. You can still add rows by hand.' : '');
+    var firstPending = rows.filter(function (r) { return !r.posted; })[0];
+    if (firstPending) { val(firstPending, 'bill').focus(); setActive(firstPending); }
+  }
+  UI.$('#bdate').addEventListener('change', function () {
+    var d = UI.readDate(UI.$('#bdate'));
+    if (d && d > td) { UI.toast('Bills cannot be entered for a future date', 'bad'); UI.$('#bdate').value = D.dmy(td); d = td; }
+    if (d) loadDate(d);
+  });
+  UI.$('#load-due').addEventListener('click', function () { var d = UI.readDate(UI.$('#bdate')); if (d) loadDate(d); });
+  var p = UI.params();
+  if (p.cust && Q.customer(p.cust)) {
+    var first = addRow({ cust: Q.customer(p.cust) });
+    setActive(first); val(first, 'bill').focus();
+    UI.$('#day-info').innerHTML = 'Entering a bill for <b>' + UI.esc(Q.customer(p.cust).name) + '</b>. Change the bill date to list all customers due that day.';
+  } else loadDate(td);
+});
+</script>
+</body>
+</html>

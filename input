@@ -1,0 +1,15 @@
+Go, with these changes:
+
+1. Delivery Staff → Daily Delivery List after login: OK. Their sidebar shows only the
+   delivery list and its print view.
+2. Accountant → view-only factory-payments.html: OK. Admin still records factory
+   batches and payments.
+3. Prices: OK, but the 20L deposit of Rs. 1,000 is the real figure (don't mark it as an
+   example). Add customer-type pricing for 10L too: Household 200 / Shop 190 /
+   Office 185 / Factory 175.
+4. Data: don't reset between pages. Store the demo data in localStorage so changes on
+   one page show on the others (e.g. a "Left at door" bill updates the customer
+   profile, delivery list, stock and dashboard). Seed it from the shared placeholder
+   data on first load, and add a "Reset demo data" button in the top bar. Wrap
+   localStorage in try/catch so pages still work if it is unavailable. Keep it plain
+   HTML/CSS/JS with no external libraries so it opens from disk.

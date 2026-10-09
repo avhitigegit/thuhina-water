@@ -1,0 +1,251 @@
+<!doctype html>
+<!-- BRD: FR-15 (quotation request), FR-16 (record supplier quotations, attach scan), FR-17 (side-by-side comparison, owner chooses manually with reason),
+     FR-18 (PO from chosen quotation, edit before approval, unique number, print/PDF), FR-19 (PO status), FR-20 (receive goods against PO, damaged on arrival),
+     FR-21 (amounts owed to suppliers and payments), FR-28 (stock updated), BR-10 (PO only from chosen quotation; receive only against approved PO). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Purchasing · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="purchasing/purchasing">
+<main id="app">
+  <div id="tabs"></div>
+  <div data-pane="quotes" class="card">
+    <div class="card-head"><h2>Quotation requests</h2><button class="btn primary write-only" id="new-qr">+ New request</button></div>
+    <p class="small muted">Ask suppliers for prices, record their quotations, compare them side by side and choose one. The chosen quotation becomes a purchase order.</p>
+    <div id="qr-list"></div>
+  </div>
+  <div data-pane="pos" class="card">
+    <div class="card-head"><h2>Purchase orders</h2><select id="po-st" style="width:auto"><option value="">All statuses</option></select></div>
+    <div id="po-list"></div>
+  </div>
+  <div data-pane="pay">
+    <div class="card">
+      <div class="card-head"><h2>Amounts owed to suppliers</h2><button class="btn primary write-only" id="new-pay">+ Record payment</button></div>
+      <div id="owed"></div>
+    </div>
+    <div class="card"><h2>Payments made</h2><div id="pays"></div></div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today();
+  var canEdit = !App.viewOnly;
+  var tabs;
+
+  /* ================= Quotations ================= */
+  function qrList() {
+    UI.table('#qr-list', {
+      columns: [
+        { h: 'Request', f: function (q) { return '<b class="mono">' + q.id + '</b><div class="small muted">' + D.dmy(q.date) + '</div>'; } },
+        { h: 'Items', f: function (q) { return q.items.map(function (i) { return UI.num(i.qty) + ' × ' + UI.esc(Q.itemName(i.item)); }).join('<br>'); } },
+        { h: 'Quotations', f: function (q) { var n = Q.quotesFor(q.id).length; return n + ' of ' + q.suppliers.length + ' suppliers'; } },
+        { h: 'Chosen', f: function (q) { var c = Q.quotesFor(q.id).filter(function (x) { return x.selected; })[0]; return c ? UI.esc(Q.supplier(c.supplierId).name) : ''; } },
+        { h: 'Status', f: function (q) { return UI.statusBadge(q.status); } },
+        { h: '', cls: 'actions', f: function (q) { return '<button class="btn sm primary" data-qr="' + q.id + '">Open</button>'; } }
+      ],
+      rows: db.qrs.slice().reverse()
+    });
+  }
+  UI.$('#qr-list').addEventListener('click', function (e) { var id = e.target.getAttribute('data-qr'); if (id) openQR(id); });
+
+  function itemOpts() { return Q.activeBottles().map(function (b) { return { v: b.id, l: 'Empty ' + b.name }; }).concat(db.products.filter(function (p) { return p.active; }).map(function (p) { return { v: p.id, l: p.name }; })); }
+  var nq = UI.$('#new-qr');
+  if (nq) nq.addEventListener('click', function () {
+    var line = function (it) { return '<tr><td><select name="item">' + UI.options(itemOpts(), it || '', { blank: 'Select item' }) + '</select></td><td><input name="qty" type="number" min="1" style="width:110px"></td><td><button type="button" class="btn sm danger" data-del>×</button></td></tr>'; };
+    var m = UI.modal({
+      title: 'New quotation request', wide: true,
+      body: '<div class="form-grid"><div class="field"><label>Request no.</label><input value="Generated on save" readonly></div><div class="field"><label>Date</label>' + UI.dateInput('date', td) + '</div><div class="field"><label>Needed by</label>' + UI.dateInput('req', '') + '</div><div class="field span2"><label>Note</label><input name="note" placeholder="Purpose"></div></div>' +
+        '<div class="section-title">Items</div><table><tbody id="lines">' + line('B20') + '</tbody></table><button type="button" class="btn sm" id="addl" style="margin-top:6px">+ Add item</button>' +
+        '<div class="section-title">Suppliers asked to quote <span class="small muted" style="text-transform:none;font-weight:400">– suppliers of the chosen items are ticked for you</span></div><div class="stack" id="sups">' + db.suppliers.filter(function (s) { return s.active; }).map(function (s) { return '<label class="check"><input type="checkbox" value="' + s.id + '" class="sup"> <b>' + UI.esc(s.name) + '</b> <span class="small muted">' + (s.items || []).map(function (i) { return UI.esc(Q.itemName(i)); }).join(', ') + '</span></label>'; }).join('') + '</div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Create request', cls: 'primary', onClick: function (close, el) {
+        var items = UI.$$('#lines tr', el).map(function (tr) { return { item: tr.querySelector('[name=item]').value, qty: tr.querySelector('[name=qty]').value }; });
+        var r = TW.Ops.createQR({ date: D.fromDmy(UI.mval(el, 'date')), requiredBy: D.fromDmy(UI.mval(el, 'req')) || '', items: items, suppliers: UI.$$('.sup:checked', el).map(function (x) { return x.value; }), note: UI.mval(el, 'note') });
+        if (UI.result(r, r.ok ? r.qr.id + ' created' : '')) { close(); qrList(); }
+        return false;
+      } }]
+    });
+    m.el.querySelector('#addl').addEventListener('click', function () { m.el.querySelector('#lines').insertAdjacentHTML('beforeend', line()); });
+    function tick() {
+      var chosen = UI.$$('#lines [name=item]', m.el).map(function (s) { return s.value; }).filter(Boolean);
+      UI.$$('.sup', m.el).forEach(function (cb) { var s = Q.supplier(cb.value); cb.checked = (s.items || []).some(function (i) { return chosen.indexOf(i) >= 0; }); });
+    }
+    m.el.querySelector('#lines').addEventListener('change', tick);
+    tick();
+    m.el.addEventListener('click', function (e) { if (e.target.hasAttribute('data-del')) e.target.closest('tr').remove(); });
+  });
+
+  /* Side-by-side comparison (FR-17) */
+  function openQR(id) {
+    var qr = Q.qr(id), quotes = Q.quotesFor(id), chosen = quotes.filter(function (q) { return q.selected; })[0];
+    var po = db.pos.filter(function (p) { return p.qrId === id && p.status !== 'Cancelled'; })[0];
+    var open = qr.status === 'Open' || qr.status === 'Quotes received';
+    var h = '<p class="muted">' + D.dmy(qr.date) + (qr.requiredBy ? ' · needed by ' + D.dmy(qr.requiredBy) : '') + (qr.note ? ' · ' + UI.esc(qr.note) : '') + '</p>';
+    if (chosen) h += '<div class="banner ok">Chosen: <b>' + UI.esc(Q.supplier(chosen.supplierId).name) + '</b> by ' + UI.esc(chosen.selectedBy) + ' – “' + UI.esc(chosen.reason) + '”' + (po ? ' · Purchase order <b>' + po.id + '</b> (' + po.status + ')' : '') + '</div>';
+    else if (quotes.length) h += '<div class="banner info">Compare and choose one. Lowest prices are highlighted only as information – the system does not choose.</div>';
+    if (!quotes.length) h += '<p class="empty-state">No quotations recorded yet.</p>';
+    else {
+      h += '<div class="table-wrap"><table><thead><tr><th></th>' + quotes.map(function (q) { return '<th style="min-width:170px' + (q.selected ? ';background:var(--ok-soft)' : '') + '">' + UI.esc(Q.supplier(q.supplierId).name) + '<div class="small muted" style="font-weight:400">' + UI.esc(q.ref) + ' · ' + D.dmy(q.date) + '</div></th>'; }).join('') + '</tr></thead><tbody>';
+      qr.items.forEach(function (it) {
+        var pr = quotes.map(function (q) { var l = q.lines.filter(function (x) { return x.item === it.item; })[0]; return l && l.price ? l.price : null; });
+        var valid = pr.filter(function (x) { return x != null; }), min = Math.min.apply(null, valid);
+        h += '<tr><td><b>' + UI.esc(Q.itemName(it.item)) + '</b><div class="small muted">Qty ' + UI.num(it.qty) + '</div></td>' + pr.map(function (p) { return p == null ? '<td class="muted">Not quoted</td>' : '<td' + (p === min && valid.length > 1 ? ' style="background:#f2faf5"' : '') + '><b>' + UI.lkr(p) + '</b> each' + (p === min && valid.length > 1 ? ' ' + UI.badge('lowest', 'ok') : '') + '</td>'; }).join('') + '</tr>';
+      });
+      h += '<tr><td><b>Total</b></td>' + quotes.map(function (q) { return '<td><b>' + UI.lkr(Q.quoteTotal(q)) + '</b></td>'; }).join('') + '</tr>' +
+        '<tr><td>Delivery</td>' + quotes.map(function (q) { return '<td>' + q.deliveryDays + ' days</td>'; }).join('') + '</tr>' +
+        '<tr><td>Valid until</td>' + quotes.map(function (q) { return '<td>' + D.dmy(q.validUntil) + (q.validUntil < td ? ' ' + UI.badge('expired', 'bad') : '') + '</td>'; }).join('') + '</tr>' +
+        '<tr><td>Notes</td>' + quotes.map(function (q) { return '<td class="small">' + UI.esc(q.notes || '–') + (q.attachment ? '<div>📎 ' + UI.esc(q.attachment) + '</div>' : '') + '</td>'; }).join('') + '</tr>';
+      if (!chosen && canEdit) h += '<tr><td></td>' + quotes.map(function (q) { return '<td><button class="btn primary sm" data-choose="' + q.id + '">Choose</button></td>'; }).join('') + '</tr>';
+      h += '</tbody></table></div>';
+    }
+    var btns = [{ label: 'Close' }];
+    if (canEdit && open && quotes.length < qr.suppliers.length) btns.unshift({ label: '+ Add quotation', onClick: function (close) { close(); addQuote(qr); } });
+    if (canEdit && chosen && !po) btns.push({ label: 'Create purchase order', cls: 'primary', onClick: function (close) { var r = TW.Ops.createPO(chosen.id); if (UI.result(r, 'Purchase order ' + (r.po ? r.po.id : '') + ' created as Draft')) { close(); refresh(); tabs.show('pos'); openPO(r.po.id); } } });
+    var m = UI.modal({ title: qr.id + ' – ' + qr.items.map(function (i) { return i.qty + ' × ' + Q.itemName(i.item); }).join(', '), wide: true, body: h, buttons: btns });
+    m.el.addEventListener('click', function (e) {
+      var qid = e.target.getAttribute('data-choose'); if (!qid) return;
+      var q = Q.quote(qid);
+      m.close();
+      UI.prompt('Choose ' + Q.supplier(q.supplierId).name + '?', 'Total ' + UI.money(Q.quoteTotal(q)) + '. Reason for choosing:', 'Choose').then(function (reason) {
+        if (reason && UI.result(TW.Ops.selectQuote(qid, reason), 'Quotation chosen')) refresh();
+        openQR(id);
+      });
+    });
+  }
+  function addQuote(qr) {
+    var done = Q.quotesFor(qr.id).map(function (x) { return x.supplierId; });
+    var pend = qr.suppliers.filter(function (s) { return done.indexOf(s) < 0; });
+    var m = UI.modal({
+      title: 'Add quotation – ' + qr.id, wide: true,
+      body: '<div class="form-grid"><div class="field req span2"><label>Supplier</label><select name="sup">' + UI.options(pend.map(function (s) { return { v: s, l: Q.supplier(s).name }; })) + '</select></div><div class="field"><label>Supplier reference (on their quotation)</label><input name="ref" placeholder="optional"></div>' +
+        '<div class="field req"><label>Date</label>' + UI.dateInput('date', td) + '</div><div class="field req"><label>Valid until</label>' + UI.dateInput('valid', D.add(td, 30)) + '</div><div class="field req"><label>Delivery (days)</label><input name="days" type="number" value="7"></div></div>' +
+        '<div class="section-title">Unit prices (leave blank if not quoted)</div><table><tbody>' + qr.items.map(function (i, n) { return '<tr><td>' + UI.esc(Q.itemName(i.item)) + '</td><td class="num">× ' + UI.num(i.qty) + '</td><td><input type="number" min="0" step="0.01" name="p' + n + '" style="width:130px" placeholder="Rs. each"></td><td class="num" data-t="' + n + '"></td></tr>'; }).join('') + '</tbody></table>' +
+        '<div class="form-grid" style="margin-top:10px"><div class="field span2"><label>Notes</label><input name="notes" placeholder="Transport, warranty, discounts…"></div><div class="field"><label>Scanned quotation</label><input type="file" name="file" accept=".pdf,.jpg,.png"></div></div>',
+      buttons: [{ label: 'Cancel', onClick: function (close) { close(); openQR(qr.id); } }, { label: 'Save quotation', cls: 'primary', onClick: function (close, el) {
+        var f = el.querySelector('[name=file]').files[0];
+        var r = TW.Ops.recordQuote({ qrId: qr.id, supplierId: UI.mval(el, 'sup'), ref: UI.mval(el, 'ref'), date: D.fromDmy(UI.mval(el, 'date')), validUntil: D.fromDmy(UI.mval(el, 'valid')), deliveryDays: UI.mval(el, 'days'), lines: qr.items.map(function (i, n) { return { item: i.item, price: UI.mval(el, 'p' + n) }; }), notes: UI.mval(el, 'notes'), attachment: f ? f.name : '' });
+        if (UI.result(r, 'Quotation saved')) { close(); refresh(); openQR(qr.id); }
+        return false;
+      } }]
+    });
+    m.el.addEventListener('input', function () { qr.items.forEach(function (i, n) { var v = +UI.mval(m.el, 'p' + n); m.el.querySelector('[data-t="' + n + '"]').textContent = v ? UI.lkr(v * i.qty) : ''; }); });
+  }
+
+  /* ================= Purchase orders ================= */
+  UI.$('#po-st').innerHTML += UI.options(TW.PO_STATUS);
+  UI.$('#po-st').addEventListener('change', poList);
+  function poList() {
+    var st = UI.$('#po-st').value;
+    UI.table('#po-list', {
+      columns: [
+        { h: 'PO', f: function (p) { return '<b class="mono">' + p.id + '</b><div class="small muted">' + D.dmy(p.date) + '</div>'; } },
+        { h: 'Supplier', f: function (p) { return UI.esc(Q.supplier(p.supplierId).name); } },
+        { h: 'Items', f: function (p) { return p.lines.map(function (l) { return l.qty + ' × ' + UI.esc(Q.itemName(l.item)); }).join('<br>'); } },
+        { h: 'Total', cls: 'num', f: function (p) { return UI.lkr(Q.poTotal(p)); } },
+        { h: 'Received', cls: 'num', f: function (p) { return UI.sum(p.lines, function (l) { return l.received; }) + ' / ' + UI.sum(p.lines, function (l) { return l.qty; }); } },
+        { h: 'Status', f: function (p) { return UI.statusBadge(p.status); } },
+        { h: 'Next step', f: function (p) { return '<span class="small">' + ({ Draft: 'Approve', Approved: 'Mark as sent', Sent: 'Receive goods', 'Partly received': 'Receive the rest' }[p.status] || '–') + '</span>'; } },
+        { h: '', cls: 'actions', f: function (p) { return '<button class="btn sm primary" data-po="' + p.id + '">Open</button>'; } }
+      ],
+      rows: db.pos.filter(function (p) { return !st || p.status === st; }).slice().reverse(), empty: 'No purchase orders.'
+    });
+  }
+  UI.$('#po-list').addEventListener('click', function (e) { var id = e.target.getAttribute('data-po'); if (id) openPO(id); });
+  function openPO(id) {
+    var po = Q.po(id), s = Q.supplier(po.supplierId), q = Q.quote(po.quoteId), draft = po.status === 'Draft' && canEdit;
+    var STEPS = ['Draft', 'Approved', 'Sent', 'Received'];
+    var cur = po.status === 'Partly received' ? 3 : STEPS.indexOf(po.status);
+    var h = (po.status === 'Cancelled' ? '' : '<div class="steps-bar">' + STEPS.map(function (s, i) { return '<span class="' + (i < cur || po.status === 'Received' ? 'done' : i === cur ? 'now' : '') + '">' + (i + 1) + '. ' + (s === 'Received' && po.status === 'Partly received' ? 'Partly received' : s) + '</span>'; }).join('') + '</div>') +
+      '<div class="summary" style="margin-bottom:10px"><span class="muted">Supplier</span><b>' + UI.esc(s.name) + '</b><span class="muted">From quotation</span><b>' + (q ? UI.esc(q.ref || q.id) + ' (' + po.qrId + ')' : '') + '</b>' +
+      '<span class="muted">Status</span><b>' + UI.statusBadge(po.status) + '</b><span class="muted">Expected delivery</span><b>' + (draft ? UI.dateInput('expected', po.expected) : D.dmy(po.expected)) + '</b></div>' +
+      '<table><thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount</th><th class="num">Received</th><th class="num">Damaged</th></tr></thead><tbody>' +
+      po.lines.map(function (l, i) { return '<tr><td>' + UI.esc(Q.itemName(l.item)) + '</td><td class="num">' + (draft ? '<input type="number" min="0" name="q' + i + '" value="' + l.qty + '" style="width:90px">' : l.qty) + '</td><td class="num">' + (draft ? '<input type="number" min="0" step="0.01" name="p' + i + '" value="' + l.price + '" style="width:110px">' : UI.lkr(l.price)) + '</td><td class="num" data-t="' + i + '">' + UI.lkr(l.qty * l.price) + '</td><td class="num">' + l.received + '</td><td class="num">' + (l.damaged || '') + '</td></tr>'; }).join('') +
+      '</tbody><tfoot><tr><td colspan="3">Total</td><td class="num" id="pot">' + UI.lkr(Q.poTotal(po)) + '</td><td></td><td></td></tr></tfoot></table>' +
+      (draft ? '<p class="small muted">Items and prices were copied from the chosen quotation. You can change them until the PO is approved.</p>' : '') +
+      (po.cancelReason ? '<div class="banner bad">Cancelled: ' + UI.esc(po.cancelReason) + '</div>' : '') +
+      '<div class="section-title">History</div><div class="small">' + po.history.map(function (x) { return D.dmyt(x.ts) + ' – ' + x.status + ' by ' + UI.esc(x.user) + (x.note && x.note !== 'GRN' ? ' (' + UI.esc(x.note) + ')' : ''); }).join('<br>') + '</div>';
+    var lines = function (el) { return po.lines.map(function (l, i) { return { item: l.item, qty: UI.mval(el, 'q' + i), price: UI.mval(el, 'p' + i) }; }); };
+    /* Only the next step is offered: Draft → Approve → Mark as sent → Receive goods. */
+    var btns = [{ label: 'Print / PDF', onClick: function () { printPO(po); return false; } }];
+    if (canEdit) {
+      if (['Draft', 'Approved'].indexOf(po.status) >= 0) btns.push({ label: 'Cancel PO', cls: 'danger', onClick: function (close) { close(); UI.prompt('Cancel ' + po.id + '?', 'Reason:', 'Cancel PO', 'danger').then(function (r) { if (r) UI.result(TW.Ops.setPOStatus(po.id, 'Cancelled', r), 'PO cancelled'); refresh(); }); } });
+      if (draft) {
+        btns.push({ label: 'Save changes', onClick: function (close, el) { if (UI.result(TW.Ops.updatePO(po.id, lines(el), D.fromDmy(UI.mval(el, 'expected')), po.notes), 'Saved')) { close(); refresh(); openPO(po.id); } return false; } });
+        btns.push({ label: 'Next: Approve', cls: 'primary', onClick: function (close, el) { if (!UI.result(TW.Ops.updatePO(po.id, lines(el), D.fromDmy(UI.mval(el, 'expected')), po.notes))) return false; if (UI.result(TW.Ops.setPOStatus(po.id, 'Approved'), 'PO approved')) { close(); refresh(); openPO(po.id); } return false; } });
+      }
+      if (po.status === 'Approved') btns.push({ label: 'Next: Mark as sent to supplier', cls: 'primary', onClick: function (close) { if (UI.result(TW.Ops.setPOStatus(po.id, 'Sent'), 'Marked as sent')) { close(); refresh(); openPO(po.id); } return false; } });
+      if (po.status === 'Sent' || po.status === 'Partly received') btns.push({ label: 'Next: Receive goods', cls: 'primary', onClick: function (close) { close(); receive(po); } });
+    }
+    btns.push({ label: 'Close' });
+    var m = UI.modal({ title: 'Purchase order ' + po.id, wide: true, body: h, buttons: btns });
+    if (draft) m.el.addEventListener('input', function () { var t = 0; lines(m.el).forEach(function (l, i) { var v = (+l.qty || 0) * (+l.price || 0); t += v; m.el.querySelector('[data-t="' + i + '"]').textContent = UI.lkr(v); }); m.el.querySelector('#pot').textContent = UI.lkr(t); });
+  }
+  /* Goods receipt (FR-20, BR-10) */
+  function receive(po) {
+    var m = UI.modal({
+      title: 'Receive goods – ' + po.id, wide: true,
+      body: '<div class="form-grid"><div class="field req"><label>Date received</label>' + UI.dateInput('date', td) + '</div><div class="field"><label>Delivery note no.</label><input name="dn"></div><div class="field span2"><label>Note</label><input name="note" placeholder="e.g. 2 bottles cracked"></div></div>' +
+        '<table style="margin-top:10px"><thead><tr><th>Item</th><th class="num">Still due</th><th class="num">Received now</th><th class="num">Damaged on arrival</th><th class="num">Added to stock</th></tr></thead><tbody>' +
+        po.lines.map(function (l, i) { var out = l.qty - l.received; return '<tr><td>' + UI.esc(Q.itemName(l.item)) + '</td><td class="num">' + out + '</td><td class="num"><input type="number" min="0" name="r' + i + '" value="' + out + '" style="width:90px"' + (out ? '' : ' disabled') + '></td><td class="num"><input type="number" min="0" name="d' + i + '" value="0" style="width:90px"' + (out ? '' : ' disabled') + '></td><td class="num" data-g="' + i + '">' + out + '</td></tr>'; }).join('') + '</tbody></table>' +
+        '<p class="small muted">Good bottles go to "Empty in store"; products go to product stock. Damaged items are not added or paid for.</p>',
+      buttons: [{ label: 'Cancel' }, { label: 'Save receipt', cls: 'primary', onClick: function (close, el) {
+        var r = TW.Ops.receiveGoods({ poId: po.id, date: D.fromDmy(UI.mval(el, 'date')), deliveryNote: UI.mval(el, 'dn'), note: UI.mval(el, 'note'), lines: po.lines.map(function (l, i) { return { received: UI.mval(el, 'r' + i), damaged: UI.mval(el, 'd' + i) }; }) });
+        if (UI.result(r, r.ok ? r.grn.id + ' saved – stock updated, PO is ' + po.status : '')) { close(); refresh(); }
+        return false;
+      } }]
+    });
+    m.el.addEventListener('input', function () { po.lines.forEach(function (l, i) { var g = m.el.querySelector('[data-g="' + i + '"]'); if (g) g.textContent = (+UI.mval(m.el, 'r' + i) || 0) - (+UI.mval(m.el, 'd' + i) || 0); }); });
+  }
+  function printPO(po) {
+    var s = Q.supplier(po.supplierId), q = Q.quote(po.quoteId);
+    UI.printDoc(po.id, '<div class="doc">' + (po.status === 'Draft' || po.status === 'Cancelled' ? '<div class="banner bad">' + po.status.toUpperCase() + ' – not valid for supply</div>' : '') +
+      UI.docHead('PURCHASE ORDER', '<div class="mono"><b>' + po.id + '</b></div><div>Date: ' + D.dmy(po.date) + '</div><div>Expected: ' + D.dmy(po.expected) + '</div>') +
+      '<p><span class="muted">Supplier</span><br><b>' + UI.esc(s.name) + '</b><br>' + UI.esc(s.address) + '<br>Attn: ' + UI.esc(s.contact) + ' · ' + UI.esc(s.phone) + '<br>Your quotation: ' + (q ? UI.esc(q.ref || q.id) : '') + ' · Terms: ' + s.terms + ' days</p>' +
+      '<table><thead><tr><th>#</th><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount (Rs.)</th></tr></thead><tbody>' + po.lines.map(function (l, i) { return '<tr><td>' + (i + 1) + '</td><td>' + UI.esc(Q.itemName(l.item)) + '</td><td class="num">' + l.qty + '</td><td class="num">' + UI.num(l.price.toFixed(2)) + '</td><td class="num">' + UI.num((l.qty * l.price).toFixed(2)) + '</td></tr>'; }).join('') +
+      '</tbody><tfoot><tr><td colspan="4" class="num">Total</td><td class="num">' + UI.money(Q.poTotal(po)) + '</td></tr></tfoot></table>' +
+      '<div class="sig-row"><div>Prepared by<br>' + UI.esc(po.user) + '</div><div>Approved by<br>' + UI.esc(po.approvedBy || '') + '</div><div>Supplier acceptance</div></div></div>');
+  }
+
+  /* ================= Supplier payments (FR-21) ================= */
+  function pays() {
+    var rows = db.suppliers.filter(function (s) { return Q.supplierBilled(s.id) || Q.supplierPaid(s.id); });
+    UI.table('#owed', {
+      columns: [{ h: 'Supplier', k: 'name' }, { h: 'Goods received', cls: 'num', f: function (s) { return UI.lkr(Q.supplierBilled(s.id)); } }, { h: 'Paid', cls: 'num', f: function (s) { return UI.lkr(Q.supplierPaid(s.id)); } },
+        { h: 'Owed', cls: 'num', f: function (s) { var o = Q.supplierOwed(s.id); return o > 0 ? '<b style="color:var(--bad)">' + UI.lkr(o) + '</b>' : UI.lkr(o); } }, { h: 'Terms', cls: 'num', f: function (s) { return s.terms + ' days'; } },
+        { h: '', cls: 'actions', f: function (s) { return Q.supplierOwed(s.id) > 0 ? '<button class="btn sm write-only" data-pay="' + s.id + '">Pay</button>' : ''; } }],
+      rows: rows, empty: 'Nothing owed.'
+    });
+    UI.table('#pays', {
+      columns: [{ h: 'Ref', k: 'id' }, { h: 'Date', f: function (p) { return D.dmy(p.date); } }, { h: 'Supplier', f: function (p) { return UI.esc(Q.supplier(p.supplierId).name); } }, { h: 'PO', k: 'poId' }, { h: 'Method', f: function (p) { return UI.esc(p.mode) + (p.ref ? '<div class="small muted">' + UI.esc(p.ref) + '</div>' : ''); } }, { h: 'Amount', cls: 'num', f: function (p) { return UI.money(p.amount); } }],
+      rows: db.supplierPayments.slice().reverse(), empty: 'No payments yet.'
+    });
+  }
+  function payForm(sid) {
+    sid = sid || (db.suppliers.filter(function (s) { return Q.supplierOwed(s.id) > 0; })[0] || db.suppliers[0]).id;
+    UI.modal({
+      title: 'Record supplier payment',
+      body: '<div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="field req full"><label>Supplier</label><select name="sup">' + UI.options(db.suppliers.map(function (s) { return { v: s.id, l: s.name + ' – owed ' + UI.lkr(Q.supplierOwed(s.id)) }; }), sid) + '</select></div>' +
+        '<div class="field req"><label>Date</label>' + UI.dateInput('date', td) + '</div><div class="field req"><label>Amount (Rs.)</label><input name="amount" type="number" min="0" value="' + Math.max(0, Q.supplierOwed(sid)) + '"></div>' +
+        '<div class="field req"><label>Method</label><select name="mode">' + UI.options(TW.PAY_MODES, 'Bank transfer') + '</select></div><div class="field"><label>Cheque no. / bank ref.</label><input name="ref"></div><div class="field full"><label>Note</label><input name="note"></div></div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Save payment', cls: 'primary', onClick: function (close, el) {
+        if (UI.result(TW.Ops.supplierPayment({ supplierId: UI.mval(el, 'sup'), date: D.fromDmy(UI.mval(el, 'date')), amount: UI.mval(el, 'amount'), mode: UI.mval(el, 'mode'), ref: UI.mval(el, 'ref'), note: UI.mval(el, 'note') }), 'Payment recorded')) { close(); pays(); }
+        return false;
+      } }]
+    });
+  }
+  UI.$('#owed').addEventListener('click', function (e) { var id = e.target.getAttribute('data-pay'); if (id) payForm(id); });
+  var np = UI.$('#new-pay'); if (np) np.addEventListener('click', function () { payForm(); });
+
+  function refresh() { qrList(); poList(); pays(); }
+  tabs = UI.tabs('#tabs', [{ id: 'quotes', label: 'Quotations' }, { id: 'pos', label: 'Purchase orders' }, { id: 'pay', label: 'Supplier payments' }]);
+  refresh();
+});
+</script>
+</body>
+</html>

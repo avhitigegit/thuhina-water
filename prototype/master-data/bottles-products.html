@@ -1,0 +1,179 @@
+<!doctype html>
+<!-- BRD: FR-01 (bottle types), FR-02 (other products with price and stock), FR-04 (water price by bottle type + customer type; deposit by bottle type),
+     FR-06 (accepted old-bottle brands – American Water), FR-07 (price history with effective dates), BR-01 (Rs. 1,000 deposit), BR-02, BR-08,
+     FR-05 (list of customer agreed prices – client feedback 08/10/2026; they are set on the customer). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bottles &amp; Products · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="master-data/bottles-products">
+<main id="app">
+  <div id="tabs"></div>
+  <div data-pane="bottles" class="card">
+    <div class="card-head"><h2>Bottle types</h2><button class="btn primary" id="add-bt">+ New bottle type</button></div>
+    <div id="bt-list"></div>
+    <p class="small muted" style="margin-top:8px">Inactive types are hidden from sales and purchasing.</p>
+  </div>
+  <div data-pane="products" class="card">
+    <div class="card-head"><h2>Other products</h2><button class="btn primary" id="add-p">+ New product</button></div>
+    <div id="p-list"></div>
+    <p class="small muted" style="margin-top:8px">Stock changes through goods receipts, sales and stock adjustments.</p>
+  </div>
+  <div data-pane="prices">
+    <div class="banner info">Click a price to change it. Prices marked <span class="badge warn">example</span> are placeholders until the client confirms them. Past bills keep the price that applied on their date.</div>
+    <div class="card">
+      <div class="card-head"><h2>Water price per bottle</h2><button class="btn" id="hist">Price history</button></div>
+      <div id="water"></div>
+    </div>
+    <div class="card">
+      <h2>Bottle deposit (per new bottle, not refundable)</h2>
+      <div id="deposit"></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Customer agreed prices</h2><select id="cp-f" style="width:auto"><option value="now">In force and scheduled</option><option value="all">All, including ended</option></select></div>
+      <p class="small muted">The standard price above applies unless a customer has an agreed price (for example a volume price for a large factory). Agreed prices are set on the customer – open a customer and click <b>Prices</b>.</p>
+      <div id="cp-list"></div>
+    </div>
+  </div>
+  <div data-pane="brands" class="card">
+    <div class="card-head"><h2>Accepted old bottles</h2><button class="btn primary" id="add-b">+ Add brand</button></div>
+    <p class="small muted">An accepted old bottle handed in replaces the deposit for one bottle. It joins the company pool and is filled like any other.</p>
+    <div id="b-list"></div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today();
+
+  /* ---- Bottle types (FR-01) ---- */
+  function bottles() {
+    UI.table('#bt-list', {
+      columns: [
+        { h: 'Code', f: function (b) { return '<b class="mono">' + b.id + '</b>'; } }, { h: 'Name', k: 'name' }, { h: 'Size', cls: 'num', f: function (b) { return b.litres + ' L'; } },
+        { h: 'Deposit', cls: 'num', f: function (b) { var d = Q.deposit(b.id); return d ? UI.lkr(d) : '–'; } }, { h: 'In circulation', cls: 'num', f: function (b) { return UI.num(Q.pool(b.id)); } },
+        { h: 'Status', f: function (b) { return UI.statusBadge(b.active ? 'Active' : 'Inactive'); } }, { h: '', cls: 'actions', f: function (b) { return '<button class="btn sm" data-bt="' + b.id + '">Edit</button>'; } }
+      ], rows: db.bottleTypes
+    });
+  }
+  function editBottle(b) {
+    UI.modal({
+      title: b ? 'Edit ' + b.name : 'New bottle type',
+      body: '<div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="field"><label>Code</label><input value="' + (b ? b.id : 'Generated from the size') + '" readonly></div><div class="field req"><label>Size (litres)</label><input name="litres" type="number" min="1" value="' + (b ? b.litres : '') + '"' + (b ? ' readonly' : '') + '></div><div class="field req full"><label>Name</label><input name="bname" value="' + UI.esc(b ? b.name : '') + '" placeholder="e.g. 19L Bottle"></div><label class="check"><input type="checkbox" name="active"' + (!b || b.active ? ' checked' : '') + '> Active</label></div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Save', cls: 'primary', onClick: function (close, el) {
+        if (UI.result(TW.Ops.saveBottleType({ id: b ? b.id : '', name: UI.mval(el, 'bname').trim(), litres: UI.mval(el, 'litres'), active: UI.mval(el, 'active') }, !b), 'Bottle type saved')) { close(); bottles(); prices(); }
+        return false;
+      } }]
+    });
+  }
+  UI.$('#bt-list').addEventListener('click', function (e) { var id = e.target.getAttribute('data-bt'); if (id) editBottle(Q.bt(id)); });
+  UI.$('#add-bt').addEventListener('click', function () { editBottle(null); });
+
+  /* ---- Products (FR-02) ---- */
+  function products() {
+    UI.table('#p-list', {
+      columns: [
+        { h: 'Product', f: function (p) { return '<b>' + UI.esc(p.name) + '</b> <span class="small muted mono">' + p.id + '</span>'; } }, { h: 'Selling price', cls: 'num', f: function (p) { return UI.lkr(p.price); } },
+        { h: 'Cost', cls: 'num', f: function (p) { return UI.lkr(p.cost); } }, { h: 'In stock', cls: 'num', f: function (p) { return p.stock <= 3 ? '<b style="color:var(--bad)">' + p.stock + '</b>' : p.stock; } },
+        { h: 'Status', f: function (p) { return UI.statusBadge(p.active ? 'Active' : 'Inactive'); } }, { h: '', cls: 'actions', f: function (p) { return '<button class="btn sm" data-p="' + p.id + '">Edit</button>'; } }
+      ], rows: db.products
+    });
+  }
+  function editProduct(p) {
+    UI.modal({
+      title: p ? 'Edit ' + p.name : 'New product',
+      body: '<div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="field full"><label>Product code</label><input value="' + (p ? p.id : 'Generated on save') + '" readonly></div><div class="field req full"><label>Product name</label><input name="pname" value="' + UI.esc(p ? p.name : '') + '"></div><div class="field req"><label>Selling price (Rs.)</label><input name="price" type="number" min="0" value="' + (p ? p.price : '') + '"></div><div class="field"><label>Cost price (Rs.)</label><input name="cost" type="number" min="0" value="' + (p ? p.cost : '') + '"></div>' +
+        (p ? '' : '<div class="field"><label>Opening stock</label><input name="stock" type="number" min="0" value="0"></div>') + '<label class="check" style="align-self:end"><input type="checkbox" name="active"' + (!p || p.active ? ' checked' : '') + '> Active</label></div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Save', cls: 'primary', onClick: function (close, el) {
+        if (UI.result(TW.Ops.saveProduct({ id: p && p.id, name: UI.mval(el, 'pname').trim(), price: UI.mval(el, 'price'), cost: UI.mval(el, 'cost'), stock: UI.mval(el, 'stock'), active: UI.mval(el, 'active') }, !p), 'Product saved')) { close(); products(); }
+        return false;
+      } }]
+    });
+  }
+  UI.$('#p-list').addEventListener('click', function (e) { var id = e.target.getAttribute('data-p'); if (id) editProduct(Q.product(id)); });
+  UI.$('#add-p').addEventListener('click', function () { editProduct(null); });
+
+  /* ---- Prices & deposits (FR-04, FR-07, BR-08) ---- */
+  function tag(key) { return db.confirmedPrices.indexOf(key) >= 0 ? ' <span class="badge ok">confirmed</span>' : ' <span class="badge warn">example</span>'; }
+  function cell(key) {
+    var e = Q.priceEntry(key, td);
+    var next = db.priceHistory.filter(function (p) { return p.key === key && p.effective > td; })[0];
+    return '<button class="btn link" data-key="' + key + '" style="font-weight:600;font-size:14px">' + (e ? UI.lkr(e.price) : 'Set price') + '</button>' + (e ? tag(key) : '') + (next ? '<div class="small" style="color:var(--brand)">→ ' + UI.lkr(next.price) + ' from ' + D.dmy(next.effective) + '</div>' : '');
+  }
+  function prices() {
+    var types = db.customerTypes.filter(function (t) { return t.active; });
+    UI.$('#water').innerHTML = '<div class="table-wrap"><table><thead><tr><th>Bottle</th>' + types.map(function (t) { return '<th class="num">' + UI.esc(t.id) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+      Q.activeBottles().map(function (b) { return '<tr><td><b>' + UI.esc(b.name) + '</b></td>' + types.map(function (t) { return '<td class="num">' + cell('water|' + b.id + '|' + t.id) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
+    UI.$('#deposit').innerHTML = '<div class="table-wrap"><table><tbody>' + Q.activeBottles().map(function (b) { return '<tr><td><b>' + UI.esc(b.name) + '</b></td><td class="num">' + cell('deposit|' + b.id) + '</td></tr>'; }).join('') + '</tbody></table></div>';
+  }
+  function custPrices() {
+    var all = UI.$('#cp-f').value === 'all';
+    var rows = db.custPrices.filter(function (e) { return all || (!e.cancelled && (!e.until || e.until >= td)); }).slice().sort(function (a, b) { var ca = Q.customer(a.custId).name, cb = Q.customer(b.custId).name; return ca < cb ? -1 : ca > cb ? 1 : a.from < b.from ? 1 : -1; });
+    UI.table('#cp-list', {
+      columns: [
+        { h: 'Customer', f: function (e) { var c = Q.customer(e.custId); return App.link('master-data/customers', { id: c.id }, '<b>' + UI.esc(c.name) + '</b>') + '<div class="small muted">' + c.id + ' · ' + UI.esc(c.type) + ' · about ' + Q.monthlyBottles(c, e.bt) + ' ' + Q.btShort(e.bt) + ' a month</div>'; } },
+        { h: 'Bottle', f: function (e) { return Q.btShort(e.bt); } },
+        { h: 'Agreed', cls: 'num', f: function (e) { return '<b>' + UI.lkr(e.price) + '</b>'; } },
+        { h: 'Standard now', cls: 'num', f: function (e) { var std = Q.stdPrice(e.bt, Q.customer(e.custId).type); return UI.lkr(std) + '<div class="small muted">' + (e.price < std ? '−' + Math.round((std - e.price) / std * 100) + '%' : e.price > std ? '+' + Math.round((e.price - std) / std * 100) + '%' : '') + '</div>'; } },
+        { h: 'From', f: function (e) { return D.dmy(e.from); } }, { h: 'Until', f: function (e) { return e.until ? D.dmy(e.until) : '–'; } },
+        { h: 'Reason', f: function (e) { return UI.esc(e.reason) + '<div class="small muted">' + UI.esc(e.by) + '</div>'; } },
+        { h: '', f: function (e) { if (e.cancelled) return UI.badge('Cancelled'); if (e.from > td) return UI.badge('Scheduled', 'info'); if (e.until && e.until < td) return UI.badge('Ended'); return Q.custPriceEntry(e.custId, e.bt) === e ? UI.badge('In force', 'ok') : UI.badge('Replaced'); } }
+      ],
+      rows: rows, empty: 'No customer has an agreed price – everyone pays the standard price.'
+    });
+  }
+  UI.$('#cp-f').addEventListener('change', custPrices);
+  UI.$('[data-pane=prices]').addEventListener('click', function (e) {
+    var key = e.target.getAttribute('data-key'); if (!key) return;
+    var k = key.split('|'), cur = Q.priceEntry(key, td);
+    UI.modal({
+      title: k[0] === 'deposit' ? 'Deposit – ' + Q.btName(k[1]) : 'Water price – ' + Q.btName(k[1]) + ' / ' + k[2],
+      body: '<p class="muted">Now: ' + (cur ? UI.money(cur.price) + ' (from ' + D.dmy(cur.effective) + ')' : 'not set') + '</p><div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="field req"><label>New price (Rs.)</label><input name="price" type="number" min="1"></div><div class="field req"><label>From date</label>' + UI.dateInput('eff', D.add(td, 1)) + '</div><div class="field req full"><label>Reason</label><input name="reason" placeholder="e.g. Factory charge increase"></div></div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Save', cls: 'primary', onClick: function (close, el) {
+        var eff = UI.readDate(el.querySelector('[name=eff]'));
+        if (UI.result(TW.Ops.setPrice(key, UI.mval(el, 'price'), eff, UI.mval(el, 'reason').trim()), eff > td ? 'Price change scheduled' : 'Price updated')) { close(); prices(); }
+        return false;
+      } }]
+    });
+  });
+  UI.$('#hist').addEventListener('click', function () {
+    var rows = db.priceHistory.slice().sort(function (a, b) { return a.effective < b.effective ? 1 : -1; });
+    var m = UI.modal({ title: 'Price history', wide: true, body: '<div id="ph"></div>' });
+    UI.table(m.el.querySelector('#ph'), {
+      columns: [{ h: 'From', f: function (p) { return D.dmy(p.effective); } }, { h: 'Price', f: function (p) { var s = p.key.split('|'); return s[0] === 'deposit' ? 'Deposit ' + Q.btShort(s[1]) : 'Water ' + Q.btShort(s[1]) + ' / ' + s[2]; } },
+        { h: 'Amount', cls: 'num', f: function (p) { return UI.lkr(p.price); } }, { h: 'Reason', k: 'reason' }, { h: 'By', k: 'by' },
+        { h: '', f: function (p) { if (p.effective > td) return UI.badge('Scheduled', 'info'); var c = Q.priceEntry(p.key, td); return c && c.id === p.id ? UI.badge('Current', 'ok') : UI.badge('Old'); } }],
+      rows: rows
+    });
+  });
+
+  /* ---- Old bottle brands (FR-06, BR-02) ---- */
+  function takenIn(id) { var n = 0; db.txns.forEach(function (t) { if (!t.reversedBy && t.kind !== 'reversal') (t.lines || []).forEach(function (l) { if (l.brandId === id) n += l.old || 0; }); }); return n; }
+  function brands() {
+    UI.table('#b-list', {
+      columns: [{ h: 'Brand', f: function (b) { return '<b>' + UI.esc(b.name) + '</b>'; } }, { h: 'For', f: function (b) { return Q.btName(b.bottle); } }, { h: 'Taken in so far', cls: 'num', f: function (b) { return takenIn(b.id); } }, { h: 'Note', k: 'note' },
+        { h: 'Status', f: function (b) { return UI.statusBadge(b.active ? 'Active' : 'Inactive'); } }, { h: '', cls: 'actions', f: function (b) { return '<button class="btn sm" data-b="' + b.id + '">' + (b.active ? 'Stop accepting' : 'Accept again') + '</button>'; } }],
+      rows: db.oldBrands
+    });
+  }
+  UI.$('#b-list').addEventListener('click', function (e) { var id = e.target.getAttribute('data-b'); if (!id) return; var b = db.oldBrands.filter(function (x) { return x.id === id; })[0]; if (UI.result(TW.Ops.saveBrand({ id: b.id, active: !b.active, note: b.note, bottle: b.bottle }, false), 'Saved')) brands(); });
+  UI.$('#add-b').addEventListener('click', function () {
+    UI.modal({
+      title: 'Add accepted brand',
+      body: '<div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="field req"><label>Brand</label><input name="brand"></div><div class="field req"><label>For bottle</label><select name="bottle">' + UI.btOptions('B20') + '</select></div><div class="field full"><label>Note</label><input name="note" placeholder="e.g. no cracks"></div></div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Add', cls: 'primary', onClick: function (close, el) { if (UI.result(TW.Ops.saveBrand({ name: UI.mval(el, 'brand').trim(), bottle: UI.mval(el, 'bottle'), note: UI.mval(el, 'note') }, true), 'Brand added')) { close(); brands(); } return false; } }]
+    });
+  });
+
+  UI.tabs('#tabs', [{ id: 'bottles', label: 'Bottle types' }, { id: 'products', label: 'Other products' }, { id: 'prices', label: 'Prices & deposits' }, { id: 'brands', label: 'Accepted old bottles' }]);
+  bottles(); products(); prices(); brands(); custPrices();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+<!doctype html>
+<!-- BRD: FR-42 (customers due on a date from delivery day and cycle), FR-43 (bottles held, usual quantity, empties to collect, bottles owed, money outstanding),
+     FR-44 (print), FR-45 (filled bottles needed vs ready, for factory planning), FR-46 (next dates by cycle).
+     Evening planning page for the Admin: pick a date (normally tomorrow) to see who is due, by area (route), and whether enough filled bottles are ready. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Delivery Planning · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+<style>
+  .route-head td { background: #eef4f7; font-weight: 600; }
+  .ready-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+  .ready-row .banner { margin: 0; flex: 1; min-width: 280px; }
+</style>
+</head>
+<body data-page="delivery/delivery-planning">
+<main id="app">
+  <div class="page-actions"><button class="btn primary" id="print">Print load sheet</button></div>
+  <div class="card">
+    <div class="toolbar" style="margin:0">
+      <div class="field"><label>Date</label><input id="date" class="date" maxlength="10"></div>
+      <button class="btn" data-q="0">Today</button>
+      <button class="btn" data-q="1">Tomorrow</button>
+      <button class="btn" data-q="7">Next week</button>
+      <div class="field"><label>Route (area)</label><select id="area"><option value="">All routes</option></select></div>
+      <div class="field"><label>Show</label><select id="show"><option value="due">Customers due on this date</option><option value="all">All customers</option></select></div>
+    </div>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="ready-row" id="ready"></div>
+  <div class="card">
+    <div class="card-head"><h2 id="title"></h2><span class="small muted">Grouped by route (area)</span></div>
+    <div id="list"></div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today();
+  var BTS = Q.activeBottles();
+  var bal = Q.balances();
+  UI.$('#area').innerHTML += UI.options(db.areas);
+  UI.$('#date').value = D.dmy(UI.params().date || D.add(td, 1)); // tomorrow by default – planned in the evening
+
+  function qty(obj) { return BTS.filter(function (b) { return obj[b.id]; }).map(function (b) { return obj[b.id] + '×' + b.litres + 'L'; }).join(' '); }
+  /* Last delivery actually made before the selected date. */
+  function lastDelivery(c, d) {
+    var t = db.txns.filter(function (x) { return x.custId === c.id && x.date < d && !x.reversedBy && ['exchange', 'leftdoor', 'first', 'extra'].indexOf(x.kind) >= 0; }).pop();
+    if (!t) return null;
+    var f = {}; (t.lines || []).forEach(function (l) { if (l.bt) f[l.bt] = (f[l.bt] || 0) + (l.filled || 0); });
+    return { date: t.date, qty: f, left: t.kind === 'leftdoor' };
+  }
+  /* Next scheduled delivery after the selected date, and the one after that. */
+  function nextAfter(c, d) {
+    if (!c.nextDelivery || c.status !== 'Active') return null;
+    var p = 7 * (c.cycle || 1), n = c.nextDelivery;
+    while (n <= d) n = D.add(n, p);
+    return n;
+  }
+  function cur() { return D.fromDmy(UI.$('#date').value) || D.add(td, 1); }
+
+  function build() {
+    var d = cur(), area = UI.$('#area').value, show = UI.$('#show').value;
+    var due = Q.dueList(d), dueMap = {};
+    due.forEach(function (x) { dueMap[x.cust.id] = x; });
+    var custs = (show === 'due' ? due.map(function (x) { return x.cust; }) : db.customers.filter(function (c) { return c.status === 'Active'; }))
+      .filter(function (c) { return !area || c.area === area; });
+    var rows = custs.map(function (c) {
+      var x = dueMap[c.id], n1 = nextAfter(c, d);
+      return { c: c, due: !!x, entered: x && x.entered.length ? x.entered : null, overdue: x && x.overdue, last: lastDelivery(c, d), next: n1, after: n1 ? D.add(n1, 7 * (c.cycle || 1)) : null };
+    });
+    rows.sort(function (a, b) { return a.c.area < b.c.area ? -1 : a.c.area > b.c.area ? 1 : a.c.name < b.c.name ? -1 : 1; });
+    return { d: d, rows: rows, due: due.filter(function (x) { return !area || x.cust.area === area; }) };
+  }
+
+  function render() {
+    var B = build(), d = B.d;
+    var pending = B.due.filter(function (x) { return !x.entered.length; });
+    var need = {}; BTS.forEach(function (b) { need[b.id] = UI.sum(pending, function (x) { return x.cust.usual[b.id] || 0; }); });
+    // bottles still needed between today and the day before the selected date
+    var before = {}; BTS.forEach(function (b) { before[b.id] = 0; });
+    for (var i = td; i < d; i = D.add(i, 1)) Q.dueList(i).forEach(function (x) { if (!x.entered.length) BTS.forEach(function (b) { before[b.id] += x.cust.usual[b.id] || 0; }); });
+
+    UI.$('#title').textContent = D.dayName(d) + ' ' + D.dmy(d) + ' – ' + (UI.$('#show').value === 'due' ? B.rows.length + ' customers due' : B.rows.length + ' customers (' + B.due.length + ' due on this date)');
+    UI.$('#kpis').innerHTML =
+      '<div class="kpi"><div class="label">Customers due</div><div class="value">' + B.due.length + '</div><div class="hint">' + (B.due.length - pending.length) + ' already entered · ' + B.due.filter(function (x) { return x.overdue; }).length + ' missed earlier</div></div>' +
+      BTS.map(function (b) { return '<div class="kpi"><div class="label">' + b.litres + 'L bottles needed</div><div class="value">' + need[b.id] + '</div><div class="hint">usual quantities</div></div>'; }).join('') +
+      '<div class="kpi"><div class="label">Empties to collect</div><div class="value">' + UI.sum(B.due, function (x) { return Q.sumBt(x.cust.toCollect); }) + '</div><div class="hint">left at the door</div></div>' +
+      '<div class="kpi"><div class="label">Bottles owed</div><div class="value">' + UI.sum(B.due, function (x) { return Q.sumBt(x.cust.owed); }) + '</div></div>' +
+      '<div class="kpi"><div class="label">Money to collect</div><div class="value">' + UI.lkr(UI.sum(B.due, function (x) { return Math.max(0, bal[x.cust.id] || 0); })) + '</div></div>';
+
+    // Ready check per bottle size (FR-45)
+    UI.$('#ready').innerHTML = BTS.filter(function (b) { return need[b.id] || before[b.id]; }).map(function (b) {
+      var s = db.stock[b.id], left = s.filled - before[b.id], short = need[b.id] - left;
+      var txt = '<b>' + b.name + ':</b> ' + need[b.id] + ' needed on ' + D.dmy(d) + ' · ' + s.filled + ' filled in store now' + (before[b.id] ? ' (' + before[b.id] + ' needed before then)' : '') + ' · ' + s.factory + ' at the factory.';
+      return short > 0
+        ? '<div class="banner bad">✖ ' + txt + ' <b>Short by ' + short + '.</b> ' + (s.factory >= short ? 'Bottles at the factory will cover it if they come back in time.' : '') + ' ' + App.link('production/production', null, 'Send empties to the factory') + '</div>'
+        : '<div class="banner ok">✔ ' + txt + ' <b>Ready.</b></div>';
+    }).join('') || '<div class="banner info">No bottles needed on this date.</div>';
+
+    // Customer list grouped by route (area)
+    var h = '<div class="table-wrap"><table><thead><tr><th>Customer</th><th>Phone</th><th>Pays</th><th>Last delivery</th><th class="num">This date</th><th>Next</th><th>Week after</th><th class="num">Collect</th><th class="num">Owed</th><th class="num">Balance</th><th>Status</th></tr></thead><tbody>';
+    var groups = {};
+    B.rows.forEach(function (r) { (groups[r.c.area] = groups[r.c.area] || []).push(r); });
+    Object.keys(groups).sort().forEach(function (a) {
+      var g = groups[a], gq = {};
+      g.forEach(function (r) { if (r.due && !r.entered) BTS.forEach(function (b) { gq[b.id] = (gq[b.id] || 0) + (r.c.usual[b.id] || 0); }); });
+      h += '<tr class="route-head"><td colspan="11">' + UI.esc(a) + ' – ' + g.filter(function (r) { return r.due; }).length + ' due · load ' + (qty(gq) || 'nothing') + '</td></tr>';
+      g.forEach(function (r) {
+        var c = r.c, b = bal[c.id] || 0;
+        var status = r.entered ? UI.statusBadge('Entered') : r.overdue ? UI.badge('Missed ' + D.dmy(c.nextDelivery), 'bad') : r.due ? (Q.sumBt(c.held) ? UI.statusBadge('Due') : UI.badge('First delivery', 'info')) : '<span class="muted">Not due</span>';
+        if (c.payType !== 'Cash' && b > c.limit) status += ' ' + UI.badge('Over limit', 'warn');
+        h += '<tr' + (r.due ? '' : ' class="row-muted"') + '><td>' + App.link('master-data/customers', { id: c.id }, '<b>' + UI.esc(c.name) + '</b>') + '<div class="small muted">' + UI.esc(c.address) + ' · ' + c.day.slice(0, 3) + ', ' + (c.cycle === 1 ? 'weekly' : 'every ' + c.cycle + ' wks') + '</div></td>' +
+          '<td class="nowrap">' + UI.esc(c.phone) + '</td><td>' + UI.statusBadge(c.payType) + '</td>' +
+          '<td>' + (r.last ? D.dmy(r.last.date) + '<div class="small muted">' + qty(r.last.qty) + (r.last.left ? ' (left at door)' : '') + '</div>' : '<span class="muted">–</span>') + '</td>' +
+          '<td class="num">' + (r.due ? '<b>' + qty(c.usual) + '</b>' : '–') + '</td>' +
+          '<td>' + (r.next ? D.dmy(r.next) : '–') + '</td><td>' + (r.after ? D.dmy(r.after) : '–') + '</td>' +
+          '<td class="num">' + (Q.sumBt(c.toCollect) ? UI.badge(Q.sumBt(c.toCollect), 'warn') : '') + '</td>' +
+          '<td class="num">' + (Q.sumBt(c.owed) ? UI.badge(Q.sumBt(c.owed), 'bad') : '') + '</td>' +
+          '<td class="num">' + (b > 0 ? UI.lkr(b) : '') + '</td><td>' + status + '</td></tr>';
+      });
+    });
+    if (!B.rows.length) h += '<tr><td colspan="11" class="empty-state">No customers due on this date.</td></tr>';
+    UI.$('#list').innerHTML = h + '</tbody></table></div>';
+  }
+
+  /* Load sheet: route totals and the customers due, for the drivers. */
+  UI.$('#print').addEventListener('click', function () {
+    var B = build(), d = B.d, rows = B.rows.filter(function (r) { return r.due && !r.entered; });
+    var groups = {}; rows.forEach(function (r) { (groups[r.c.area] = groups[r.c.area] || []).push(r); });
+    var tot = {}; rows.forEach(function (r) { BTS.forEach(function (b) { tot[b.id] = (tot[b.id] || 0) + (r.c.usual[b.id] || 0); }); });
+    var h = '<div class="doc" style="max-width:none">' + UI.docHead('LOAD SHEET', '<div><b>' + D.dayName(d) + ' ' + D.dmy(d) + '</b></div><div>' + rows.length + ' customers · load ' + (qty(tot) || '–') + '</div>') +
+      '<table style="margin-bottom:14px"><thead><tr><th>Route (area)</th><th class="num">Customers</th>' + BTS.map(function (b) { return '<th class="num">' + b.litres + 'L to load</th>'; }).join('') + '<th class="num">Empties to collect</th></tr></thead><tbody>' +
+      Object.keys(groups).sort().map(function (a) { var g = groups[a]; return '<tr><td><b>' + UI.esc(a) + '</b></td><td class="num">' + g.length + '</td>' + BTS.map(function (b) { return '<td class="num">' + UI.sum(g, function (r) { return r.c.usual[b.id] || 0; }) + '</td>'; }).join('') + '<td class="num">' + UI.sum(g, function (r) { return Q.sumBt(r.c.toCollect); }) + '</td></tr>'; }).join('') +
+      '</tbody></table>' +
+      '<table style="font-size:12px"><thead><tr><th>#</th><th>Customer / address</th><th>Phone</th><th>Pays</th><th>Usual</th><th class="num">Collect</th><th class="num">Owed</th><th class="num">Balance</th><th>Bill no.</th><th>Filled</th><th>Empties</th><th>Cash / note</th></tr></thead><tbody>';
+    var n = 0;
+    Object.keys(groups).sort().forEach(function (a) {
+      h += '<tr><td colspan="12" style="background:#eef4f7;font-weight:600">' + UI.esc(a) + '</td></tr>';
+      groups[a].forEach(function (r) { var c = r.c, b = bal[c.id] || 0; h += '<tr><td>' + (++n) + '</td><td><b>' + UI.esc(c.name) + '</b><br>' + UI.esc(c.address) + '</td><td class="nowrap">' + UI.esc(c.phone) + '</td><td>' + c.payType + '</td><td><b>' + qty(c.usual) + '</b></td><td class="num">' + (Q.sumBt(c.toCollect) || '') + '</td><td class="num">' + (Q.sumBt(c.owed) || '') + '</td><td class="num">' + (b > 0 ? UI.num(Math.round(b)) : '') + '</td><td></td><td></td><td></td><td style="min-width:120px"></td></tr>'; });
+    });
+    h += (rows.length ? '' : '<tr><td colspan="12">No customers to deliver.</td></tr>') + '</tbody></table><div class="sig-row"><div>Loaded by</div><div>Driver</div><div>Checked by</div></div></div>';
+    UI.printDoc('Load sheet ' + D.dmy(d), h, true);
+  });
+
+  UI.$$('[data-q]').forEach(function (b) { b.addEventListener('click', function () { UI.$('#date').value = D.dmy(D.add(td, +b.getAttribute('data-q'))); render(); }); });
+  ['#date', '#area', '#show'].forEach(function (s) { UI.$(s).addEventListener('change', render); });
+  render();
+});
+</script>
+</body>
+</html>

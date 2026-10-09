@@ -1,0 +1,125 @@
+<!doctype html>
+<!-- Sitemap: every prototype screen grouped by module with the BRD requirement IDs it covers.
+     Generated from the same navigation definition the sidebar uses (assets/js/layout.js). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sitemap · Thuhina Water Prototype</title>
+<link rel="stylesheet" href="assets/css/styles.css">
+</head>
+<body data-page="index">
+<div class="content" style="margin:0 auto">
+  <div class="page-head">
+    <div>
+      <h1>Thuhina Water – Prototype Sitemap</h1>
+      <p class="sub">Water Distribution Inventory &amp; Sales Management System · BRD v4.0 · static clickable prototype</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <a class="btn primary" href="login.html">Open the prototype (Login)</a>
+      <button class="btn" id="reset">Reset demo data</button>
+    </div>
+  </div>
+
+  <div class="grid c2" style="margin-bottom:16px">
+    <div class="card">
+      <h2>How to use</h2>
+      <ol class="steps">
+        <li>Start at <a href="login.html">login.html</a> and pick a demo user (any password).</li>
+        <li>Use the <b>Role</b> switcher in the top bar to see how the sidebar and access change for Admin, Accountant and Delivery Staff.</li>
+        <li>Demo data is stored in your browser (localStorage), so a bill entered on one screen updates the customer profile, delivery list, stock and dashboard.</li>
+        <li><b>Reset demo data</b> (top bar) restores the original sample data.</li>
+        <li>The business date is fixed at <b>Friday 02/10/2026</b> so the sample delivery list and aging always line up.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h2>Suggested demo path</h2>
+      <ol class="steps">
+        <li><a href="delivery/delivery-schedule.html">Delivery Schedule</a> – customers due today, incl. one who was missed last week.</li>
+        <li><a href="sales/enter-bills.html">Enter Bills</a> – the customers due on the selected date are listed automatically; type the paper bill numbers with the keyboard; try a shortage, a "Left at door" row and a duplicate bill number.</li>
+        <li><a href="master-data/customers.html?id=C0017">Customers</a> – click a customer to see bottles, balance and history update.</li>
+        <li><a href="purchasing/purchasing.html">Purchasing</a> – open QR-2026-013 → choose a quotation → create PO → approve → receive goods.</li>
+        <li><a href="sales/sales-bills.html?new=first&amp;cust=C0040">First purchase</a> for the new customer Priyanka Rathnayake, with an American Water bottle.</li>
+        <li><a href="master-data/customers.html?id=C0008">Agreed prices</a> – Ceyknit Garments pays an agreed Rs. 270 for 20L (Factory standard Rs. 300); click <b>Prices</b> to change it. All agreed prices are listed under <a href="master-data/bottles-products.html#prices">Bottles &amp; Products → Prices</a>.</li>
+        <li><a href="sales/quotations.html">Customer Quotations</a> – open QT-2026-001 (accepted) → Register as customer: the quoted Rs. 300 becomes their agreed price.</li>
+        <li><a href="expenses/expenses.html">Expenses</a> – add a month's bills; see net profit in <a href="reports/reports.html?r=profit">Reports → Profit</a>.</li>
+        <li><a href="billing/billing.html#invoices">Billing</a> – generate September invoices → receive a payment → check aging.</li>
+      </ol>
+    </div>
+  </div>
+
+  <div id="sitemap" class="sitemap"></div>
+
+  <div class="card">
+    <h2>BRD coverage</h2>
+    <p class="muted small">Calculated from the BRD IDs listed against each screen above. Hover a box to see the screens.</p>
+    <h3 style="margin-top:12px">Functional requirements (FR-01 – FR-66)</h3>
+    <div class="cov-grid" id="cov-fr"></div>
+    <h3 style="margin-top:14px">Business rules (BR-01 – BR-20)</h3>
+    <div class="cov-grid" id="cov-br"></div>
+    <h3 style="margin-top:14px">Non-functional requirements</h3>
+    <div id="cov-nfr"></div>
+  </div>
+</div>
+<script src="assets/js/data.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/ui.js"></script>
+<script src="assets/js/layout.js"></script>
+<script>
+(function () {
+  var roleName = { A: 'Admin', C: 'Accountant', D: 'Delivery Staff' };
+  var html = '';
+  var cov = {};
+  App.NAV.forEach(function (g) {
+    if (g.hidden) { // hidden for now: not listed, but its requirements are marked
+      g.items.forEach(function (it) { it.brd.split(',').forEach(function (b) { var m = /(FR|BR|NFR)-\d+/.exec(b); if (m) (cov[m[0]] = cov[m[0]] || []).push(it.title + ' (hidden for now)'); }); });
+      return;
+    }
+    html += '<div class="card"><div class="card-head"><h2>' + App.icon(g.icon).replace('<svg', '<svg width="16" height="16" style="vertical-align:-2px;margin-right:6px"') + UI.esc(g.module) + '</h2></div><ul>';
+    g.items.forEach(function (it) {
+      var roles = it.acc.split(' ').map(function (a) { return roleName[a.charAt(0)] + (a.length > 1 ? ' (view)' : ''); }).join(', ');
+      html += '<li><a href="' + it.id + '.html">' + UI.esc(it.title) + '</a> <span class="brd-tags" style="display:inline-flex">' + it.brd.split(',').map(function (b) { return '<span class="brd-tag">' + UI.esc(b.trim()) + '</span>'; }).join('') + '</span><div class="small muted">' + UI.esc(it.id) + '.html · ' + roles + '</div></li>';
+      it.brd.split(',').forEach(function (b) {
+        var m = /(FR|BR|NFR)-\d+/.exec(b);
+        if (m) (cov[m[0]] = cov[m[0]] || []).push(it.title);
+      });
+    });
+    html += '</ul></div>';
+  });
+  UI.$('#sitemap').innerHTML = html;
+
+  function grid(prefix, n, el) {
+    var h = '';
+    for (var i = 1; i <= n; i++) {
+      var id = prefix + '-' + (i < 10 ? '0' : '') + i;
+      var s = cov[id];
+      var hid = s && s.every(function (x) { return / \(hidden for now\)$/.test(x); });
+      h += '<div class="cov' + (s && !hid ? '' : ' miss') + '" title="' + UI.esc(s ? s.join(', ') : 'Not covered by a screen') + '"><b>' + id + '</b> ' + (hid ? 'hidden for now' : s ? '✓ ' + s.length + ' screen' + (s.length > 1 ? 's' : '') : 'not covered') + '</div>';
+    }
+    UI.$(el).innerHTML = h;
+  }
+  grid('FR', 66, '#cov-fr');
+  grid('BR', 20, '#cov-br');
+  var nfr = [
+    ['NFR-01', 'Platform – Chrome, Edge, Firefox on desktop/laptop', 'Prototype is plain HTML/CSS/JS and runs in these browsers; full cross-browser testing is for the build phase.', 'partial'],
+    ['NFR-02', 'Capacity – 10,000 customers, hundreds of bills per day', 'Not demonstrable in a static prototype (sample has 40 customers).', 'no'],
+    ['NFR-03', 'Speed – screens and searches within 3 seconds', 'Not demonstrable in a static prototype.', 'no'],
+    ['NFR-04', 'Fast keyboard-friendly bill entry', 'Shown on Paper Bill Entry (Enter/Tab moves, Enter on last field adds a row, Ctrl+S posts).', 'yes'],
+    ['NFR-05', 'Role-based access, encrypted passwords, HTTPS', 'Role-based access shown (role switcher, sidebar, view-only). Password encryption and HTTPS are server features – not demonstrable.', 'partial'],
+    ['NFR-06', 'Automatic daily backup with tested restore', 'Server feature – not demonstrable in the prototype.', 'no'],
+    ['NFR-07', 'LKR currency; dates DD/MM/YYYY', 'Used on every screen.', 'yes'],
+    ['NFR-08', 'Future mobile app for delivery staff', 'Architecture item – not demonstrable. Delivery Staff screens are kept simple and printable.', 'no']
+  ];
+  UI.table('#cov-nfr', {
+    columns: [{ h: 'ID', f: function (r) { return '<b class="mono">' + r[0] + '</b>'; } }, { h: 'Requirement', f: function (r) { return UI.esc(r[1]); } },
+      { h: 'In prototype', f: function (r) { return r[3] === 'yes' ? UI.badge('Shown', 'ok') : r[3] === 'partial' ? UI.badge('Partly', 'warn') : UI.badge('Not demonstrable', 'bad'); } },
+      { h: 'Note', f: function (r) { return '<span class="small">' + UI.esc(r[2]) + '</span>'; } }],
+    rows: nfr
+  });
+  UI.$('#reset').addEventListener('click', function () {
+    UI.confirm('Reset demo data?', 'Restore the original placeholder data and history?', 'Reset', 'danger').then(function (y) { if (y) { TW.reset(); UI.toast('Demo data restored', 'ok'); } });
+  });
+})();
+</script>
+</body>
+</html>

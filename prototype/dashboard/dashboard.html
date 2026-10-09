@@ -1,0 +1,96 @@
+<!doctype html>
+<!-- BRD: Section 8 Dashboard (today's sales, collections, filled stock, bottles at factory, deliveries due, empties to collect, outstanding total),
+     FR-31 (low-stock alert). Roles: Admin, Accountant. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="dashboard/dashboard">
+<main id="app">
+  <div class="page-actions" id="quick"></div>
+  <div id="alerts"></div>
+  <div class="kpis" id="kpis"></div>
+  <div class="grid side">
+    <div class="card">
+      <div class="card-head"><h2>Today's deliveries</h2><span id="dl-link"></span></div>
+      <div id="today"></div>
+    </div>
+    <div class="stack">
+      <div class="card"><h2>Needs attention</h2><ul id="todo" style="margin:0;padding-left:18px"></ul></div>
+      <div class="card"><h2>Sales – last 14 days</h2><div id="chart"></div></div>
+    </div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today();
+  var q = [];
+  if (App.can('sales/enter-bills')) q.push('<a class="btn primary" href="' + App.url('sales/enter-bills') + '">Enter bills</a>');
+  if (App.can('billing/billing')) q.push('<a class="btn" href="' + App.url('billing/billing', { pay: 'new' }) + '">Receive payment</a>');
+  UI.$('#quick').innerHTML = q.join('');
+  UI.$('#dl-link').innerHTML = App.link('delivery/delivery-schedule', null, 'Open delivery schedule →');
+
+  var todays = db.txns.filter(function (t) { return t.date === td && t.kind !== 'opening'; });
+  var sales = UI.sum(todays, function (t) { return t.amount; });
+  var cash = UI.sum(todays, function (t) { return t.paid; }) + UI.sum(db.payments.filter(function (p) { return p.date === td; }), function (p) { return p.amount; });
+  var due = Q.dueList(td), done = due.filter(function (x) { return x.entered.length; }).length;
+  var ct = Q.custTotals(), s = db.stock.B20, low = Q.lowStock();
+  UI.$('#alerts').innerHTML = low.map(function (l) { return '<div class="banner bad"><b>Low stock:</b> only ' + l.filled + ' filled ' + Q.btShort(l.bt) + ' bottles in store (minimum ' + l.min + '). ' + db.stock[l.bt].factory + ' are at the factory. ' + App.link('production/production', null, 'Send empties') + '</div>'; }).join('');
+  var k = [
+    ['Sales today', UI.lkr(sales), todays.length + ' bills', 'sales/sales-bills'],
+    ['Collected today', UI.lkr(cash), 'cash and payments', 'billing/billing'],
+    ['Filled 20L in store', s.filled, 'minimum ' + (db.minLevels.B20 || 0), 'inventory/inventory', low.length],
+    ['Bottles at factory', s.factory + db.stock.B10.factory, '', 'production/production'],
+    ['Deliveries today', done + ' of ' + due.length, 'entered', 'delivery/delivery-schedule'],
+    ['Empties to collect', Q.sumBt(ct.toCollect), 'left at the door', 'sales/sales-bills'],
+    ['Bottles owed', Q.sumBt(ct.owed), 'shortages', 'sales/sales-bills'],
+    ['Outstanding', UI.lkr(Q.totalOutstanding()), 'all customers', 'billing/billing']
+  ];
+  UI.$('#kpis').innerHTML = k.map(function (x) { return '<div class="kpi' + (x[4] ? ' alert' : '') + '"><div class="label">' + x[0] + '</div><div class="value">' + App.link(x[3], null, x[1]) + '</div><div class="hint">' + x[2] + '</div></div>'; }).join('');
+
+  UI.table('#today', {
+    columns: [
+      { h: 'Customer', f: function (x) { return '<b>' + UI.esc(x.cust.name) + '</b><div class="small muted">' + UI.esc(x.cust.area) + '</div>'; } },
+      { h: 'Usual', cls: 'num', f: function (x) { return Q.activeBottles().filter(function (b) { return x.cust.usual[b.id]; }).map(function (b) { return x.cust.usual[b.id] + '×' + b.litres + 'L'; }).join(' '); } },
+      { h: 'Status', f: function (x) { return x.entered.length ? UI.statusBadge('Entered') : x.overdue ? UI.badge('Missed ' + D.dmy(x.cust.nextDelivery), 'bad') : UI.statusBadge('Due'); } }
+    ],
+    rows: due, empty: 'No deliveries today.'
+  });
+
+  var todo = [];
+  db.qrs.filter(function (r) { return r.status === 'Quotes received'; }).forEach(function (r) { todo.push(App.link('purchasing/purchasing', null, r.id) + ' – quotations waiting for a choice'); });
+  db.pos.filter(function (p) { return p.status === 'Draft'; }).forEach(function (p) { todo.push(App.link('purchasing/purchasing', null, p.id) + ' – draft PO waiting for approval'); });
+  db.pos.filter(function (p) { return ['Approved', 'Sent', 'Partly received'].indexOf(p.status) >= 0; }).forEach(function (p) { todo.push(App.link('purchasing/purchasing', null, p.id) + ' – goods to receive'); });
+  db.cquotes.forEach(function (q) {
+    var st = Q.cquoteStatus(q);
+    if (st === 'Draft') todo.push(App.link('sales/quotations', { id: q.id }, q.id) + ' – customer quotation to ' + UI.esc(q.org) + ' not sent yet');
+    else if (st === 'Sent' && D.diff(q.validUntil, td) <= 7) todo.push(App.link('sales/quotations', { id: q.id }, q.id) + ' – ' + UI.esc(q.org) + ': no answer yet, valid until ' + D.dmy(q.validUntil));
+    else if (st === 'Accepted' && !q.custId) todo.push(App.link('sales/quotations', { id: q.id }, q.id) + ' – accepted by ' + UI.esc(q.org) + ', register as a customer');
+    else if (st === 'Accepted' && !q.pricesApplied && q.lines.some(function (l) { return /^water\|/.test(l.item); })) todo.push(App.link('sales/quotations', { id: q.id }, q.id) + ' – accepted by ' + UI.esc(q.org) + ', apply the quoted prices');
+  });
+  var lm = D.prevMonth(D.month(td));
+  // Agreed customer prices ending within 30 days (FR-05)
+  db.custPrices.forEach(function (e) { if (!e.cancelled && e.until && e.until >= td && D.diff(e.until, td) <= 30 && Q.custPriceEntry(e.custId, e.bt) === e) todo.push(App.link('master-data/customers', { id: e.custId }, UI.esc(Q.customer(e.custId).name)) + ' – agreed ' + Q.btShort(e.bt) + ' price ' + UI.lkr(e.price) + ' ends ' + D.dmy(e.until)); });
+  if (!Q.expensesFor(lm).length) todo.push(App.link('expenses/expenses', { month: lm }, 'No expenses entered') + ' for ' + D.monthLabel(lm));
+  var notInv = db.customers.filter(function (c) { return c.payType === 'Monthly bill' && c.status === 'Active' && !db.invoices.some(function (i) { return i.custId === c.id && i.period === lm; }); }).length;
+  if (notInv) todo.push(App.link('billing/billing', null, notInv + ' monthly invoice(s)') + ' for ' + D.monthLabel(lm) + ' not generated');
+  var over = db.customers.filter(function (c) { return c.payType !== 'Cash' && Q.balance(c.id) > c.limit; }).length;
+  if (over) todo.push(App.link('billing/billing', null, over + ' customer(s)') + ' over the credit limit');
+  var aged = Q.aging().filter(function (a) { return a.b90 > 0; }).length;
+  if (aged) todo.push(App.link('billing/billing', null, aged + ' customer(s)') + ' owing for more than 90 days');
+  UI.$('#todo').innerHTML = todo.map(function (t) { return '<li style="margin:5px 0">' + t + '</li>'; }).join('') || '<li class="muted">Nothing pending.</li>';
+
+  var days = [];
+  for (var i = 13; i >= 0; i--) { var d = D.add(td, -i); var v = UI.sum(db.txns.filter(function (t) { return t.date === d && t.kind !== 'opening'; }), function (t) { return t.amount; }); days.push({ label: d.slice(8), value: v, title: D.dmy(d) + ': ' + UI.lkr(v) }); }
+  UI.bars(UI.$('#chart'), days, UI.lkr);
+});
+</script>
+</body>
+</html>

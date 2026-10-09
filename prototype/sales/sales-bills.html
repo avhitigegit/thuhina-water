@@ -1,0 +1,250 @@
+<!doctype html>
+<!-- BRD: FR-41 / BR-13 (find a bill by paper bill number; prevent duplicates), BR-14 (correction by reversal entry),
+     FR-32 / FR-33 / BR-01 / BR-02 (first purchase: deposit + water; old American Water bottle waives deposit), FR-39 (extra order; deposit beyond holding),
+     FR-40 (product sale), FR-36 (collect empties left at door), FR-37 / BR-06 (customer-damaged bottle), FR-38 / BR-07 (settle bottles owed). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sales &amp; Bills · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="sales/sales-bills">
+<main id="app">
+  <div class="page-actions">
+    <a class="btn" href="enter-bills.html">Enter daily bills</a>
+    <button class="btn primary" id="new">+ New ▾</button>
+  </div>
+  <div class="card">
+    <div class="toolbar">
+      <div class="field"><label>Bill no. / paper bill no.</label><input id="bill" placeholder="e.g. B000275 or 41275" style="width:190px"></div>
+      <div class="field grow"><label>Customer</label><input id="cust" list="cust-dl" placeholder="Any customer"></div>
+      <div class="field"><label>Type</label><select id="kind"><option value="">All</option></select></div>
+      <div class="field"><label>From</label><input id="from" class="date" maxlength="10"></div>
+      <div class="field"><label>To</label><input id="to" class="date" maxlength="10"></div>
+    </div>
+    <div id="check"></div>
+    <div id="list"></div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today();
+  document.querySelector('.content').insertAdjacentHTML('beforeend', UI.custDatalist('cust-dl'));
+  UI.$('#kind').innerHTML += UI.options(Object.keys(TW.KINDS).filter(function (k) { return k !== 'opening'; }).map(function (k) { return { v: k, l: TW.KINDS[k] }; }));
+  UI.$('#from').value = D.dmy(D.add(td, -14));
+  UI.$('#to').value = D.dmy(td);
+  var P = UI.params();
+  if (P.bill) UI.$('#bill').value = P.bill;
+
+  /* ---------- Bill list + search (FR-41) ---------- */
+  function render() {
+    var b = UI.$('#bill').value.trim().toUpperCase(), c = UI.findCustomer(UI.$('#cust').value), k = UI.$('#kind').value;
+    var f = D.fromDmy(UI.$('#from').value) || '2000-01-01', t = D.fromDmy(UI.$('#to').value) || '2999-12-31';
+    if (b) {
+      var ex = Q.billExists(b);
+      UI.$('#check').innerHTML = ex ? '<div class="banner warn">Bill <b>' + UI.esc(b) + '</b> is already entered – ' + TW.KINDS[ex.kind] + ', ' + UI.esc(ex.custId ? Q.customer(ex.custId).name : ex.walkIn) + ', ' + D.dmy(ex.date) + '. Do not enter it again.</div>' : '<div class="banner ok">Bill <b>' + UI.esc(b) + '</b> has not been entered yet.</div>';
+    } else UI.$('#check').innerHTML = '';
+    var rows = db.txns.filter(function (x) {
+      if (x.kind === 'opening') return false;
+      if (b) return (x.billNo && x.billNo.toUpperCase().indexOf(b) >= 0) || (x.paperNo && x.paperNo.toUpperCase().indexOf(b) >= 0);
+      return x.date >= f && x.date <= t && (!c || x.custId === c.id) && (!k || x.kind === k);
+    }).slice().reverse().slice(0, 300);
+    UI.table('#list', {
+      columns: [
+        { h: 'Bill no.', f: function (x) { return '<b class="mono">' + UI.esc(x.billNo || '–') + '</b>' + (x.paperNo ? '<div class="small muted">paper ' + UI.esc(x.paperNo) + '</div>' : ''); } },
+        { h: 'Date', f: function (x) { return D.dmy(x.date); } },
+        { h: 'Type', f: function (x) { return UI.kindBadge(x.kind) + (x.reversedBy ? ' ' + UI.badge('reversed', 'bad') : ''); } },
+        { h: 'Customer', f: function (x) { return UI.esc(x.custId ? Q.customer(x.custId).name : x.walkIn || ''); } },
+        { h: 'Bottles', cls: 'num', f: function (x) { return (x.lines || []).filter(function (l) { return l.bt; }).map(function (l) { return (l.filled || 0) + '/' + (l.empties || 0); }).join(' ') || ''; } },
+        { h: 'Amount', cls: 'num', f: function (x) { return x.amount ? UI.lkr(x.amount) : ''; } },
+        { h: 'Paid', cls: 'num', f: function (x) { return x.paid ? UI.lkr(x.paid) : ''; } }
+      ],
+      rows: rows, empty: 'No bills found.', rowClass: function (x) { return 'clickable' + (x.reversedBy || x.kind === 'reversal' ? ' row-muted' : ''); }, rowAttr: function (x) { return 'data-id="' + x.id + '"'; }
+    });
+  }
+  UI.$('#list').addEventListener('click', function (e) { var tr = e.target.closest('tr[data-id]'); if (tr) showBill(tr.getAttribute('data-id')); });
+  ['#bill', '#cust', '#kind', '#from', '#to'].forEach(function (s) { UI.$(s).addEventListener('input', render); UI.$(s).addEventListener('change', render); });
+
+  /* ---------- Bill details + reversal (BR-14) ---------- */
+  function showBill(id) {
+    var x = Q.txn(id), c = x.custId && Q.customer(x.custId);
+    var lines = (x.lines || []).map(function (l) {
+      if (l.pid) return l.qty + ' × ' + UI.esc(Q.product(l.pid).name) + ' @ ' + UI.lkr(l.price);
+      var s = [Q.btShort(l.bt) + ':'];
+      if (l.filled) s.push(l.filled + ' filled' + (l.price ? ' @ ' + UI.lkr(l.price) : ''));
+      if (l.empties) s.push(l.empties + ' empties back');
+      if (l.owed) s.push('<b>' + l.owed + ' owed</b>');
+      if (l.toCollect) s.push(l.toCollect + ' to collect');
+      if (l.deposits) s.push(l.deposits + ' deposit(s)');
+      if (l.old) s.push(l.old + ' old bottle(s) in');
+      if (l.damaged) s.push(l.damaged + ' damaged');
+      return s.join(' ');
+    }).join('<br>');
+    var h = '<div class="summary"><span class="muted">Bill no.</span><b class="mono">' + UI.esc(x.billNo || '–') + (x.paperNo ? ' <span class="muted">(paper ' + UI.esc(x.paperNo) + ')</span>' : '') + '</b><span class="muted">Type</span><b>' + UI.kindBadge(x.kind) + '</b><span class="muted">Date</span><b>' + D.dmy(x.date) + '</b><span class="muted">Customer</span><b>' + (c ? App.link('master-data/customers', { id: c.id }, UI.esc(c.name)) : UI.esc(x.walkIn || '–')) + '</b>' +
+      '<span class="muted">Details</span><b>' + (lines || '–') + '</b><span class="muted">Amount</span><b>' + UI.money(x.amount) + '</b><span class="muted">Paid on bill</span><b>' + UI.money(x.paid) + '</b>' +
+      (x.note ? '<span class="muted">Note</span><b>' + UI.esc(x.note) + '</b>' : '') + '<span class="muted">Entered by</span><b>' + UI.esc(x.user) + ' · ' + D.dmyt(x.created) + '</b></div>' +
+      (x.override ? '<div class="banner warn" style="margin-top:10px">Over the credit limit – approved by ' + UI.esc(x.override) + '</div>' : '') +
+      (x.reversedBy ? '<div class="banner bad" style="margin-top:10px">Reversed: ' + UI.esc(Q.txn(x.reversedBy).note) + '</div>' : '') +
+      (x.kind === 'reversal' ? '<div class="banner warn" style="margin-top:10px">This entry cancels an earlier bill.</div>' : '') +
+      (!x.reversedBy && x.kind !== 'reversal' ? '<p class="small muted" style="margin-top:10px">Saved bills are never deleted. To correct a mistake, reverse the bill and enter it again.</p>' : '');
+    var btns = [{ label: 'Print bill', onClick: function () { UI.printBill(x); return false; } }, { label: 'Close' }];
+    if (!x.reversedBy && x.kind !== 'reversal') btns.unshift({ label: 'Reverse this bill', cls: 'danger', onClick: function (close) {
+      close();
+      UI.prompt('Reverse ' + (x.billNo ? 'bill ' + x.billNo : 'entry') + '?', 'Reason for the correction:', 'Reverse', 'danger').then(function (r) { if (r && UI.result(TW.Ops.reverse(x.id, r), 'Bill reversed – stock, bottles and balance corrected')) render(); });
+    } });
+    UI.modal({ title: x.billNo ? 'Bill ' + x.billNo : TW.KINDS[x.kind], body: h, buttons: btns });
+  }
+
+  /* ---------- New entries ---------- */
+  function custField(filter, sel) {
+    var id = 'dl' + Math.random().toString(36).slice(2, 7);
+    return UI.custDatalist(id, filter) + '<div class="field req span2"><label>Customer</label><input name="cust" list="' + id + '" value="' + (sel ? UI.esc(UI.custLabel(Q.customer(sel))) : '') + '" placeholder="Code, name or phone"></div>';
+  }
+  function brandOpts(bt) { var b = db.oldBrands.filter(function (x) { return x.active && x.bottle === bt; }); return UI.options(b.map(function (x) { return { v: x.id, l: x.name }; }), '', { blank: b.length ? null : 'None for this size' }); }
+  function saleModal(title, body, calc, save, okMsg) {
+    var paidTouched = false;
+    var m = UI.modal({
+      title: title, wide: true,
+      body: '<div class="grid" style="grid-template-columns:minmax(0,3fr) minmax(240px,2fr)"><div class="form-grid" id="sf">' + body + '</div><div><div id="calc"></div><div id="card" style="margin-top:10px"></div></div></div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Save', cls: 'primary', onClick: function (close, el) {
+        var c = UI.findCustomer(UI.mval(el, 'cust'));
+        UI.withCreditApproval(function (ok) { return save(el, c, ok); }, okMsg, function () { close(); render(); });
+        return false;
+      } }]
+    });
+    function upd(e) {
+      if (e && e.target.name === 'paid') paidTouched = true;
+      if (e && e.target.name === 'cust') paidTouched = false;
+      var c = UI.findCustomer(UI.mval(m.el, 'cust'));
+      var r = calc(m.el, c) || {};
+      var paidEl = m.el.querySelector('[name=paid]');
+      if (paidEl && !paidTouched && r.amount != null) paidEl.value = !c || c.payType === 'Cash' ? r.amount : 0;
+      var paid = paidEl ? +paidEl.value || 0 : 0;
+      m.el.querySelector('#calc').innerHTML = r.html || '';
+      var after = c ? { held: r.held || c.held, toCollect: r.toCollect || c.toCollect, owed: r.owed || c.owed, balance: Q.balance(c.id) + (r.amount || 0) - paid } : null;
+      m.el.querySelector('#card').innerHTML = c ? '<div class="card" style="padding:10px;margin:0">' + UI.custCard(c, after) + '</div>' : '';
+    }
+    m.el.addEventListener('input', upd); m.el.addEventListener('change', upd); upd();
+    return m;
+  }
+  /* Bill numbers are generated by the system when the entry is saved. */
+  function common() {
+    return '<div class="field"><label>Bill no.</label><input value="Generated on save" readonly></div><div class="field req"><label>Date</label>' + UI.dateInput('date', td) + '</div>';
+  }
+  function sum(rows) { return '<div class="summary">' + rows.map(function (r) { return '<span' + (r[2] ? ' class="total"' : '') + '>' + r[0] + '</span><b class="num' + (r[2] ? ' total' : '') + '">' + r[1] + '</b>'; }).join('') + '</div>'; }
+  var clone = function (o) { return JSON.parse(JSON.stringify(o)); };
+
+  /* First purchase (FR-32, FR-33) */
+  function first(sel) {
+    saleModal('First purchase', custField(function (c) { return c.status === 'Active' && !Q.sumBt(c.held); }, sel) + common(true, true) +
+      '<div class="field req"><label>Bottle</label><select name="bt">' + UI.btOptions('B20') + '</select></div><div class="field req"><label>Bottles given</label><input name="qty" type="number" min="1" value="2"></div>' +
+      '<div class="field"><label>Old bottles handed in</label><input name="old" type="number" min="0" value="0"></div><div class="field"><label>Old bottle brand</label><select name="brand">' + brandOpts('B20') + '</select></div>' +
+      '<div class="field"><label>Cash paid (Rs.)</label><input name="paid" type="number" min="0"></div><div class="field full small muted">Deposit Rs. 1,000 per new bottle + water. Each accepted old bottle (American Water) replaces one deposit.</div>',
+      function (el, c) {
+        var x = TW.Ops.previewFirst({ custId: c && c.id, bt: UI.mval(el, 'bt'), qty: UI.mval(el, 'qty'), oldBottles: UI.mval(el, 'old'), date: D.fromDmy(UI.mval(el, 'date')) || td });
+        var held = c ? clone(c.held) : null; if (held) held[UI.mval(el, 'bt')] = (held[UI.mval(el, 'bt')] || 0) + x.qty;
+        return { amount: x.amount, held: held, html: (c && Q.sumBt(c.held) ? '<div class="banner bad">Already has bottles – use Extra order.</div>' : '') + sum([['Water ' + x.qty + ' × ' + UI.lkr(x.price) + ag(c, UI.mval(el, 'bt'), el), UI.lkr(x.water)], ['Deposit ' + x.deposits + ' × ' + UI.lkr(x.deposit), UI.lkr(x.depositAmt)], x.old ? ['Old bottles handed in (no deposit)', x.old] : ['', ''], ['Total', UI.lkr(x.amount), 1]]) };
+      },
+      function (el, c, ok) { return TW.Ops.firstPurchase({ custId: c && c.id, date: D.fromDmy(UI.mval(el, 'date')), bt: UI.mval(el, 'bt'), qty: UI.mval(el, 'qty'), oldBottles: UI.mval(el, 'old'), brandId: UI.mval(el, 'brand'), paid: UI.mval(el, 'paid'), approveOverLimit: ok }); },
+      'First purchase saved');
+  }
+  /* Marks a water price that is this customer's agreed price (FR-05). */
+  function ag(c, bt, el) { return c && Q.isAgreed(c, bt, D.fromDmy(UI.mval(el, 'date')) || td) ? ' (agreed price)' : ''; }
+  /* Extra order (FR-39) */
+  function extra(sel) {
+    saleModal('Extra order', custField(function (c) { return c.status === 'Active' && Q.sumBt(c.held); }, sel) + common(true, true) +
+      '<div class="field req"><label>Bottle</label><select name="bt">' + UI.btOptions('B20') + '</select></div><div class="field req"><label>Filled given</label><input name="filled" type="number" min="1" value="1"></div>' +
+      '<div class="field"><label>Empties returned</label><input name="empties" type="number" min="0" value="0"></div><div class="field"><label>Old bottles handed in</label><input name="old" type="number" min="0" value="0"></div>' +
+      '<div class="field"><label>Old bottle brand</label><select name="brand">' + brandOpts('B20') + '</select></div><div class="field"><label>Cash paid (Rs.)</label><input name="paid" type="number" min="0"></div>' +
+      '<div class="field full small muted">Bottles beyond the customer\'s holding need a deposit (or an accepted old bottle).</div>',
+      function (el, c) {
+        var bt = UI.mval(el, 'bt'), x = TW.Ops.previewExtra({ custId: c && c.id, bt: bt, filled: UI.mval(el, 'filled'), empties: UI.mval(el, 'empties'), oldBottles: UI.mval(el, 'old'), date: D.fromDmy(UI.mval(el, 'date')) || td });
+        var held = c ? clone(c.held) : null; if (held) held[bt] = (held[bt] || 0) + x.newBottles;
+        return { amount: x.amount, held: held, html: sum([['New bottles beyond holding', x.newBottles], ['Water ' + x.filled + ' × ' + UI.lkr(x.price) + ag(c, bt, el), UI.lkr(x.water)], ['Deposit ' + x.deposits + ' × ' + UI.lkr(x.deposit), UI.lkr(x.depositAmt)], ['Total', UI.lkr(x.amount), 1]]) };
+      },
+      function (el, c, ok) { return TW.Ops.extraOrder({ custId: c && c.id, date: D.fromDmy(UI.mval(el, 'date')), bt: UI.mval(el, 'bt'), filled: UI.mval(el, 'filled'), empties: UI.mval(el, 'empties'), oldBottles: UI.mval(el, 'old'), brandId: UI.mval(el, 'brand'), paid: UI.mval(el, 'paid'), approveOverLimit: ok }); },
+      'Extra order saved');
+  }
+  /* Product sale (FR-40) */
+  function product(sel) {
+    var prods = db.products.filter(function (p) { return p.active; });
+    saleModal('Product sale', custField(function (c) { return c.status === 'Active'; }, sel) + '<div class="field span2"><label>…or walk-in name</label><input name="walk" placeholder="Leave customer empty for walk-in (cash only)"></div>' + common(true, true) +
+      '<div class="field req span2"><label>Product</label><select name="pid">' + UI.options(prods.map(function (p) { return { v: p.id, l: p.name + ' – ' + UI.lkr(p.price) + ' (' + p.stock + ' in stock)' }; })) + '</select></div>' +
+      '<div class="field req"><label>Qty</label><input name="qty" type="number" min="1" value="1"></div><div class="field"><label>Unit price (Rs.)</label><input name="price" type="number" min="0"></div>' +
+      '<div class="field"><label>Paid (Rs.)</label><input name="paid" type="number" min="0"></div><div class="field"><label>Paid by</label><select name="mode">' + UI.options(TW.PAY_MODES, 'Cash') + '</select></div>',
+      function (el) {
+        var p = Q.product(UI.mval(el, 'pid')), pr = el.querySelector('[name=price]');
+        if (!pr.dataset.for || pr.dataset.for !== p.id) { pr.value = p.price; pr.dataset.for = p.id; }
+        var q = +UI.mval(el, 'qty') || 0, amt = q * (+pr.value || 0);
+        return { amount: amt, html: (q > p.stock ? '<div class="banner bad">Only ' + p.stock + ' in stock.</div>' : '') + sum([[q + ' × ' + UI.esc(p.name), UI.lkr(amt)], ['Total', UI.lkr(amt), 1]]) };
+      },
+      function (el, c, ok) { return TW.Ops.productSale({ custId: c && c.id, walkIn: c ? '' : UI.mval(el, 'walk').trim(), date: D.fromDmy(UI.mval(el, 'date')), items: [{ pid: UI.mval(el, 'pid'), qty: UI.mval(el, 'qty'), price: UI.mval(el, 'price') }], paid: UI.mval(el, 'paid'), payMode: UI.mval(el, 'mode'), approveOverLimit: ok }); },
+      'Product sale saved');
+  }
+  /* Collect empties left at the door (FR-36) */
+  function collect(sel) {
+    saleModal('Collect empties (left at door)', custField(function (c) { return Q.sumBt(c.toCollect) > 0; }, sel) + common(false, false) +
+      '<div class="field req"><label>Bottle</label><select name="bt">' + UI.btOptions('B20') + '</select></div><div class="field req"><label>Empties collected</label><input name="qty" type="number" min="1"></div>',
+      function (el, c) {
+        var bt = UI.mval(el, 'bt'), q = el.querySelector('[name=qty]');
+        if (c && !q.value) q.value = c.toCollect[bt] || '';
+        var tc = c ? clone(c.toCollect) : null; if (tc) tc[bt] = (tc[bt] || 0) - (+q.value || 0);
+        return { toCollect: tc, html: c ? '<p class="small">Waiting to be collected: <b>' + (c.toCollect[bt] || 0) + '</b>. Collected empties go to empty stock.</p>' : '' };
+      },
+      function (el, c) { return TW.Ops.collectEmpties({ custId: c && c.id, date: D.fromDmy(UI.mval(el, 'date')), bt: UI.mval(el, 'bt'), qty: UI.mval(el, 'qty') }); },
+      'Empties collected');
+  }
+  /* Customer-damaged bottle (FR-37, BR-06) */
+  function damage(sel) {
+    saleModal('Customer-damaged bottle', custField(function (c) { return c.status === 'Active' && Q.sumBt(c.held); }, sel) + common(false, false) +
+      '<div class="field req"><label>Bottle</label><select name="bt">' + UI.btOptions('B20') + '</select></div><div class="field req"><label>Damaged</label><input name="qty" type="number" min="1" value="1"></div>' +
+      '<div class="field req full"><label>What happened</label><input name="reason" placeholder="e.g. Bottle cracked – dropped by customer"></div>' +
+      '<div class="full radio-row"><label class="check"><input type="radio" name="mode" value="replace" checked> Customer buys a new bottle (keeps holding)</label><label class="check"><input type="radio" name="mode" value="reduce"> Not replaced – reduce holding</label></div>' +
+      '<label class="check full"><input type="checkbox" name="water" checked> Give the new bottle filled and charge water</label><div class="field"><label>Cash paid (Rs.)</label><input name="paid" type="number" min="0"></div>',
+      function (el, c) {
+        var bt = UI.mval(el, 'bt'), mode = el.querySelector('[name=mode]:checked').value;
+        var x = TW.Ops.previewCustDamage({ custId: c && c.id, bt: bt, qty: UI.mval(el, 'qty'), mode: mode, chargeWater: UI.mval(el, 'water') });
+        var held = c ? clone(c.held) : null; if (held && mode === 'reduce') held[bt] -= x.qty;
+        return { amount: x.amount, held: held, html: sum([['New bottle (deposit)', UI.lkr(x.depositAmt)], ['Water', UI.lkr(x.water)], ['Total', UI.lkr(x.amount), 1]]) + '<p class="small muted">The damaged bottle is written off.</p>' };
+      },
+      function (el, c, ok) { return TW.Ops.customerDamage({ custId: c && c.id, date: D.fromDmy(UI.mval(el, 'date')), bt: UI.mval(el, 'bt'), qty: UI.mval(el, 'qty'), mode: el.querySelector('[name=mode]:checked').value, chargeWater: UI.mval(el, 'water'), reason: UI.mval(el, 'reason').trim(), paid: UI.mval(el, 'paid'), approveOverLimit: ok }); },
+      'Customer damage saved – bottle written off');
+  }
+  /* Settle bottles owed (FR-38, BR-07) */
+  function owed(sel) {
+    saleModal('Settle bottles owed', custField(function (c) { return Q.sumBt(c.owed) > 0; }, sel) + common(false, false) +
+      '<div class="field req"><label>Bottle</label><select name="bt">' + UI.btOptions('B20') + '</select></div><div class="field req"><label>Bottles</label><input name="qty" type="number" min="1"></div>' +
+      '<div class="full radio-row"><label class="check"><input type="radio" name="method" value="return" checked> Bottles returned</label><label class="check"><input type="radio" name="method" value="deposit"> Customer pays the deposit and keeps them</label></div>' +
+      '<div class="field"><label>Cash paid (Rs.)</label><input name="paid" type="number" min="0"></div>',
+      function (el, c) {
+        var bt = UI.mval(el, 'bt'), q = el.querySelector('[name=qty]'), dep = el.querySelector('[name=method]:checked').value === 'deposit';
+        if (c && !q.value) q.value = c.owed[bt] || '';
+        var n = +q.value || 0, amt = dep ? n * Q.deposit(bt) : 0;
+        var ow = c ? clone(c.owed) : null; if (ow) ow[bt] -= n;
+        var held = c ? clone(c.held) : null; if (held && dep) held[bt] += n;
+        return { amount: amt, owed: ow, held: held, html: c ? '<p class="small">Owed now: <b>' + (c.owed[bt] || 0) + '</b>.</p>' + (dep ? sum([['Deposit ' + n + ' × ' + UI.lkr(Q.deposit(bt)), UI.lkr(amt), 1]]) : '') : '' };
+      },
+      function (el, c) { return TW.Ops.settleOwed({ custId: c && c.id, date: D.fromDmy(UI.mval(el, 'date')), bt: UI.mval(el, 'bt'), qty: UI.mval(el, 'qty'), method: el.querySelector('[name=method]:checked').value, paid: UI.mval(el, 'paid') }); },
+      'Bottles owed settled');
+  }
+
+  var NEW = { first: first, extra: extra, product: product, collect: collect, damage: damage, owed: owed };
+  UI.menuButton(UI.$('#new'), [
+    { label: 'First purchase<small>New customer: deposit + water</small>', onClick: function () { first(); } },
+    { label: 'Extra order<small>More bottles on any day</small>', onClick: function () { extra(); } },
+    { label: 'Product sale<small>Dispensers, stands, pumps</small>', onClick: function () { product(); } },
+    { label: 'Collect empties<small>Left at the door last trip</small>', onClick: function () { collect(); } },
+    { label: 'Customer-damaged bottle<small>Customer pays for a new bottle</small>', onClick: function () { damage(); } },
+    { label: 'Settle bottles owed<small>Bottles returned or deposit paid</small>', onClick: function () { owed(); } }
+  ]);
+  render();
+  if (P['new'] && NEW[P['new']]) NEW[P['new']](P.cust && Q.customer(P.cust) ? P.cust : null);
+});
+</script>
+</body>
+</html>

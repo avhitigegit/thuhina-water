@@ -1,0 +1,218 @@
+<!doctype html>
+<!-- BRD: FR-47 (cash collected on delivery), FR-48 / BR-09 (credit balance vs limit), FR-49 (monthly invoices), FR-50 (payments incl. part-payments; cash, bank transfer, cheque),
+     FR-51 (aging 0–30, 31–60, 61–90, 90+), FR-52 (statements and invoices – print / PDF). Roles: Admin, Accountant. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Billing &amp; Payments · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="billing/billing">
+<main id="app">
+  <div class="page-actions"><button class="btn primary" id="pay">+ Receive payment</button></div>
+  <div id="tabs"></div>
+  <div data-pane="accounts">
+    <div class="kpis" id="kpis"></div>
+    <div class="card">
+      <div class="toolbar">
+        <div class="field grow"><label>Search</label><input id="q" placeholder="Customer name, code or phone"></div>
+        <div class="field"><label>Payment type</label><select id="pt"><option value="">All</option></select></div>
+        <div class="field"><label>Show</label><select id="show"><option value="">All with a balance</option><option value="over">Over credit limit</option><option value="old">Older than 30 days</option></select></div>
+      </div>
+      <div id="list"></div>
+    </div>
+    <div class="card"><h2>Recent payments and cash collected</h2><div id="recent"></div></div>
+  </div>
+  <div data-pane="invoices">
+    <div class="card">
+      <div class="toolbar" style="margin:0">
+        <div class="field"><label>Month</label><select id="period"></select></div>
+        <span style="flex:1"></span>
+        <button class="btn primary" id="gen">Generate invoices</button>
+      </div>
+      <p class="small muted" style="margin-top:6px">Monthly bill customers get one invoice per month listing every delivery.</p>
+    </div>
+    <div class="card"><div id="inv"></div></div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script src="../assets/js/customer-panel.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today();
+  UI.$('#pt').innerHTML += UI.options(TW.PAY_TYPES);
+
+  /* ---------- Customer accounts (FR-48, FR-51) ---------- */
+  function accounts() {
+    var ag = Q.aging(), q = UI.$('#q').value.trim().toLowerCase(), pt = UI.$('#pt').value, show = UI.$('#show').value;
+    var t = { b0: 0, b30: 0, b60: 0, b90: 0, total: 0 };
+    ag.forEach(function (a) { Object.keys(t).forEach(function (k) { t[k] += a[k]; }); });
+    UI.$('#kpis').innerHTML = [['Total outstanding', t.total], ['0–30 days', t.b0], ['31–60 days', t.b30], ['61–90 days', t.b60], ['Over 90 days', t.b90]].map(function (k, i) { return '<div class="kpi' + (i === 4 && k[1] > 0 ? ' alert' : '') + '"><div class="label">' + k[0] + '</div><div class="value">' + UI.lkr(k[1]) + '</div></div>'; }).join('');
+    var rows = ag.filter(function (a) {
+      var c = a.cust;
+      if (q && (c.name + ' ' + c.id + ' ' + c.phone.replace(/\s/g, '')).toLowerCase().indexOf(q.replace(/\s/g, '')) < 0) return false;
+      return (!pt || c.payType === pt) && (!show || (show === 'over' && c.payType !== 'Cash' && a.total > c.limit) || (show === 'old' && a.b30 + a.b60 + a.b90 > 0));
+    }).sort(function (a, b) { return b.total - a.total; });
+    UI.table('#list', {
+      columns: [
+        { h: 'Customer', f: function (a) { return '<a href="#" data-open="' + a.cust.id + '"><b>' + UI.esc(a.cust.name) + '</b></a><div class="small muted">' + a.cust.id + ' · ' + UI.esc(a.cust.phone) + '</div>'; } },
+        { h: 'Pays', f: function (a) { return UI.statusBadge(a.cust.payType); } },
+        { h: 'Limit', cls: 'num', f: function (a) { return a.cust.limit ? UI.lkr(a.cust.limit) : ''; } },
+        { h: '0–30', cls: 'num', f: function (a) { return a.b0 ? UI.num(Math.round(a.b0)) : ''; } },
+        { h: '31–60', cls: 'num', f: function (a) { return a.b30 ? UI.num(Math.round(a.b30)) : ''; } },
+        { h: '61–90', cls: 'num', f: function (a) { return a.b60 ? '<b style="color:var(--warn)">' + UI.num(Math.round(a.b60)) + '</b>' : ''; } },
+        { h: '90+', cls: 'num', f: function (a) { return a.b90 ? '<b style="color:var(--bad)">' + UI.num(Math.round(a.b90)) + '</b>' : ''; } },
+        { h: 'Balance', cls: 'num', f: function (a) { var over = a.cust.payType !== 'Cash' && a.total > a.cust.limit; return '<b' + (over ? ' style="color:var(--bad)" title="Over credit limit"' : '') + '>' + UI.lkr(a.total) + '</b>' + (over ? '<div class="small" style="color:var(--bad)">over limit</div>' : ''); } },
+        { h: '', cls: 'actions', f: function (a) { return (a.total > 0 ? '<button class="btn sm primary" data-pay="' + a.cust.id + '">Receive</button>' : '') + '<button class="btn sm" data-st="' + a.cust.id + '">Statement</button>'; } }
+      ],
+      rows: rows, empty: 'No balances.', foot: ['Total', '', '', UI.num(Math.round(UI.sum(rows, function (a) { return a.b0; }))), UI.num(Math.round(UI.sum(rows, function (a) { return a.b30; }))), UI.num(Math.round(UI.sum(rows, function (a) { return a.b60; }))), UI.num(Math.round(UI.sum(rows, function (a) { return a.b90; }))), UI.lkr(UI.sum(rows, function (a) { return a.total; })), '']
+    });
+    var rec = [];
+    db.payments.forEach(function (p) { rec.push({ date: p.date, s: p.created || '', who: p.custId, how: p.mode + (p.ref ? ' – ' + p.ref : ''), amt: p.amount, ref: p.id }); });
+    db.txns.forEach(function (x) { if (x.paid > 0) rec.push({ date: x.date, s: x.created || '', who: x.custId, walk: x.walkIn, how: 'Cash on delivery – bill ' + x.billNo, amt: x.paid, ref: x.billNo }); });
+    rec.sort(function (a, b) { return a.date < b.date ? 1 : a.date > b.date ? -1 : a.s < b.s ? 1 : -1; });
+    UI.table('#recent', {
+      columns: [{ h: 'Date', f: function (r) { return D.dmy(r.date); } }, { h: 'Customer', f: function (r) { return UI.esc(r.who ? Q.customer(r.who).name : r.walk || ''); } }, { h: 'How', f: function (r) { return UI.esc(r.how); } }, { h: 'Amount', cls: 'num', f: function (r) { return UI.money(r.amt); } }],
+      rows: rec.slice(0, 15)
+    });
+  }
+  UI.$('#list').addEventListener('click', function (e) {
+    var o = e.target.closest('[data-open]'); if (o) { e.preventDefault(); UI.customerPanel(o.getAttribute('data-open'), { onChange: accounts }); return; }
+    var p = e.target.getAttribute('data-pay'); if (p) payForm(p);
+    var s = e.target.getAttribute('data-st'); if (s) statement(s);
+  });
+  UI.$('#q').addEventListener('input', accounts);
+  ['#pt', '#show'].forEach(function (s) { UI.$(s).addEventListener('change', accounts); });
+
+  /* ---------- Receive payment (FR-50) ---------- */
+  function payForm(custId) {
+    var dl = UI.custDatalist('pay-dl');
+    var m = UI.modal({
+      title: 'Receive payment', wide: true,
+      body: dl + '<div class="grid" style="grid-template-columns:minmax(0,3fr) minmax(240px,2fr)"><div class="form-grid">' +
+        '<div class="field req span2"><label>Customer</label><input name="cust" list="pay-dl" value="' + (custId ? UI.esc(UI.custLabel(Q.customer(custId))) : '') + '"></div>' +
+        '<div class="field req"><label>Date</label>' + UI.dateInput('date', td) + '</div><div class="field req"><label>Amount (Rs.)</label><input name="amount" type="number" min="0" step="0.01"></div>' +
+        '<div class="field req"><label>How paid</label><select name="mode">' + UI.options(TW.PAY_MODES, 'Cash') + '</select></div><div class="field ref"><label class="ref-l">Reference</label><input name="ref"></div>' +
+        '<div class="field span2"><label>Against invoice</label><select name="inv"></select></div><div class="field full"><label>Note</label><input name="note"></div></div><div id="side"></div></div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Save payment', cls: 'primary', onClick: function (close, el) {
+        var c = UI.findCustomer(UI.mval(el, 'cust'));
+        var r = TW.Ops.receivePayment({ custId: c && c.id, date: D.fromDmy(UI.mval(el, 'date')), amount: UI.mval(el, 'amount'), mode: UI.mval(el, 'mode'), ref: UI.mval(el, 'ref'), invoiceId: UI.mval(el, 'inv'), note: UI.mval(el, 'note') });
+        if (!UI.result(r, 'Payment saved – receipt ' + (r.payment ? r.payment.id : ''))) return false;
+        close(); accounts();
+        var p = r.payment;
+        UI.confirm('Payment saved', '<p>' + UI.money(p.amount) + ' received from <b>' + UI.esc(c.name) + '</b>. Balance now <b>' + UI.money(r.balanceAfter) + '</b>.</p>', 'Print receipt').then(function (y) {
+          if (y) UI.printDoc(p.id, '<div class="doc" style="max-width:520px">' + UI.docHead('RECEIPT', '<div class="mono">' + p.id + '</div><div>' + D.dmy(p.date) + '</div>') + '<div class="summary"><span>Received from</span><b>' + UI.esc(c.name) + ' (' + c.id + ')</b><span>Amount</span><b>' + UI.money(p.amount) + '</b><span>Paid by</span><b>' + p.mode + (p.ref ? ' – ' + UI.esc(p.ref) : '') + '</b><span>Balance before</span><b>' + UI.money(p.balanceBefore) + '</b><span class="total">Balance now</span><b class="total">' + UI.money(r.balanceAfter) + '</b></div><div class="sig-row"><div>Received by<br>' + UI.esc(p.user) + '</div></div></div>');
+        });
+        return false;
+      } }]
+    });
+    var lastC = null;
+    function upd() {
+      var c = UI.findCustomer(UI.mval(m.el, 'cust')), mode = UI.mval(m.el, 'mode');
+      m.el.querySelector('.ref').classList.toggle('hidden', mode === 'Cash');
+      m.el.querySelector('.ref-l').textContent = mode === 'Cheque' ? 'Cheque number' : 'Bank reference';
+      if (c !== lastC) {
+        lastC = c;
+        var invs = c ? db.invoices.filter(function (i) { return i.custId === c.id; }).reverse() : [];
+        m.el.querySelector('[name=inv]').innerHTML = UI.options(invs.map(function (i) { return { v: i.id, l: i.id + ' – ' + D.monthLabel(i.period) }; }), invs[0] ? invs[0].id : '', { blank: '—' });
+        m.el.querySelector('[name=amount]').value = c && Q.balance(c.id) > 0 ? Q.balance(c.id).toFixed(2) : '';
+      }
+      var bal = c ? Q.balance(c.id) : 0, amt = +UI.mval(m.el, 'amount') || 0;
+      m.el.querySelector('#side').innerHTML = c ? '<div class="summary"><span>Balance now</span><b class="num">' + UI.money(bal) + '</b><span>Paying</span><b class="num">' + UI.money(amt) + '</b><span class="total">Balance after</span><b class="num total">' + UI.money(bal - amt) + '</b></div>' + (amt && amt < bal ? '<div class="banner warn" style="margin-top:8px">Part payment</div>' : '') + '<p class="small muted">Payments clear the oldest amounts first.</p>' : '';
+    }
+    m.el.addEventListener('input', upd); m.el.addEventListener('change', upd); upd();
+  }
+  UI.$('#pay').addEventListener('click', function () { payForm(null); });
+
+  /* ---------- Statement (FR-52) ---------- */
+  function statement(custId) {
+    var c = Q.customer(custId);
+    var m = UI.modal({
+      title: 'Statement – ' + c.name,
+      body: '<div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="field"><label>From</label>' + UI.dateInput('from', D.monthStart(D.prevMonth(D.month(td)))) + '</div><div class="field"><label>To</label>' + UI.dateInput('to', td) + '</div></div>',
+      buttons: [{ label: 'Cancel' }, { label: 'Print / PDF', cls: 'primary', onClick: function (close, el) {
+        var f = D.fromDmy(UI.mval(el, 'from')), t = D.fromDmy(UI.mval(el, 'to'));
+        if (!f || !t) return UI.toast('Enter dates as DD/MM/YYYY', 'bad'), false;
+        close(); printStatement(c, f, t);
+      } }]
+    });
+  }
+  function printStatement(c, f, t) {
+    var open = Q.balanceAt(c.id, f, true), rows = [];
+    Q.custTxns(c.id).forEach(function (x) { if (x.date >= f && x.date <= t && (x.amount || x.paid)) rows.push({ d: x.date, s: x.created || '', ref: x.billNo || x.id, desc: TW.KINDS[x.kind] + ((x.lines || []).filter(function (l) { return l.filled; }).map(function (l) { return ' ' + l.filled + '×' + Q.btShort(l.bt); }).join(',')), dr: x.amount > 0 ? x.amount : 0, cr: (x.amount < 0 ? -x.amount : 0) + x.paid }); });
+    Q.custPayments(c.id).forEach(function (p) { if (p.date >= f && p.date <= t) rows.push({ d: p.date, s: p.created || '', ref: p.id, desc: 'Payment – ' + p.mode, dr: 0, cr: p.amount }); });
+    rows.sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : a.s < b.s ? -1 : 1; });
+    var run = open;
+    var body = rows.map(function (r) { run += r.dr - r.cr; return '<tr><td>' + D.dmy(r.d) + '</td><td class="mono">' + UI.esc(r.ref) + '</td><td>' + UI.esc(r.desc) + '</td><td class="num">' + (r.dr ? UI.num(r.dr.toFixed(2)) : '') + '</td><td class="num">' + (r.cr ? UI.num(r.cr.toFixed(2)) : '') + '</td><td class="num">' + UI.num(run.toFixed(2)) + '</td></tr>'; }).join('');
+    var a = Q.aging(t).filter(function (x) { return x.cust.id === c.id; })[0] || { b0: 0, b30: 0, b60: 0, b90: 0 };
+    UI.printDoc('Statement ' + c.name, '<div class="doc">' + UI.docHead('STATEMENT', '<div>' + D.dmy(f) + ' – ' + D.dmy(t) + '</div>') +
+      '<p><b>' + UI.esc(c.name) + '</b> (' + c.id + ')<br>' + UI.esc(c.address) + ', ' + UI.esc(c.area) + '<br>' + UI.esc(c.phone) + ' · ' + c.payType + '</p>' +
+      '<table><thead><tr><th>Date</th><th>Ref</th><th>Description</th><th class="num">Charges</th><th class="num">Payments</th><th class="num">Balance</th></tr></thead><tbody><tr><td>' + D.dmy(f) + '</td><td></td><td><b>Brought forward</b></td><td></td><td></td><td class="num"><b>' + UI.num(open.toFixed(2)) + '</b></td></tr>' + body + '</tbody>' +
+      '<tfoot><tr><td colspan="5">Balance due</td><td class="num">' + UI.money(run) + '</td></tr></tfoot></table>' +
+      '<p style="margin-top:10px">Age of balance: 0–30 ' + UI.lkr(a.b0) + ' · 31–60 ' + UI.lkr(a.b30) + ' · 61–90 ' + UI.lkr(a.b60) + ' · 90+ ' + UI.lkr(a.b90) + '</p><p class="small muted">Bottle deposits are not refundable.</p></div>');
+  }
+
+  /* ---------- Monthly invoices (FR-49, FR-52) ---------- */
+  var months = [], mth = D.month(td);
+  for (var i = 0; i < 4; i++) { months.push(mth); mth = D.prevMonth(mth); }
+  UI.$('#period').innerHTML = UI.options(months.map(function (x) { return { v: x, l: D.monthLabel(x) }; }), D.prevMonth(D.month(td)));
+  function invoices() {
+    var ym = UI.$('#period').value;
+    var rows = db.customers.filter(function (c) { return c.payType === 'Monthly bill'; }).map(function (c) { return { c: c, pv: TW.Ops.invoicePreview(c.id, ym), inv: db.invoices.filter(function (x) { return x.custId === c.id && x.period === ym; })[0] }; });
+    UI.table('#inv', {
+      columns: [
+        { h: 'Customer', f: function (r) { return '<b>' + UI.esc(r.c.name) + '</b>'; } }, { h: 'Deliveries', cls: 'num', f: function (r) { return r.pv.deliveries; } },
+        { h: 'This month', cls: 'num', f: function (r) { return UI.lkr(r.pv.charges - r.pv.paidOnBills); } }, { h: 'Previous balance', cls: 'num', f: function (r) { return UI.lkr(r.pv.opening); } },
+        { h: 'Payments', cls: 'num', f: function (r) { return r.pv.payments ? '– ' + UI.lkr(r.pv.payments) : ''; } }, { h: 'Total due', cls: 'num', f: function (r) { return '<b>' + UI.lkr(r.inv ? r.inv.total : r.pv.closing) + '</b>'; } },
+        { h: 'Invoice', f: function (r) { return r.inv ? UI.badge('Generated', 'ok') + ' <span class="mono small">' + r.inv.id + '</span>' : UI.badge('Not generated', 'warn'); } },
+        { h: '', cls: 'actions', f: function (r) { return r.inv ? '<button class="btn sm" data-inv="' + r.inv.id + '">View / Print</button>' : ''; } }
+      ],
+      rows: rows
+    });
+    UI.$('#gen').disabled = !rows.some(function (r) { return !r.inv; });
+  }
+  UI.$('#period').addEventListener('change', invoices);
+  UI.$('#inv').addEventListener('click', function (e) { var id = e.target.getAttribute('data-inv'); if (id) printInvoice(id); });
+  UI.$('#gen').addEventListener('click', function () {
+    var ym = UI.$('#period').value, ids = db.customers.filter(function (c) { return c.payType === 'Monthly bill' && !db.invoices.some(function (i) { return i.custId === c.id && i.period === ym; }); }).map(function (c) { return c.id; });
+    UI.confirm('Generate invoices for ' + D.monthLabel(ym) + '?', '<p>' + ids.length + ' Monthly bill customer(s) will get an invoice listing all deliveries in the month.</p>', 'Generate').then(function (y) {
+      if (!y) return;
+      var r = TW.Ops.generateInvoices(ym, ids);
+      UI.toast(r.created.length + ' invoice(s) generated' + (r.skipped.length ? ', ' + r.skipped.length + ' skipped (nothing to bill)' : ''), 'ok');
+      invoices();
+    });
+  });
+  function printInvoice(id) {
+    var inv = Q.invoice(id), c = Q.customer(inv.custId), lines = [];
+    inv.txnIds.map(Q.txn).filter(Boolean).forEach(function (t) {
+      if (t.kind === 'product') t.lines.forEach(function (l) { lines.push([t.date, t.billNo, Q.product(l.pid).name, l.qty, l.price, l.amount]); });
+      else if (t.kind === 'reversal') lines.push([t.date, t.billNo, t.note, '', '', t.amount]);
+      else (t.lines || []).forEach(function (l) {
+        if (l.filled && l.price) lines.push([t.date, t.billNo, 'Water ' + Q.btName(l.bt) + (t.kind === 'leftdoor' ? ' (left at door)' : ''), l.filled, l.price, l.filled * l.price]);
+        if (l.deposits) lines.push([t.date, t.billNo, 'Bottle deposit', l.deposits, l.deposit, l.deposits * l.deposit]);
+        if (l.damaged && t.mode !== 'reduce') lines.push([t.date, t.billNo, 'New bottle – customer damage', l.damaged, l.deposit, l.damaged * l.deposit]);
+      });
+      if (t.paid) lines.push([t.date, t.billNo, 'Paid on delivery', '', '', -t.paid]);
+    });
+    UI.printDoc(inv.id, '<div class="doc">' + UI.docHead('INVOICE', '<div class="mono"><b>' + inv.id + '</b></div><div>Date: ' + D.dmy(inv.date) + '</div><div>Period: ' + D.dmy(inv.from) + ' – ' + D.dmy(inv.to) + '</div><div><b>Due: ' + D.dmy(inv.due) + '</b></div>') +
+      '<p><span class="muted">Bill to</span><br><b>' + UI.esc(c.name) + '</b> (' + c.id + ')<br>' + UI.esc(c.address) + ', ' + UI.esc(c.area) + '<br>' + UI.esc(c.phone) + '</p>' +
+      '<table><thead><tr><th>Date</th><th>Bill</th><th>Description</th><th class="num">Qty</th><th class="num">Unit price</th><th class="num">Amount (Rs.)</th></tr></thead><tbody>' +
+      lines.map(function (l) { return '<tr><td>' + D.dmy(l[0]) + '</td><td class="mono">' + UI.esc(l[1]) + '</td><td>' + UI.esc(l[2]) + '</td><td class="num">' + l[3] + '</td><td class="num">' + (l[4] !== '' ? UI.num(Number(l[4]).toFixed(2)) : '') + '</td><td class="num">' + UI.num(l[5].toFixed(2)) + '</td></tr>'; }).join('') + '</tbody></table>' +
+      '<div style="display:flex;justify-content:flex-end;margin-top:10px"><div class="summary" style="min-width:300px"><span>Previous balance</span><b class="num">' + UI.money(inv.opening) + '</b><span>Payments received</span><b class="num">– ' + UI.money(inv.payments) + '</b><span>This month</span><b class="num">' + UI.money(inv.amount) + '</b><span class="total">Total due</span><b class="num total">' + UI.money(inv.total) + '</b></div></div>' +
+      '<p class="small muted" style="margin-top:12px">VAT not applied (to be confirmed). Please quote ' + inv.id + ' with your payment.</p></div>');
+  }
+
+  UI.tabs('#tabs', [{ id: 'accounts', label: 'Customer accounts' }, { id: 'invoices', label: 'Monthly invoices' }]);
+  accounts(); invoices();
+  var P = UI.params();
+  if (P.pay) payForm(Q.customer(P.pay) ? P.pay : null);
+  if (P.statement && Q.customer(P.statement)) statement(P.statement);
+  if (P.invoice && Q.invoice(P.invoice)) printInvoice(P.invoice);
+});
+</script>
+</body>
+</html>

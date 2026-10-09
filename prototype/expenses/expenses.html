@@ -1,0 +1,197 @@
+<!doctype html>
+<!-- Client request 08/10/2026: a separate page to keep running expenses month by month – electricity, water bill, salaries, rent,
+     vehicle fuel and spare parts, and any other type the owner adds. Each expense is entered with the month it is for, so a bill
+     paid in early October can still be counted for September. Totals by type and month; feeds the Profit and Expenses reports.
+     Admin and Accountant can add, edit and delete (delete needs a reason and is kept in the audit log). -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expenses · Thuhina Water</title>
+<link rel="stylesheet" href="../assets/css/styles.css">
+</head>
+<body data-page="expenses/expenses">
+<main id="app">
+  <div class="page-actions write-only">
+    <button class="btn" id="types">Expense types</button>
+    <button class="btn primary" id="add">+ Add expense</button>
+  </div>
+  <div class="card no-print">
+    <div class="toolbar">
+      <div class="field"><label>Month</label><select id="month"></select></div>
+      <div class="field"><label>Type</label><select id="cat"><option value="">All types</option></select></div>
+      <div class="field grow"><label>Search</label><input id="q" placeholder="Description, paid to, bill no. or reference"></div>
+      <button class="btn" id="print" type="button">Print month</button>
+    </div>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div id="tabs"></div>
+  <div data-pane="list" class="grid side" style="align-items:start">
+    <div class="card"><h2 id="list-title">Expenses</h2><div id="list"></div></div>
+    <div class="card"><h2>By type</h2><div id="bytype"></div></div>
+  </div>
+  <div data-pane="summary" class="card">
+    <div class="card-head"><h2>Month by month</h2><button class="btn" id="csv" type="button">Export Excel</button></div>
+    <p class="small muted">Expenses are counted in the month they are for. Click a month to open it.</p>
+    <div id="matrix"></div>
+  </div>
+</main>
+<script src="../assets/js/data.js"></script>
+<script src="../assets/js/store.js"></script>
+<script src="../assets/js/ui.js"></script>
+<script src="../assets/js/layout.js"></script>
+<script>
+App.page(function () {
+  var db = TW.db, Q = TW.Q, D = TW.D, td = TW.today();
+  var canEdit = !App.viewOnly;
+
+  /* Months from July 2026 (or the first expense) up to this month, newest first. */
+  function months() {
+    var first = db.expenses.reduce(function (m, e) { return e.month < m ? e.month : m; }, '2026-07'), cur = D.month(td), out = [];
+    for (var m = cur; m >= first; m = D.prevMonth(m)) out.push(m);
+    return out;
+  }
+  UI.$('#month').innerHTML = UI.options(months().map(function (m) { return { v: m, l: D.monthLabel(m) }; }), UI.params().month || D.month(td));
+  function catOpts() { UI.$('#cat').innerHTML = '<option value="">All types</option>' + UI.options(db.expenseCategories.map(function (c) { return c.id; }), UI.$('#cat').value); }
+  catOpts();
+
+  function rows() {
+    var ym = UI.$('#month').value, cat = UI.$('#cat').value, q = UI.$('#q').value.trim().toLowerCase();
+    return Q.expensesFor(ym).filter(function (e) {
+      return (!cat || e.category === cat) && (!q || (e.description + ' ' + e.paidTo + ' ' + e.billNo + ' ' + e.ref + ' ' + e.id).toLowerCase().indexOf(q) >= 0);
+    }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : 1; });
+  }
+  function render() {
+    var ym = UI.$('#month').value, pm = D.prevMonth(ym), tot = Q.expenseTotal(ym), prev = Q.expenseTotal(pm);
+    var byCat = db.expenseCategories.map(function (c) { return { label: c.id, value: Q.expenseTotal(ym, c.id) }; }).filter(function (x) { return x.value; }).sort(function (a, b) { return b.value - a.value; });
+    var diff = tot - prev;
+    UI.$('#kpis').innerHTML = '<div class="kpi"><div class="label">Total for ' + D.monthLabel(ym) + '</div><div class="value">' + UI.lkr(tot) + '</div></div>' +
+      '<div class="kpi"><div class="label">' + D.monthLabel(pm) + '</div><div class="value">' + UI.lkr(prev) + '</div><div class="hint"' + (diff > 0 ? ' style="color:var(--bad)"' : '') + '>' + (prev ? (diff >= 0 ? '+' : '−') + UI.lkr(Math.abs(diff)) + ' this month' : '') + '</div></div>' +
+      '<div class="kpi"><div class="label">Entries</div><div class="value">' + Q.expensesFor(ym).length + '</div></div>' +
+      '<div class="kpi"><div class="label">Biggest expense type</div><div class="value" style="font-size:1rem">' + (byCat[0] ? UI.esc(byCat[0].label) + '<div class="small muted">' + UI.lkr(byCat[0].value) + '</div>' : '–') + '</div></div>';
+    var rs = rows();
+    UI.$('#list-title').textContent = 'Expenses for ' + D.monthLabel(ym);
+    UI.table('#list', {
+      columns: [
+        { h: 'Paid on', f: function (e) { return D.dmy(e.date) + (D.month(e.date) !== e.month ? '<div class="small muted" title="Paid in a different month">paid ' + D.monthLabel(D.month(e.date)).slice(0, 3) + '</div>' : ''); } },
+        { h: 'Type', f: function (e) { return UI.badge(e.category); } },
+        { h: 'Details', f: function (e) { return UI.esc(e.description || '–') + '<div class="small muted">' + UI.esc(e.paidTo || '') + (e.billNo ? ' · bill ' + UI.esc(e.billNo) : '') + '</div>'; } },
+        { h: 'Paid by', f: function (e) { return UI.esc(e.mode) + (e.ref ? '<div class="small muted">' + UI.esc(e.ref) + '</div>' : ''); } },
+        { h: 'Amount', cls: 'num', f: function (e) { return UI.money(e.amount); } },
+        { h: '', cls: 'actions', f: function (e) { return canEdit ? '<button class="btn sm" data-edit="' + e.id + '">Edit</button> <button class="btn sm danger" data-del="' + e.id + '">Delete</button>' : ''; } }
+      ],
+      rows: rs, empty: 'No expenses entered for this month yet.',
+      foot: ['Total', '', rs.length + ' entr' + (rs.length === 1 ? 'y' : 'ies'), '', '<b>' + UI.money(UI.sum(rs, function (e) { return e.amount; })) + '</b>', '']
+    });
+    if (byCat.length) UI.hbars(UI.$('#bytype'), byCat, UI.lkr); else UI.$('#bytype').innerHTML = '<p class="empty-state">Nothing yet.</p>';
+    matrix();
+  }
+
+  /* Month-by-month summary: type × last 6 months. */
+  function matrix() {
+    var ms = months().slice(0, 6).reverse();
+    var cats = db.expenseCategories.filter(function (c) { return c.active || ms.some(function (m) { return Q.expenseTotal(m, c.id); }); });
+    var cols = [{ h: 'Type', f: function (c) { return '<b>' + UI.esc(c.id) + '</b>'; } }].concat(ms.map(function (m) { return { h: '<a href="#list" data-m="' + m + '">' + D.monthLabel(m).replace(' 20', ' ’') + '</a>', cls: 'num', f: function (c) { var v = Q.expenseTotal(m, c.id); return v ? UI.num(v) : '<span class="muted">–</span>'; } }; }))
+      .concat([{ h: 'Total', cls: 'num', f: function (c) { return '<b>' + UI.num(UI.sum(ms, function (m) { return Q.expenseTotal(m, c.id); })) + '</b>'; } }]);
+    UI.table('#matrix', { id: 'mx', columns: cols, rows: cats,
+      foot: ['Total'].concat(ms.map(function (m) { return '<b>' + UI.num(Q.expenseTotal(m)) + '</b>'; })).concat(['<b>' + UI.num(UI.sum(ms, function (m) { return Q.expenseTotal(m); })) + '</b>']) });
+  }
+  UI.$('#matrix').addEventListener('click', function (e) {
+    var m = e.target.getAttribute('data-m');
+    if (!m) return;
+    e.preventDefault();
+    UI.$('#month').value = m; render(); tabs.show('list');
+  });
+  UI.$('#csv').addEventListener('click', function () { UI.tableToCSV(UI.$('#mx'), 'Expenses_by_month.csv'); UI.toast('Excel (CSV) file downloaded', 'ok'); });
+
+  /* Add / edit popup */
+  function edit(x, again) {
+    var cats = db.expenseCategories.filter(function (c) { return c.active || (x && c.id === x.category); }).map(function (c) { return c.id; });
+    var ms = months();
+    var m = UI.modal({
+      title: x ? 'Edit expense ' + x.id : 'Add expense', wide: true,
+      body: '<div class="form-grid"><div class="field"><label>Expense no.</label><input value="' + (x ? x.id : 'Generated on save') + '" readonly></div>' +
+        '<div class="field req"><label>Date paid</label>' + UI.dateInput('date', x ? x.date : td) + '</div>' +
+        '<div class="field req"><label>For month</label><select name="month">' + UI.options(ms.map(function (mm) { return { v: mm, l: D.monthLabel(mm) }; }), x ? x.month : (again && again.month) || UI.$('#month').value) + '</select><span class="help">e.g. September electricity paid on 02/10 → September</span></div>' +
+        '<div class="field req"><label>Expense type</label><select name="category">' + UI.options(cats, x ? x.category : again ? again.category : '', { blank: 'Select' }) + '</select></div>' +
+        '<div class="field span2"><label>Description</label><input name="description" value="' + UI.esc(x ? x.description : '') + '" placeholder="e.g. LH-4521 – 2 rear tyres"></div>' +
+        '<div class="field"><label>Paid to</label><input name="paidTo" value="' + UI.esc(x ? x.paidTo : '') + '" placeholder="e.g. CEB, Dinesh Auto Service" list="payees"></div>' +
+        '<div class="field"><label>Bill / account no.</label><input name="billNo" value="' + UI.esc(x ? x.billNo : '') + '"></div>' +
+        '<div class="field req"><label>Amount (Rs.)</label><input name="amount" type="number" min="0" step="0.01" value="' + (x ? x.amount : '') + '"></div>' +
+        '<div class="field req"><label>Paid by</label><select name="mode">' + UI.options(TW.PAY_MODES, x ? x.mode : 'Cash') + '</select></div>' +
+        '<div class="field ref"><label>Cheque no. / bank ref.</label><input name="ref" value="' + UI.esc(x ? x.ref : '') + '"></div></div>' +
+        '<datalist id="payees">' + UI.options(db.expenses.map(function (e) { return e.paidTo; }).filter(function (v, i, a) { return v && a.indexOf(v) === i; })) + '</datalist>',
+      buttons: [{ label: 'Cancel' }].concat(x ? [] : [{ label: 'Save & add another', onClick: function (close, el) { if (save(el)) { close(); edit(null, { month: UI.mval(el, 'month'), category: '' }); } return false; } }])
+        .concat([{ label: 'Save', cls: 'primary', onClick: function (close, el) { if (save(el)) close(); return false; } }])
+    });
+    function upd() {
+      m.el.querySelector('.ref').style.display = UI.mval(m.el, 'mode') === 'Cash' ? 'none' : '';
+    }
+    m.el.addEventListener('change', upd); upd();
+    function save(el) {
+      var r = TW.Ops.saveExpense({ id: x && x.id, date: D.fromDmy(UI.mval(el, 'date')), month: UI.mval(el, 'month'), category: UI.mval(el, 'category'), description: UI.mval(el, 'description'), paidTo: UI.mval(el, 'paidTo'), billNo: UI.mval(el, 'billNo'), amount: UI.mval(el, 'amount'), mode: UI.mval(el, 'mode'), ref: UI.mval(el, 'mode') === 'Cash' ? '' : UI.mval(el, 'ref') }, !x);
+      if (!UI.result(r, r.ok ? (x ? 'Expense updated' : r.expense.id + ' saved – ' + UI.lkr(r.expense.amount) + ' for ' + D.monthLabel(r.expense.month)) : '')) return false;
+      if (UI.$('#month').value !== r.expense.month) UI.$('#month').value = r.expense.month;
+      render();
+      return true;
+    }
+  }
+  UI.$('#list').addEventListener('click', function (e) {
+    var id = e.target.getAttribute('data-edit');
+    if (id) return edit(Q.expense(id));
+    id = e.target.getAttribute('data-del');
+    if (id) {
+      var x = Q.expense(id);
+      UI.prompt('Delete ' + x.id + '?', x.category + ' ' + UI.money(x.amount) + ' for ' + D.monthLabel(x.month) + '. Reason for deleting:', 'Delete', 'danger').then(function (reason) {
+        if (reason && UI.result(TW.Ops.deleteExpense(id, reason), 'Expense deleted')) render();
+      });
+    }
+  });
+
+  /* Expense types popup */
+  function types() {
+    function body() {
+      var ym = UI.$('#month').value;
+      return '<div class="table-wrap"><table><thead><tr><th>Type</th><th>Description</th><th class="num">' + D.monthLabel(ym) + '</th><th>Status</th><th></th></tr></thead><tbody>' +
+        db.expenseCategories.map(function (c) { return '<tr><td><b>' + UI.esc(c.id) + '</b></td><td>' + UI.esc(c.desc) + '</td><td class="num">' + UI.lkr(Q.expenseTotal(ym, c.id)) + '</td><td>' + UI.statusBadge(c.active ? 'Active' : 'Inactive') + '</td><td><button class="btn sm" type="button" data-tt="' + UI.esc(c.id) + '">' + (c.active ? 'Deactivate' : 'Activate') + '</button></td></tr>'; }).join('') +
+        '</tbody></table></div><div class="form-grid" style="margin-top:12px;grid-template-columns:1fr 2fr auto"><div class="field"><label>New type</label><input name="tname" placeholder="e.g. Insurance"></div><div class="field"><label>Description</label><input name="tdesc"></div><button class="btn" type="button" data-addtype style="align-self:end">Add</button></div>' +
+        '<p class="small muted">An inactive type is hidden when adding expenses; its past expenses are kept.</p>';
+    }
+    var m = UI.modal({ title: 'Expense types', wide: true, body: body() });
+    m.el.addEventListener('click', function (e) {
+      var id = e.target.getAttribute('data-tt');
+      if (id) {
+        var c = db.expenseCategories.filter(function (x) { return x.id === id; })[0];
+        TW.Ops.saveExpenseCategory({ id: c.id, active: !c.active }, false);
+      } else if (e.target.hasAttribute('data-addtype')) {
+        if (!UI.result(TW.Ops.saveExpenseCategory({ id: UI.mval(m.el, 'tname'), desc: UI.mval(m.el, 'tdesc') }, true), 'Expense type added')) return;
+      } else return;
+      m.el.querySelector('.body').innerHTML = body();
+      catOpts(); render();
+    });
+  }
+
+  /* Printable month statement */
+  UI.$('#print').addEventListener('click', function () {
+    var ym = UI.$('#month').value, rs = Q.expensesFor(ym).slice().sort(function (a, b) { return a.category < b.category ? -1 : a.category > b.category ? 1 : a.date < b.date ? -1 : 1; });
+    var byCat = db.expenseCategories.map(function (c) { return { c: c.id, v: Q.expenseTotal(ym, c.id) }; }).filter(function (x) { return x.v; });
+    UI.printDoc('Expenses ' + D.monthLabel(ym), '<div class="doc">' + UI.docHead('EXPENSES', '<div><b>' + D.monthLabel(ym) + '</b></div><div>Printed ' + D.dmy(td) + '</div>') +
+      '<table><thead><tr><th>Paid on</th><th>Type</th><th>Description</th><th>Paid to</th><th>Paid by</th><th class="num">Amount (Rs.)</th></tr></thead><tbody>' +
+      rs.map(function (e) { return '<tr><td>' + D.dmy(e.date) + '</td><td>' + UI.esc(e.category) + '</td><td>' + UI.esc(e.description) + (e.billNo ? ' (' + UI.esc(e.billNo) + ')' : '') + '</td><td>' + UI.esc(e.paidTo) + '</td><td>' + UI.esc(e.mode) + (e.ref ? ' ' + UI.esc(e.ref) : '') + '</td><td class="num">' + UI.num(e.amount.toFixed(2)) + '</td></tr>'; }).join('') +
+      '</tbody><tfoot><tr><td colspan="5" class="num">Total</td><td class="num">' + UI.money(Q.expenseTotal(ym)) + '</td></tr></tfoot></table>' +
+      '<h3 style="margin-top:14px">By type</h3><table><tbody>' + byCat.map(function (x) { return '<tr><td>' + UI.esc(x.c) + '</td><td class="num">' + UI.money(x.v) + '</td></tr>'; }).join('') + '</tbody></table>' +
+      '<div class="sig-row"><div>Prepared by<br>' + UI.esc(TW.currentUser().name) + '</div><div>Checked by</div><div>Approved by</div></div></div>');
+  });
+
+  var tabs = UI.tabs('#tabs', [{ id: 'list', label: 'Monthly expenses' }, { id: 'summary', label: 'Month by month' }]);
+  var ab = UI.$('#add'); if (ab) ab.addEventListener('click', function () { edit(null); });
+  var tb = UI.$('#types'); if (tb) tb.addEventListener('click', types);
+  UI.$('#month').addEventListener('change', render);
+  UI.$('#cat').addEventListener('change', render);
+  UI.$('#q').addEventListener('input', render);
+  render();
+  if (UI.params()['new'] && ab) edit(null);
+});
+</script>
+</body>
+</html>
