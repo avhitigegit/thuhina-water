@@ -50,7 +50,7 @@ Branch: feature/M05-customers
 |---|---|
 | `[ ]` / ☐ To do | Not started |
 | ◐ In progress | Branch created, work ongoing |
-| `[x]` / ☑ Done | Finished, tested, merged to `develop` |
+| `[x]` / ☑ Done | Finished, tested, merged to `dev` |
 | ⊘ Moved / skipped | Moved to another module or dropped (say why in comments) |
 
 ---
@@ -63,24 +63,24 @@ Branch: feature/M05-customers
 
 ```
  feature/M05-customers ──┐
- feature/M06-sales-server┼──► develop ──(release PR, after UAT sign-off)──► main ──tag v1.0.0──► Production
+ feature/M06-sales-server┼──► dev ──(release PR, after UAT sign-off)──► main ──tag v1.0.0──► Production
  fix/M07-paper-bill ─────┘       │                                          │
                                  └──► auto-deploy to UAT                    │
                                                                             │
  hotfix/1.0.1-login-lock ◄──────────── branched from main ──────────────────┘
-        └──► PR to main (tag v1.0.1 → Production) ──► then merged back into develop
+        └──► PR to main (tag v1.0.1 → Production) ──► then merged back into dev
 ```
 
 | Branch | Purpose | Created from | Merges into | Deploys to |
 |---|---|---|---|---|
 | `main` | Production code only. Always what is live (or ready to go live). | – | – | **Production** (manual, on tag) |
-| `develop` | Integration branch. All finished modules land here. | `main` (once, at start) | `main` via release PR | **UAT** (automatic on every merge) |
-| `feature/Mnn-name` | One module (or one half of a split module) | `develop` | `develop` via PR | – (local) |
-| `fix/Mnn-name` | Fix for a module already merged to `develop`, not yet in production | `develop` | `develop` | – |
-| `hotfix/x.y.z-name` | Urgent fix to production | `main` | `main` (tag x.y.z) **and** `develop` | Production |
-| `release/x.y` *(optional)* | Only if UAT fixes must continue while new features go into `develop` | `develop` | `main` and back to `develop` | UAT |
+| `dev` | Integration branch. All finished modules land here. | `main` (once, at start) | `main` via release PR | **UAT** (automatic on every merge) |
+| `feature/Mnn-name` | One module (or one half of a split module) | `dev` | `dev` via PR | – (local) |
+| `fix/Mnn-name` | Fix for a module already merged to `dev`, not yet in production | `dev` | `dev` | – |
+| `hotfix/x.y.z-name` | Urgent fix to production | `main` | `main` (tag x.y.z) **and** `dev` | Production |
+| `release/x.y` *(optional)* | Only if UAT fixes must continue while new features go into `dev` | `dev` | `main` and back to `dev` | UAT |
 
-**Flow summary: feature → develop → main (tag) → production.** This matches your proposal "feature → dev → main → prod", with the `prod` step done by a tag instead of a branch.
+**Flow summary: feature → dev → main (tag) → production.** The integration branch is named `dev`. The production step is a tag on `main`, not a separate `prod` branch.
 
 ### 2.2 Branch names for this project
 
@@ -106,14 +106,14 @@ Branch: feature/M05-customers
 
 | Rule | Detail |
 |---|---|
-| Protected branches | `main` and `develop`: no direct push; merge only by pull request; CI must be green |
+| Protected branches | `main` and `dev`: no direct push; merge only by pull request; CI must be green |
 | Reviews | Every PR reviewed (by a teammate, or by Amritha with the PR checklist) before merge |
-| Merge style | Feature → develop: **squash merge** (one clean commit per module/half). develop → main: **merge commit** (keeps release history) |
-| Up to date | Before opening a PR, merge the latest `develop` into the feature branch and re-run tests |
+| Merge style | Feature → dev: **squash merge** (one clean commit per module/half). dev → main: **merge commit** (keeps release history) |
+| Up to date | Before opening a PR, merge the latest `dev` into the feature branch and re-run tests |
 | Branch life | Delete the feature branch after merge |
 | Commit messages | `M05: add customer registration validation` · `M07 fix: paper bill duplicate message` |
 | Versions | `0.x.0` at each milestone during the build (section 7); `1.0.0` at go-live; `1.0.x` hotfixes; `1.x.0` later features |
-| Database | Flyway scripts are never edited after merge to `develop`; changes go in a new script |
+| Database | Flyway scripts are never edited after merge to `dev`; changes go in a new script |
 | Secrets | Never committed. `.env` files stay local / on servers; `.env.example` is committed |
 
 ### 2.4 Pull request template (`.github/pull_request_template.md`)
@@ -143,7 +143,7 @@ M05 – Customers (SERVER)   Tasks: S1–S9
 | Step | What to do | Output |
 |---|---|---|
 | 1 | **Read** the module block, the design-document sections it lists, and the prototype page(s). Note any question in the module's comments table before starting. | Clear scope |
-| 2 | **Start**: update the progress tracker to ◐; `git checkout develop && git pull`; create the feature branch. | Branch |
+| 2 | **Start**: update the progress tracker to ◐; `git checkout dev && git pull`; create the feature branch. | Branch |
 | 3 | **Database**: write the Flyway migration (tables, constraints, indexes, sequence rows, settings rows). | `V0nn__…sql` |
 | 4 | **Model & repository**: entities (extend `BaseEntity`), repositories, custom queries. | `model/`, `repository/` |
 | 5 | **Rules & services**: pure rule classes first (with unit tests), then services (transactions, ledger posting, numbering, audit). | `rules/`, `service/` |
@@ -151,7 +151,7 @@ M05 – Customers (SERVER)   Tasks: S1–S9
 | 7 | **Server tests**: unit + integration (Testcontainers) + invariants; run the full test suite. | Green build |
 | 8 | **Client** (after the server part is merged, or on the same branch for non-split modules): regenerate API types → feature hooks → pages and components → permissions (view-only hides buttons) → match the prototype. | Screens |
 | 9 | **Check**: lint, type-check, all tests; manual run-through as **Admin, Accountant, Delivery Staff**; compare with the prototype page side by side. | Ready |
-| 10 | **Pull request** to `develop` with the PR template; fix review comments; squash merge. | Merged |
+| 10 | **Pull request** to `dev` with the PR template; fix review comments; squash merge. | Merged |
 | 11 | **UAT**: automatic deploy; quick smoke test on UAT with seed data. | On UAT |
 | 12 | **Update this document**: tick tasks and acceptance items, set tracker to ☑ with dates, add notes/comments and any decision to section 8. | Document updated |
 
@@ -161,7 +161,7 @@ M05 – Customers (SERVER)   Tasks: S1–S9
 
 ## 4. Progress tracker
 
-| Module | Branch(es) | Status | Started | Merged to develop | Release tag | Comments |
+| Module | Branch(es) | Status | Started | Merged to dev | Release tag | Comments |
 |---|---|---|---|---|---|---|
 | M00 Foundation | `feature/M00-foundation-server` / `-client` | ☐ To do | | | | |
 | M01 Administration | `feature/M01-administration` | ☐ To do | | | | |
@@ -246,7 +246,7 @@ Admin = full. Accountant = Dashboard, Billing (full), Reports (Sales, Purchasing
 - **Errors:** 400 VALIDATION (field errors) · 401 not logged in · 403 no permission · 404 · 409 CONFLICT (optimistic lock) · 422 business rule.
 
 #### SERVER tasks
-- [ ] **S1 – Repository & branches:** create `develop` from `main`; protect `main` and `develop`; root `README.md`, `.gitignore`, `.editorconfig`, PR template (section 2.4); `deploy/` with `docker-compose.yml` (db, api, web, nginx), `nginx.conf` (`/` → web, `/api` → api), `.env.example`.
+- [ ] **S1 – Repository & branches:** create `dev` from `main`; protect `main` and `dev`; root `README.md`, `.gitignore`, `.editorconfig`, PR template (section 2.4); `deploy/` with `docker-compose.yml` (db, api, web, nginx), `nginx.conf` (`/` → web, `/api` → api), `.env.example`.
 - [ ] **S2 – Spring Boot project** in `server/` (Gradle, Java 21): web, security, data-jpa, validation, flyway, postgresql, actuator, springdoc, openpdf, poi (added later where used), test + testcontainers. Profiles `local`, `uat`, `prod`; time zone `Asia/Colombo`; JVM heap setting documented; `Dockerfile` (multi-stage).
 - [ ] **S3 – Common package:** `BaseEntity` (id, created_at/by, updated_at/by, version) with JPA auditing from the current user; `BusinessException(code, message, details)`; `GlobalExceptionHandler` (formats above); `PageResponse<T>`; `Money` and `BusinessDates` utils.
 - [ ] **S4 – Migration `V001__foundation.sql`:** `app_user`, `audit_log`, `doc_sequence` (rows for every sequence in design 5.3), `app_setting` (company details from BRD: Thuhina Water (Pvt) Ltd, address, phone, email, reg. no; `features.dataMigration=false`), `login_attempt`.
@@ -1077,7 +1077,7 @@ Admin = full. Accountant = Dashboard, Billing (full), Reports (Sales, Purchasing
 - **Security check (NFR-05):** HTTPS only, cookies Secure, role access tested for every page and API, default passwords changed.
 - **UAT:** client tests against the BRD v4.0 checklist (incl. the list of agreed prices); issues logged in this module's comments; fixes on `fix/` branches.
 - **Data:** client confirms real prices, deposits, filling charges, credit limits, areas, products, users; trial import on UAT and fix rejected rows with the client; final import on production.
-- **Release:** release PR `develop → main`, tag `v1.0.0`, deploy production, smoke test (login each role, register a customer, enter bills, print), turn off the migration menu, 2 weeks of hypercare (daily check of logs, back-ups, WhatsApp log).
+- **Release:** release PR `dev → main`, tag `v1.0.0`, deploy production, smoke test (login each role, register a customer, enter bills, print), turn off the migration menu, 2 weeks of hypercare (daily check of logs, back-ups, WhatsApp log).
 
 #### SERVER tasks
 - [ ] **S1 – Migration `V012__migration.sql`:** `import_batch`.
@@ -1097,7 +1097,7 @@ Admin = full. Accountant = Dashboard, Billing (full), Reports (Sales, Purchasing
 - [ ] **G5 – Performance, browser & security checks** (10,000 customers, 3 browsers, access matrix)
 - [ ] **G6 – UAT with the client** (BRD checklist, fix list, sign-off)
 - [ ] **G7 – Real master data & trial import on UAT**, then final import on production; real users created
-- [ ] **G8 – Release v1.0.0** (develop → main, tag, deploy, smoke test, migration menu off, hypercare)
+- [ ] **G8 – Release v1.0.0** (dev → main, tag, deploy, smoke test, migration menu off, hypercare)
 
 **Acceptance checklist**
 - [ ] Sample customer file: valid rows imported, rejected rows listed with reasons, nothing saved before Confirm
@@ -1213,7 +1213,7 @@ Admin = full. Accountant = Dashboard, Billing (full), Reports (Sales, Purchasing
 
 ## 7. Milestones & release plan
 
-| Milestone | Modules | Merge develop → main | Tag | Client demo |
+| Milestone | Modules | Merge dev → main | Tag | Client demo |
 |---|---|---|---|---|
 | R1 – Foundation & master data | M00–M05 | After demo sign-off | `v0.1.0` | Login, roles, admin, master data, suppliers/factories, stock, customers |
 | R2 – Sales & deliveries | M06–M08 | After demo sign-off | `v0.2.0` | Registration with bottles, sales, Enter Bills, delivery planning & lists |
@@ -1233,7 +1233,7 @@ Before go-live there is no production server yet: `main` holds the last client-a
 | D3 | 04/10/2026 | ~~No special customer prices (FR-05 removed)~~ – replaced by D11; first delivery = very next delivery day | Client |
 | D4 | 05/10/2026 | Backend module-first structure; no `ServiceImpl` by default | Client |
 | D5 | 05/10/2026 | Break down by module, each split into Server and Client parts; one branch per module (split branches for M00, M06, M07, M11) | Client |
-| D6 | 05/10/2026 | Branching: feature → develop (UAT) → main (production, tagged); no separate prod branch; hotfix from main | Client / Amritha |
+| D6 | 05/10/2026 | Branching: feature → dev (UAT) → main (production, tagged); no separate prod branch; hotfix from main | Client / Amritha |
 | D7 | 08/10/2026 | New Expenses page (month-wise running expenses) – new module M15; Profit report shows net profit after expenses | Client |
 | D8 | 08/10/2026 | Send empties: one entry sends every bottle type with its quantity (dispatch FD-… with one batch per bottle type) | Client |
 | D9 | 08/10/2026 | Customer quotations for government offices, factories and other organisations – new module M16 | Client |
@@ -1241,6 +1241,7 @@ Before go-live there is no production server yet: `main` holds the last client-a
 | D11 | 08/10/2026 | **Agreed customer prices**: standard price list by bottle type × customer type stays the default; Admin sets a dated agreed price per customer and bottle type (from, optional until, reason); bills store the price used. Accepted quotations set agreed prices. Automatic volume price bands not in Phase 1. One deposit for all customers. BRD v4.0 (FR-05, BR-08, BR-18) | Client / Amritha |
 | D12 | 08/10/2026 | Supplier quotation number renamed `SQ-0001` so customer quotations can use `QT-2026-001` | Amritha |
 | D13 | 08/10/2026 | Documents updated to BRD v4.0, Architecture v1.1, Tech stack v1.1; old versions removed from `doc/` (only the latest kept) | Client |
+| D14 | 09/10/2026 | One GitHub repo `thuhina-water` (monorepo: server, client, deploy, doc, prototype). Integration branch named `dev` (not `develop`). `main` and `dev` created and pushed | Amritha |
 | | | | |
 
 ---
