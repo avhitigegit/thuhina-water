@@ -1,0 +1,9 @@
+node_modules
+.next
+coverage
+Dockerfile
+.dockerignore
+.env*
+*.md
+*.test.ts
+*.test.tsx

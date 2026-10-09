@@ -1,7 +1,7 @@
 # Thuhina Water – all four containers on one server (design 1, 12).
 #   cp .env.example .env     (then fill in the values)
-#   docker compose up -d --build
-# Until the client is built (M00 CLIENT part), start only the database and the API:
+#   docker compose up -d --build        → http://localhost (login page)
+# Only the database and the API (when running the web app with `npm run dev`):
 #   docker compose up -d --build db api
 
 name: thuhina-water
@@ -49,7 +49,10 @@ services:
       - "127.0.0.1:${API_PORT:-8080}:8080"
 
   web:
-    build: ../client
+    build:
+      context: ../client
+      args:
+        API_PROXY_URL: http://api:8080
     image: thuhina/web:${APP_VERSION:-local}
     restart: unless-stopped
     environment:

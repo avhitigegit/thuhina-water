@@ -3,10 +3,10 @@
 | Item | Detail |
 |---|---|
 | Product | Water Distribution Inventory & Sales Management System |
-| Document version | 1.3 |
+| Document version | 1.4 |
 | Created | 05/10/2026 |
 | Prepared by | Amritha |
-| Based on | BRD v4.0 (`BRD Water Distribution System.md`) · System Architecture & Design v1.2 (`System_Architecture_and_Design.md`) · Prototype (`/prototype`) · Tech stack v1.1 (`TechStack Thuhina Water.md`) |
+| Based on | BRD v4.0 (`BRD Water Distribution System.md`) · System Architecture & Design v1.3 (`System_Architecture_and_Design.md`) · Prototype (`/prototype`) · Tech stack v1.1 (`TechStack Thuhina Water.md`) |
 | Purpose | The build plan. Each module block (M00–M14) is pasted one at a time to build that module. This file is updated after every module with status, ticks and comments. |
 
 > **Living document.** After each step: tick the tasks (`[x]`), update the progress tracker (section 4), and add a line to the module's **Notes & comments** table. Record any change of scope or design decision in section 8 (Decision log).
@@ -163,7 +163,7 @@ M05 – Customers (SERVER)   Tasks: S1–S9
 
 | Module | Branch(es) | Status | Started | Merged to dev | Release tag | Comments |
 |---|---|---|---|---|---|---|
-| M00 Foundation | `feature/M00-foundation-server` / `-client` | ◐ In progress – SERVER part done, CLIENT next | 09/10/2026 | | | Server: 51 tests green; Docker run checked. Spring Boot 4.1 (D15) |
+| M00 Foundation | `feature/M00-foundation-server` / `-client` | ◐ In progress – SERVER merged to dev (PR #2); CLIENT part done, PR to dev next | 09/10/2026 | SERVER 09/10/2026 | | Server: 51 tests green (D15 Spring Boot 4.1). Client: 22 tests green, lint / type-check / build clean; full `docker compose up` checked (D19–D22) |
 | M01 Administration | `feature/M01-administration` | ☐ To do | | | | |
 | M02 Master data | `feature/M02-master-data` | ☐ To do | | | | |
 | M03 Suppliers & factories | `feature/M03-suppliers-factories` | ☐ To do | | | | |
@@ -259,26 +259,26 @@ Admin = full. Accountant = Dashboard, Billing (full), Reports (Sales, Purchasing
 - [x] **S11 – Tests:** login success/fail/lock/inactive, logout, token invalid after deactivation, permission denied (403), error format, numbering.
 
 #### CLIENT tasks
-- [ ] **C1 – Next.js project** in `client/` (TypeScript strict, App Router, Tailwind, shadcn/ui init, ESLint, Prettier); `lib/api.ts` (fetch with `credentials: 'include'`, error → toast, 401 → login); TanStack Query provider; `npm run api:types` (openapi-typescript); `Dockerfile`.
-- [ ] **C2 – Theme & shell** from the prototype CSS (colours, spacing, cards, tables, badges, banners): `AppShell`, `Sidebar` (built from `/auth/me` menu; single link when a module has one page; group with sub-items for Master Data, Sales & Deliveries, Delivery Schedule; "view" tag; hidden modules omitted), `TopBar` (today DD/MM/YYYY, user name + role, Log out).
-- [ ] **C3 – Login page** (as `login.html`, without demo users): username, password, errors; redirect to landing page by role; **Change password** screen when `must_change_password`.
-- [ ] **C4 – Route protection:** protected `(app)` layout loads `/auth/me`; "No access" page; `useCan(permission)` hook; `<Can>` wrapper to hide write buttons for view-only roles.
-- [ ] **C5 – Shared components:** `DataTable` (server paging, sorting, empty state, row click), `FormDialog` (pop-up; Enter does not submit by accident), `SidePanel` (sheet), `ConfirmDialog`, `ReasonDialog` (required text), `StatusBadge`, `KpiCard`, `StepBar`, `Tabs` (remembers tab in URL hash), toasts.
-- [ ] **C6 – `DateField`:** calendar picker (Monday first, highlights today and selected, ‹ › month navigation, **Today** and **Clear**), typing allowed with auto-slash, DD/MM/YYYY display, ISO value, invalid state; opens above the field when there is no room below; follows the field on scroll. `MoneyText` (`Rs. 1,350.00`), `formatDate`, number inputs right-aligned.
-- [ ] **C7 – CI & local run:** `client-ci.yml` (lint, type-check, build); `docker compose up` runs db + api + web + nginx locally; README "how to run".
+- [x] **C1 – Next.js project** in `client/` (TypeScript strict, App Router, Tailwind, shadcn/ui init, ESLint, Prettier); `lib/api.ts` (fetch with `credentials: 'include'`, error → toast, 401 → login); TanStack Query provider; `npm run api:types` (openapi-typescript); `Dockerfile`. *(Next.js **16.3** – D19. API client is `src/lib/api/client.ts`; 403 `PASSWORD_CHANGE_REQUIRED` → change-password screen; generated types in `src/lib/api/schema.d.ts`. Dockerfile: multi-stage, standalone output, non-root user.)*
+- [x] **C2 – Theme & shell** from the prototype CSS (colours, spacing, cards, tables, badges, banners): `AppShell`, `Sidebar` (built from `/auth/me` menu; single link when a module has one page; group with sub-items for Master Data, Sales & Deliveries, Delivery Schedule; "view" tag; hidden modules omitted), `TopBar` (today DD/MM/YYYY, user name + role, Log out). *(Prototype CSS classes kept in `globals.css`. The server menu now has a `group` flag so Delivery Staff still see the "Delivery Schedule" heading, as in the prototype – D20. The top bar also has **Change password** – D22.)*
+- [x] **C3 – Login page** (as `login.html`, without demo users): username, password, errors; redirect to landing page by role; **Change password** screen when `must_change_password`. *(After login the user returns to the page they asked for (`?next=`) when the role may open it.)*
+- [x] **C4 – Route protection:** protected `(app)` layout loads `/auth/me`; "No access" page; `useCan(permission)` hook; `<Can>` wrapper to hide write buttons for view-only roles. *(A page may be opened when it is in the user's server menu; view-only banner as in the prototype. All 17 routes exist with a "Coming in Mnn" placeholder.)*
+- [x] **C5 – Shared components:** `DataTable` (server paging, sorting, empty state, row click), `FormDialog` (pop-up; Enter does not submit by accident), `SidePanel` (sheet), `ConfirmDialog`, `ReasonDialog` (required text), `StatusBadge`, `KpiCard`, `StepBar`, `Tabs` (remembers tab in URL hash), toasts. *(Pop-ups and side panel use Radix Dialog with the prototype look; also `MoneyText`, `PageActions`, `NoAccess`. Enter → next field, Ctrl+Enter saves. All shown on `/ui-check` (Admin) – D22.)*
+- [x] **C6 – `DateField`:** calendar picker (Monday first, highlights today and selected, ‹ › month navigation, **Today** and **Clear**), typing allowed with auto-slash, DD/MM/YYYY display, ISO value, invalid state; opens above the field when there is no room below; follows the field on scroll. `MoneyText` (`Rs. 1,350.00`), `formatDate`, number inputs right-aligned. *(Own small calendar copied from the prototype picker, helpers in `lib/format.ts` – D21. "Today" is the Asia/Colombo date.)*
+- [x] **C7 – CI & local run:** `client-ci.yml` (lint, type-check, build); `docker compose up` runs db + api + web + nginx locally; README "how to run". *(CI job **`Client build & tests`** also runs the Prettier check and the tests. `client/README.md` added; root README updated.)*
 
 **Tests:** server tests in S11; client: type-check, lint, component test for `DateField` (typing, picking, clearing).
 
 **Acceptance checklist**
-- [ ] `docker compose up` starts everything; `http://localhost` shows the login page
-- [ ] Admin logs in → Dashboard placeholder with the full sidebar; Accountant → reduced sidebar; Delivery Staff → only Daily Delivery List
+- [x] `docker compose up` starts everything; `http://localhost` shows the login page
+- [x] Admin logs in → Dashboard placeholder with the full sidebar; Accountant → reduced sidebar; Delivery Staff → only Daily Delivery List
 - [x] 5 wrong passwords lock the account for 15 minutes; inactive user cannot log in
-- [ ] Opening a page without permission shows "No access"; calling its API returns 403
-- [ ] First login with a temporary password forces a password change
+- [x] Opening a page without permission shows "No access"; calling its API returns 403
+- [x] First login with a temporary password forces a password change
 - [x] Numbering service returns correct formats; concurrent calls never duplicate
 - [x] Audit log rows written for login/logout
-- [ ] Calendar picker works on a test page (pick, type, clear, today)
-- [ ] CI runs on pull requests for both projects
+- [x] Calendar picker works on a test page (pick, type, clear, today)
+- [ ] CI runs on pull requests for both projects *(workflow added; tick when the CLIENT PR shows both checks green)*
 
 **Notes & comments**
 
@@ -288,6 +288,11 @@ Admin = full. Accountant = Dashboard, Billing (full), Reports (Sales, Purchasing
 | 09/10/2026 | Amritha / Claude | Server side of the acceptance items: 403 for API without permission ✓, forced password change ✓ (server refuses other calls until changed), Admin / Accountant / Delivery Staff menus ✓. The screen parts ("No access" page, sidebar, change-password screen, calendar) and the full `docker compose up` come with the CLIENT part. |
 | 09/10/2026 | Amritha / Claude | Login messages: "Invalid username or password." for unknown user and wrong password; "deactivated" only after the right password; unknown usernames are locked too (no hint which usernames exist). |
 | 09/10/2026 | Amritha / Claude | Left for the CLIENT part: C1–C7, `client-ci.yml`, client `Dockerfile`. After the server PR is merged, add the required status check `Server build & tests` to the `main` and `dev` protection rules. |
+| 09/10/2026 | Amritha | SERVER part merged to `dev` (PR #2), CI green; required check `Server build & tests` added to `main` and `dev`. |
+| 09/10/2026 | Amritha / Claude | **CLIENT part done** on `feature/M00-foundation-client` (C1–C7). Next.js 16.3, Tailwind 4, Radix dialogs, TanStack Query, React Hook Form + Zod. 22 client tests (DateField, FormDialog Enter rule, formats, landing page); lint, type-check, Prettier and build clean. |
+| 09/10/2026 | Amritha / Claude | Checked with the full `docker compose up` (db, api, web, nginx) on `http://localhost`: login page; wrong-password message; `/admin` → login → back to `/admin`; Admin full sidebar; calendar on `/ui-check`; Accountant and Delivery Staff menus and 403 on admin APIs; deactivated user refused; temporary password → change forced (server 403 until changed, then landing page). |
+| 09/10/2026 | Amritha / Claude | Small server change in this branch: `/auth/me` menu modules have a `group` flag (D20); menu test updated – 51 server tests still green. `server/gradlew` marked executable in Git. |
+| 09/10/2026 | Amritha / Claude | After the CLIENT PR is merged: add the required check `Client build & tests` to `main` and `dev`, tick the last acceptance item, set M00 to ☑. `npm audit`: 0 issues in the app packages; 5 "high" only in the ESLint tooling (development only, not in the built app). |
 
 ---
 
@@ -1249,6 +1254,10 @@ Before go-live there is no production server yet: `main` holds the last client-a
 | D16 | 09/10/2026 | Login: same message for unknown user / wrong password; "deactivated" only after the correct password; lock applies to unknown usernames too. `must_change_password` is enforced by the server as well as the screen | Amritha |
 | D17 | 09/10/2026 | Numbering Service runs only inside the caller's transaction; yearly / monthly sequences never go back to an earlier period (`SEQUENCE_PERIOD_CLOSED`) | Amritha |
 | D18 | 09/10/2026 | API served under `/api` (Spring context path); Nginx passes `/api/…` unchanged; `/api/actuator/*` blocked at Nginx (health is internal only) | Amritha |
+| D19 | 09/10/2026 | Frontend on **Next.js 16.3** (React 19.2, Tailwind 4, TypeScript 5.9) instead of 15 – 16 is the current supported line. `npm run dev` forwards `/api` to the API on this computer, so the login cookie works without Nginx | Amritha |
+| D20 | 09/10/2026 | `/auth/me` menu modules carry a `group` flag (the module has several pages) so the sidebar shows a heading with sub-items even when a role sees only one of them – same as the prototype | Amritha |
+| D21 | 09/10/2026 | `DateField` is a small own component copied from the prototype picker (typing with auto-slash, opens above when there is no room, follows on scroll) instead of react-day-picker; shadcn/ui is used for Radix Dialog / Sheet only, styled with the prototype CSS | Amritha |
+| D22 | 09/10/2026 | Top bar has **Change password** for every user (not in the prototype; uses the existing endpoint). `/ui-check` (Admin only, not in the menu) shows every shared component for checking | Amritha |
 | | | | |
 
 ---
@@ -1261,4 +1270,5 @@ Before go-live there is no production server yet: `main` holds the last client-a
 | 1.1 | 08/10/2026 | Client feedback: customer status (M05), multi-bottle dispatch (M10), new M15 Expenses and M16 Customer quotations; decisions D7–D10 | Amritha |
 | 1.2 | 08/10/2026 | Agreed customer prices (M02 Pricing Service, M05 S10–S11 / C7–C8, M06, M12, M14, M16); Q1 resolved; references moved to BRD v4.0 / Architecture v1.1; decisions D11–D13 | Amritha |
 | 1.3 | 09/10/2026 | Integration branch renamed `dev` (D14). M00 SERVER part done: S1–S11 ticked, tracker, notes; decisions D15–D18; Architecture v1.2 | Amritha |
+| 1.4 | 09/10/2026 | M00 SERVER merged to `dev`. M00 CLIENT part done: C1–C7 and acceptance ticked, tracker, notes; decisions D19–D22; Architecture v1.3 | Amritha |
 | | | | |

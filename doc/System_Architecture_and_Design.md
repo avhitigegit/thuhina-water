@@ -3,12 +3,13 @@
 | Item | Detail |
 |---|---|
 | Product | Water Distribution Inventory & Sales Management System |
-| Version | 1.2 |
+| Version | 1.3 |
 | Date | 09/10/2026 |
 | Prepared by | Amritha |
 | Based on | BRD v4.0 (`BRD Water Distribution System.md`) · Clickable prototype (`/prototype`) · Technology Stack & Hosting (`TechStack Thuhina Water.md`) |
 | Changes in 1.1 | Client feedback 08/10/2026: agreed customer prices (Pricing Service, `customer_price`), customer status date, multi-bottle factory dispatch (`factory_dispatch`), running expenses (new module), customer quotations (new module); supplier quotation number renamed `SQ-` |
 | Changes in 1.2 | M00 build (09/10/2026): Spring Boot 4.1 instead of 3.x (3.x free support has ended); `login_attempt` table; settings rows keep who/when changed; numbering only moves forward for yearly / monthly sequences; API served under `/api`; temporary password enforced by the server |
+| Changes in 1.3 | M00 client build (09/10/2026): Next.js 16 instead of 15; the date picker is a small own component (copy of the prototype picker) instead of react-day-picker; the `/auth/me` menu has a `group` flag per module; `/ui-check` page for the shared components |
 | Purpose | Defines **how** the system is built. It is the input for the Master Task Breakdown and for every module build. |
 
 ---
@@ -74,11 +75,11 @@ Follows the NUVI shared stack (see `TechStack Thuhina Water.md`).
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Frontend | Next.js 15 (App Router) + TypeScript | Client components for screens; no business logic |
+| Frontend | Next.js 16 (App Router) + TypeScript, React 19 | Client components for screens; no business logic. `npm run dev` forwards `/api` to the local API; production build is `standalone` in Docker |
 | UI | Tailwind CSS + shadcn/ui | Dialog (pop-up), Sheet (side panel), Tabs, Table, Calendar |
 | Data fetching | TanStack Query | Caching, refetch after save |
 | Forms | React Hook Form + Zod | Same validation messages as the prototype |
-| Dates | date-fns + react-day-picker | Display **DD/MM/YYYY**, calendar picker on every date field (NFR-07) |
+| Dates | Own `DateField` + formatters in `lib/format.ts` | Display **DD/MM/YYYY**, calendar picker on every date field (NFR-07) – same behaviour as the prototype picker |
 | Backend | Spring Boot 4.1, Java 21 | Spring Web MVC, Spring Security 7, Spring Data JPA (Hibernate 7), Validation, Scheduling; Jackson 3 for JSON. JWT with Nimbus (`spring-security-oauth2-jose`) |
 | DB migrations | Flyway | Versioned SQL scripts, run on start-up |
 | Database | PostgreSQL 16 | NUMERIC for money, DATE for business dates |
@@ -187,7 +188,8 @@ client/src/
 │     ├─ expenses/page.tsx
 │     ├─ reports/page.tsx
 │     ├─ admin/page.tsx
-│     └─ migration/page.tsx          (hidden by feature flag)
+│     ├─ migration/page.tsx          (hidden by feature flag)
+│     └─ ui-check/page.tsx           (Admin only, not in the menu: every shared component with sample data)
 ├─ components/
 │  ├─ layout/   AppShell, Sidebar (built from /api/auth/me menu), TopBar
 │  ├─ ui/       shadcn components
@@ -196,7 +198,7 @@ client/src/
 │               ConfirmDialog, ReasonDialog, PrintButton, StepBar, KpiCard,
 │               PriceText (price + "agreed" badge + standard), CustomerPriceDialog, CustomerStatusDialog
 ├─ features/<module>/   API hooks (TanStack Query), forms, module components
-└─ lib/         api client (fetch with credentials), formatters, zod schemas, permissions
+└─ lib/         api client (fetch with credentials), generated API types, formatters, permissions, routes, toast
 ```
 
 **Screen ↔ prototype file map** (the prototype page is the visual spec):

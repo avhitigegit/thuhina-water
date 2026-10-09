@@ -1,0 +1,54 @@
+# Client CI (design 12.2): lint, type-check, tests and production build of the Next.js app on every pull request.
+name: client-ci
+
+on:
+  # Runs on every pull request (no path filter) so it can be a required status check.
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [dev, main]
+    paths:
+      - "client/**"
+      - ".github/workflows/client-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: client-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Client build & tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Format check
+        run: npm run format:check
+
+      - name: Tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
