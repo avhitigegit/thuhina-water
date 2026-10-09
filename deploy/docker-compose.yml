@@ -1,0 +1,72 @@
+# Thuhina Water – all four containers on one server (design 1, 12).
+#   cp .env.example .env     (then fill in the values)
+#   docker compose up -d --build
+# Until the client is built (M00 CLIENT part), start only the database and the API:
+#   docker compose up -d --build db api
+
+name: thuhina-water
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-thuhina}
+      POSTGRES_USER: ${POSTGRES_USER:-thuhina}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in deploy/.env}
+      TZ: Asia/Colombo
+      PGTZ: Asia/Colombo
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    # Only reachable from this computer (for pgAdmin / DBeaver / running the API from the IDE).
+    ports:
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: ../server
+    image: thuhina/api:${APP_VERSION:-local}
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-local}
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB:-thuhina}
+      DB_USERNAME: ${POSTGRES_USER:-thuhina}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in deploy/.env}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_TEMP_PASSWORD: ${ADMIN_TEMP_PASSWORD:-}
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx768m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError}
+    depends_on:
+      db:
+        condition: service_healthy
+    # The API is reached through Nginx (/api); this port is for local testing only.
+    ports:
+      - "127.0.0.1:${API_PORT:-8080}:8080"
+
+  web:
+    build: ../client
+    image: thuhina/web:${APP_VERSION:-local}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - api
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - api
+      - web
+
+volumes:
+  db-data:

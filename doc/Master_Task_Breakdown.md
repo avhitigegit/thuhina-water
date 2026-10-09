@@ -3,10 +3,10 @@
 | Item | Detail |
 |---|---|
 | Product | Water Distribution Inventory & Sales Management System |
-| Document version | 1.2 |
+| Document version | 1.3 |
 | Created | 05/10/2026 |
 | Prepared by | Amritha |
-| Based on | BRD v4.0 (`BRD Water Distribution System.md`) · System Architecture & Design v1.1 (`System_Architecture_and_Design.md`) · Prototype (`/prototype`) · Tech stack v1.1 (`TechStack Thuhina Water.md`) |
+| Based on | BRD v4.0 (`BRD Water Distribution System.md`) · System Architecture & Design v1.2 (`System_Architecture_and_Design.md`) · Prototype (`/prototype`) · Tech stack v1.1 (`TechStack Thuhina Water.md`) |
 | Purpose | The build plan. Each module block (M00–M14) is pasted one at a time to build that module. This file is updated after every module with status, ticks and comments. |
 
 > **Living document.** After each step: tick the tasks (`[x]`), update the progress tracker (section 4), and add a line to the module's **Notes & comments** table. Record any change of scope or design decision in section 8 (Decision log).
@@ -163,7 +163,7 @@ M05 – Customers (SERVER)   Tasks: S1–S9
 
 | Module | Branch(es) | Status | Started | Merged to dev | Release tag | Comments |
 |---|---|---|---|---|---|---|
-| M00 Foundation | `feature/M00-foundation-server` / `-client` | ☐ To do | | | | |
+| M00 Foundation | `feature/M00-foundation-server` / `-client` | ◐ In progress – SERVER part done, CLIENT next | 09/10/2026 | | | Server: 51 tests green; Docker run checked. Spring Boot 4.1 (D15) |
 | M01 Administration | `feature/M01-administration` | ☐ To do | | | | |
 | M02 Master data | `feature/M02-master-data` | ☐ To do | | | | |
 | M03 Suppliers & factories | `feature/M03-suppliers-factories` | ☐ To do | | | | |
@@ -246,17 +246,17 @@ Admin = full. Accountant = Dashboard, Billing (full), Reports (Sales, Purchasing
 - **Errors:** 400 VALIDATION (field errors) · 401 not logged in · 403 no permission · 404 · 409 CONFLICT (optimistic lock) · 422 business rule.
 
 #### SERVER tasks
-- [ ] **S1 – Repository & branches:** create `dev` from `main`; protect `main` and `dev`; root `README.md`, `.gitignore`, `.editorconfig`, PR template (section 2.4); `deploy/` with `docker-compose.yml` (db, api, web, nginx), `nginx.conf` (`/` → web, `/api` → api), `.env.example`.
-- [ ] **S2 – Spring Boot project** in `server/` (Gradle, Java 21): web, security, data-jpa, validation, flyway, postgresql, actuator, springdoc, openpdf, poi (added later where used), test + testcontainers. Profiles `local`, `uat`, `prod`; time zone `Asia/Colombo`; JVM heap setting documented; `Dockerfile` (multi-stage).
-- [ ] **S3 – Common package:** `BaseEntity` (id, created_at/by, updated_at/by, version) with JPA auditing from the current user; `BusinessException(code, message, details)`; `GlobalExceptionHandler` (formats above); `PageResponse<T>`; `Money` and `BusinessDates` utils.
-- [ ] **S4 – Migration `V001__foundation.sql`:** `app_user`, `audit_log`, `doc_sequence` (rows for every sequence in design 5.3), `app_setting` (company details from BRD: Thuhina Water (Pvt) Ltd, address, phone, email, reg. no; `features.dataMigration=false`), `login_attempt`.
-- [ ] **S5 – NumberingService** + unit tests (formats, yearly/monthly reset) + concurrency test (two threads → different numbers, no gaps).
-- [ ] **S6 – AuditService** + `AuditLog` entity/repository (insert-only; no update/delete methods exposed).
-- [ ] **S7 – Security:** BCrypt encoder; `JwtService`; cookie writer (Secure off only in `local`); `JwtAuthFilter` (active + token_version check); `Permissions` constants and role → permission map exactly as design 8.2; `@EnableMethodSecurity`.
-- [ ] **S8 – Auth endpoints:** `POST /auth/login` (lock rule, audit LOGIN, `last_login_at`), `POST /auth/logout` (audit LOGOUT, clear cookie), `GET /auth/me` (user, permissions, menu), `POST /auth/change-password`.
-- [ ] **S9 – Settings service:** `GET/PUT /settings/{group}` (company, business, features); first-run bootstrap of the Admin user from environment variables (`ADMIN_USERNAME`, `ADMIN_TEMP_PASSWORD`, must change on first login). Seed users (local/UAT) from the prototype.
-- [ ] **S10 – OpenAPI & CI:** Swagger UI in local/UAT only; GitHub Actions workflow `server-ci.yml` (build + tests with Testcontainers on every PR).
-- [ ] **S11 – Tests:** login success/fail/lock/inactive, logout, token invalid after deactivation, permission denied (403), error format, numbering.
+- [x] **S1 – Repository & branches:** create `dev` from `main`; protect `main` and `dev`; root `README.md`, `.gitignore`, `.editorconfig`, PR template (section 2.4); `deploy/` with `docker-compose.yml` (db, api, web, nginx), `nginx.conf` (`/` → web, `/api` → api), `.env.example`. *(Done 09/10: `dev` created; branch protection is set by Amritha in GitHub – add the required check `Server build & tests` after this PR. `web` and `nginx` are in the compose file; `web` builds once the client exists.)*
+- [x] **S2 – Spring Boot project** in `server/` (Gradle, Java 21): web, security, data-jpa, validation, flyway, postgresql, actuator, springdoc, openpdf, poi (added later where used), test + testcontainers. Profiles `local`, `uat`, `prod`; time zone `Asia/Colombo`; JVM heap setting documented; `Dockerfile` (multi-stage). *(Spring Boot **4.1.1** – see D15; JVM heap 768 MB in the Dockerfile / `JAVA_OPTS`.)*
+- [x] **S3 – Common package:** `BaseEntity` (id, created_at/by, updated_at/by, version) with JPA auditing from the current user; `BusinessException(code, message, details)`; `GlobalExceptionHandler` (formats above); `PageResponse<T>`; `Money` and `BusinessDates` utils. *(Also `ValidationException`, `NotFoundException`, `ErrorCodes`, `Clock` bean.)*
+- [x] **S4 – Migration `V001__foundation.sql`:** `app_user`, `audit_log`, `doc_sequence` (rows for every sequence in design 5.3), `app_setting` (company details from BRD: Thuhina Water (Pvt) Ltd, address, phone, email, reg. no; `features.dataMigration=false`), `login_attempt`. *(Plus a DB trigger that makes `audit_log` insert-only; company details are the prototype placeholders until the client confirms.)*
+- [x] **S5 – NumberingService** + unit tests (formats, yearly/monthly reset) + concurrency test (two threads → different numbers, no gaps). *(Must run inside the caller's transaction; yearly/monthly sequences only move forward – D17.)*
+- [x] **S6 – AuditService** + `AuditLog` entity/repository (insert-only; no update/delete methods exposed).
+- [x] **S7 – Security:** BCrypt encoder; `JwtService`; cookie writer (Secure off only in `local`); `JwtAuthFilter` (active + token_version check); `Permissions` constants and role → permission map exactly as design 8.2; `@EnableMethodSecurity`.
+- [x] **S8 – Auth endpoints:** `POST /auth/login` (lock rule, audit LOGIN, `last_login_at`), `POST /auth/logout` (audit LOGOUT, clear cookie), `GET /auth/me` (user, permissions, menu), `POST /auth/change-password`. *(Login returns the same data as `/auth/me`; the menu matches the prototype NAV.)*
+- [x] **S9 – Settings service:** `GET/PUT /settings/{group}` (company, business, features); first-run bootstrap of the Admin user from environment variables (`ADMIN_USERNAME`, `ADMIN_TEMP_PASSWORD`, must change on first login). Seed users (local/UAT) from the prototype. *(Seed password `demo1234`, as in the prototype; `R__seed_01_users.sql` runs only in local/UAT.)*
+- [x] **S10 – OpenAPI & CI:** Swagger UI in local/UAT only; GitHub Actions workflow `server-ci.yml` (build + tests with Testcontainers on every PR).
+- [x] **S11 – Tests:** login success/fail/lock/inactive, logout, token invalid after deactivation, permission denied (403), error format, numbering.
 
 #### CLIENT tasks
 - [ ] **C1 – Next.js project** in `client/` (TypeScript strict, App Router, Tailwind, shadcn/ui init, ESLint, Prettier); `lib/api.ts` (fetch with `credentials: 'include'`, error → toast, 401 → login); TanStack Query provider; `npm run api:types` (openapi-typescript); `Dockerfile`.
@@ -272,11 +272,11 @@ Admin = full. Accountant = Dashboard, Billing (full), Reports (Sales, Purchasing
 **Acceptance checklist**
 - [ ] `docker compose up` starts everything; `http://localhost` shows the login page
 - [ ] Admin logs in → Dashboard placeholder with the full sidebar; Accountant → reduced sidebar; Delivery Staff → only Daily Delivery List
-- [ ] 5 wrong passwords lock the account for 15 minutes; inactive user cannot log in
+- [x] 5 wrong passwords lock the account for 15 minutes; inactive user cannot log in
 - [ ] Opening a page without permission shows "No access"; calling its API returns 403
 - [ ] First login with a temporary password forces a password change
-- [ ] Numbering service returns correct formats; concurrent calls never duplicate
-- [ ] Audit log rows written for login/logout
+- [x] Numbering service returns correct formats; concurrent calls never duplicate
+- [x] Audit log rows written for login/logout
 - [ ] Calendar picker works on a test page (pick, type, clear, today)
 - [ ] CI runs on pull requests for both projects
 
@@ -284,7 +284,10 @@ Admin = full. Accountant = Dashboard, Billing (full), Reports (Sales, Purchasing
 
 | Date | By | Comment |
 |---|---|---|
-| | | |
+| 09/10/2026 | Amritha / Claude | **SERVER part done** on `feature/M00-foundation-server` (S1–S11). 51 tests pass (unit + integration on PostgreSQL 16 with Testcontainers). Checked with Docker: `docker compose up db api` → migrations + seed users, login, settings, Swagger. |
+| 09/10/2026 | Amritha / Claude | Server side of the acceptance items: 403 for API without permission ✓, forced password change ✓ (server refuses other calls until changed), Admin / Accountant / Delivery Staff menus ✓. The screen parts ("No access" page, sidebar, change-password screen, calendar) and the full `docker compose up` come with the CLIENT part. |
+| 09/10/2026 | Amritha / Claude | Login messages: "Invalid username or password." for unknown user and wrong password; "deactivated" only after the right password; unknown usernames are locked too (no hint which usernames exist). |
+| 09/10/2026 | Amritha / Claude | Left for the CLIENT part: C1–C7, `client-ci.yml`, client `Dockerfile`. After the server PR is merged, add the required status check `Server build & tests` to the `main` and `dev` protection rules. |
 
 ---
 
@@ -1242,6 +1245,10 @@ Before go-live there is no production server yet: `main` holds the last client-a
 | D12 | 08/10/2026 | Supplier quotation number renamed `SQ-0001` so customer quotations can use `QT-2026-001` | Amritha |
 | D13 | 08/10/2026 | Documents updated to BRD v4.0, Architecture v1.1, Tech stack v1.1; old versions removed from `doc/` (only the latest kept) | Client |
 | D14 | 09/10/2026 | One GitHub repo `thuhina-water` (monorepo: server, client, deploy, doc, prototype). Integration branch named `dev` (not `develop`). `main` and `dev` created and pushed | Amritha |
+| D15 | 09/10/2026 | Backend on **Spring Boot 4.1.1** (Java 21) instead of 3.x: 3.x free support ended in June 2026 and Spring Initializr no longer offers it. Brings Spring Security 7, Hibernate 7, Jackson 3. Design v1.2 updated | Amritha |
+| D16 | 09/10/2026 | Login: same message for unknown user / wrong password; "deactivated" only after the correct password; lock applies to unknown usernames too. `must_change_password` is enforced by the server as well as the screen | Amritha |
+| D17 | 09/10/2026 | Numbering Service runs only inside the caller's transaction; yearly / monthly sequences never go back to an earlier period (`SEQUENCE_PERIOD_CLOSED`) | Amritha |
+| D18 | 09/10/2026 | API served under `/api` (Spring context path); Nginx passes `/api/…` unchanged; `/api/actuator/*` blocked at Nginx (health is internal only) | Amritha |
 | | | | |
 
 ---
@@ -1253,4 +1260,5 @@ Before go-live there is no production server yet: `main` holds the last client-a
 | 1.0 | 05/10/2026 | First version: branching strategy, workflow, tracker, global rules, modules M00–M14, milestones, decision log | Amritha |
 | 1.1 | 08/10/2026 | Client feedback: customer status (M05), multi-bottle dispatch (M10), new M15 Expenses and M16 Customer quotations; decisions D7–D10 | Amritha |
 | 1.2 | 08/10/2026 | Agreed customer prices (M02 Pricing Service, M05 S10–S11 / C7–C8, M06, M12, M14, M16); Q1 resolved; references moved to BRD v4.0 / Architecture v1.1; decisions D11–D13 | Amritha |
+| 1.3 | 09/10/2026 | Integration branch renamed `dev` (D14). M00 SERVER part done: S1–S11 ticked, tracker, notes; decisions D15–D18; Architecture v1.2 | Amritha |
 | | | | |

@@ -1,0 +1,28 @@
+# Secrets – never commit (design 2.3 rules)
+.env
+.env.*
+!.env.example
+
+# Server (Gradle)
+server/build/
+server/.gradle/
+server/out/
+server/bin/
+
+# Client (Next.js)
+client/node_modules/
+client/.next/
+client/out/
+client/coverage/
+client/next-env.d.ts
+
+# IDE / OS
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+
+# Local tool settings
+.claude/settings.local.json

@@ -1,0 +1,23 @@
+# Local development (developer laptop, Docker Compose or the IDE).
+# Seed data from the prototype is loaded; the login cookie works on plain http://localhost.
+
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+app:
+  jwt:
+    # Local only – UAT and production must set JWT_SECRET.
+    secret: ${JWT_SECRET:local-dev-secret-change-me-0123456789abcdef}
+  cookie:
+    secure: ${COOKIE_SECURE:false}
+
+logging:
+  level:
+    lk.thuhina.water: DEBUG
