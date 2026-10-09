@@ -28,6 +28,8 @@ class MenuAndPermissionIntegrationTest extends IntegrationTest {
                         "Inventory", "Sales & Deliveries", "Delivery Schedule", "Billing & Payments", "Expenses",
                         "Data Migration", "Reports", "Administration")))
                 .andExpect(jsonPath("$.menu[?(@.module == 'Data Migration')].hidden").value(contains(true)))
+                .andExpect(jsonPath("$.menu[?(@.module == 'Dashboard')].group").value(contains(false)))
+                .andExpect(jsonPath("$.menu[?(@.module == 'Master Data')].group").value(contains(true)))
                 .andExpect(jsonPath("$.menu[?(@.module == 'Master Data')].items[*].view").value(contains(false, false, false)));
     }
 
@@ -53,6 +55,8 @@ class MenuAndPermissionIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.landingPage").value("/delivery/daily-list"))
                 .andExpect(jsonPath("$.menu.length()").value(1))
+                .andExpect(jsonPath("$.menu[0].module").value("Delivery Schedule"))
+                .andExpect(jsonPath("$.menu[0].group").value(true))
                 .andExpect(jsonPath("$.menu[0].items[*].path").value(contains("/delivery/daily-list")))
                 .andExpect(jsonPath("$.permissions").value(contains(Permissions.DELIVERY_LIST_VIEW)));
     }

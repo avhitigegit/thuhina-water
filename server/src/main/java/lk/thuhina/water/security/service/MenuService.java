@@ -78,7 +78,7 @@ public class MenuService {
                     .toList();
             if (!items.isEmpty()) {
                 boolean hidden = m.feature() != null && !settings.isFeatureEnabled(m.feature());
-                result.add(new MenuModule(m.module(), m.icon(), hidden, items));
+                result.add(new MenuModule(m.module(), m.icon(), hidden, m.pages().size() > 1, items));
             }
         }
         return result;
