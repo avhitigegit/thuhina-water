@@ -3,11 +3,12 @@
 | Item | Detail |
 |---|---|
 | Product | Water Distribution Inventory & Sales Management System |
-| Version | 1.1 |
-| Date | 08/10/2026 |
+| Version | 1.2 |
+| Date | 09/10/2026 |
 | Prepared by | Amritha |
 | Based on | BRD v4.0 (`BRD Water Distribution System.md`) · Clickable prototype (`/prototype`) · Technology Stack & Hosting (`TechStack Thuhina Water.md`) |
 | Changes in 1.1 | Client feedback 08/10/2026: agreed customer prices (Pricing Service, `customer_price`), customer status date, multi-bottle factory dispatch (`factory_dispatch`), running expenses (new module), customer quotations (new module); supplier quotation number renamed `SQ-` |
+| Changes in 1.2 | M00 build (09/10/2026): Spring Boot 4.1 instead of 3.x (3.x free support has ended); `login_attempt` table; settings rows keep who/when changed; numbering only moves forward for yearly / monthly sequences; API served under `/api`; temporary password enforced by the server |
 | Purpose | Defines **how** the system is built. It is the input for the Master Task Breakdown and for every module build. |
 
 ---
@@ -78,7 +79,7 @@ Follows the NUVI shared stack (see `TechStack Thuhina Water.md`).
 | Data fetching | TanStack Query | Caching, refetch after save |
 | Forms | React Hook Form + Zod | Same validation messages as the prototype |
 | Dates | date-fns + react-day-picker | Display **DD/MM/YYYY**, calendar picker on every date field (NFR-07) |
-| Backend | Spring Boot 3.x, Java 21 | Spring Web, Spring Security, Spring Data JPA, Validation, Scheduling |
+| Backend | Spring Boot 4.1, Java 21 | Spring Web MVC, Spring Security 7, Spring Data JPA (Hibernate 7), Validation, Scheduling; Jackson 3 for JSON. JWT with Nimbus (`spring-security-oauth2-jose`) |
 | DB migrations | Flyway | Versioned SQL scripts, run on start-up |
 | Database | PostgreSQL 16 | NUMERIC for money, DATE for business dates |
 | Auth | JWT in an **httpOnly, Secure, SameSite=Strict cookie** | Passwords hashed with BCrypt (NFR-05) |
@@ -268,7 +269,8 @@ client/src/
 | `app_user` | `username` (unique), `full_name`, `phone`, `role` (ADMIN / ACCOUNTANT / DELIVERY_STAFF), `password_hash`, `must_change_password`, `active`, `last_login_at`, `token_version` |
 | `audit_log` | `ts`, `user_id`, `username`, `role`, `action` (CREATE / UPDATE / APPROVE / REVERSE / IMPORT / LOGIN / LOGOUT), `entity`, `ref`, `details`, `ip` – insert-only |
 | `doc_sequence` | `name` (PK), `prefix`, `next_value`, `padding`, `reset_rule` (NONE / YEARLY / MONTHLY), `period_key` |
-| `app_setting` | `key` (PK), `value` (JSON) – company details, logo, business settings, feature flags, WhatsApp settings |
+| `app_setting` | `key` (PK), `value` (JSON object), `updated_at`, `updated_by` – one row per group: `company`, `business`, `features` (later `whatsapp`) |
+| `login_attempt` | `username` (PK, also for unknown usernames), `failed_count`, `last_failed_at`, `locked_until` – 5 failures → 15-minute lock; cleared on success and by the hourly job |
 
 **Master data**
 
@@ -441,7 +443,7 @@ For each bottle type on an **exchange** bill:
 
 ### 5.3 Numbering Service (`numbering`)
 
-`next(name)` locks the `doc_sequence` row (`SELECT … FOR UPDATE`), returns the formatted number and increments it – in the same DB transaction as the document, so numbers are unique and gap-free.
+`next(name)` locks the `doc_sequence` row (`SELECT … FOR UPDATE`), returns the formatted number and increments it – in the same DB transaction as the document (the service refuses to run without one), so numbers are unique and gap-free. `next(name, date)` uses the period of `date` (e.g. the invoice month); yearly / monthly sequences only move forward – a period earlier than the current one is refused (`SEQUENCE_PERIOD_CLOSED`) because its numbers may already be used.
 
 | Sequence | Format | Reset |
 |---|---|---|
@@ -539,7 +541,7 @@ Short design notes per module. Detailed tasks are in the Master Task Breakdown.
 
 ### 7.1 Conventions
 
-- Base path `/api`. JSON. ISO dates (`2026-10-05`) in the API; the UI shows DD/MM/YYYY.
+- Base path `/api` (Spring Boot context path; Nginx passes `/api/…` through unchanged). JSON. ISO dates (`2026-10-05`) in the API; the UI shows DD/MM/YYYY.
 - Lists: `?page=0&size=50&sort=name,asc&q=…` → `{ items, page, size, total }`.
 - Actions on documents are explicit sub-resources (`POST /purchase-orders/{id}/approve`) – no generic status PATCH.
 - Every endpoint is protected by a permission (8.2) with `@PreAuthorize`.
@@ -576,7 +578,8 @@ Short design notes per module. Detailed tasks are in the Master Task Breakdown.
 - `POST /auth/login` checks username + password (BCrypt) and active status → sets the JWT cookie (`HttpOnly; Secure; SameSite=Strict`, 12 hours – one working day).
 - The JWT holds user id, role and `token_version`. Each request checks the user is still active and the `token_version` matches (deactivation or password reset logs the user out).
 - 5 failed logins → 15-minute lock for that username. All logins and logouts are audited.
-- `must_change_password` → the UI forces the change-password screen after login.
+- `must_change_password` → the UI forces the change-password screen after login; the server also refuses every call except `/auth/me`, `/auth/change-password` and `/auth/logout` (`403 PASSWORD_CHANGE_REQUIRED`). Changing the password ends the user's other sessions.
+- Unknown username and wrong password give the same message; "deactivated" is shown only after the correct password.
 - HTTPS only (Nginx + Let's Encrypt); HSTS; CORS not needed (same domain).
 
 ### 8.2 Permission matrix

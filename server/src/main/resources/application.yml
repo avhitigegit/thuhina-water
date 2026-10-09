@@ -1,0 +1,73 @@
+# Thuhina Water API – settings shared by every profile (local, uat, prod).
+# Secrets and connection details come from environment variables (deploy/.env, never committed).
+
+spring:
+  application:
+    name: thuhina-water
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/thuhina}
+    username: ${DB_USERNAME:thuhina}
+    password: ${DB_PASSWORD:}
+    hikari:
+      maximum-pool-size: 10
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: Asia/Colombo
+  flyway:
+    locations: classpath:db/migration
+  jackson:
+    time-zone: Asia/Colombo
+  threads:
+    virtual:
+      enabled: true
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+  # Behind Nginx: use X-Forwarded-* for the client address (audit log) and https detection.
+  forward-headers-strategy: native
+  error:
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+# Swagger UI is off unless a profile switches it on (local, uat).
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:}
+    ttl: 12h
+  cookie:
+    name: TW_AUTH
+    secure: ${COOKIE_SECURE:true}
+  login:
+    max-failed-attempts: 5
+    lock-duration: 15m
+  bootstrap:
+    admin-username: ${ADMIN_USERNAME:}
+    admin-temp-password: ${ADMIN_TEMP_PASSWORD:}
+    admin-full-name: ${ADMIN_FULL_NAME:System Administrator}
+
+logging:
+  level:
+    root: INFO

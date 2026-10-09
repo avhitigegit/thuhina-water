@@ -1,0 +1,14 @@
+# Integration tests: PostgreSQL from Testcontainers (no seed data), fixed test secrets.
+app:
+  jwt:
+    secret: test-secret-for-integration-tests-0123456789
+  cookie:
+    secure: true
+  bootstrap:
+    admin-username: First.Admin
+    admin-temp-password: Temp-Pass-123
+
+logging:
+  level:
+    root: WARN
+    lk.thuhina.water: INFO
