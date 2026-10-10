@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isoMinusDays } from "./AuditTab";
+import { addDaysIso } from "@/lib/format";
 import { actionBadgeKind, actionLabel, roleBadgeKind } from "./labels";
 import { companySchema, editUserSchema, logoProblem, MSG_USERNAME, newUserSchema } from "./schemas";
 
@@ -75,7 +75,8 @@ describe("labels", () => {
   });
 
   it("audit default range is the last 7 days", () => {
-    expect(isoMinusDays("2026-10-05", 7)).toBe("2026-09-28");
-    expect(isoMinusDays("2026-03-01", 1)).toBe("2026-02-28");
+    expect(addDaysIso("2026-10-05", -7)).toBe("2026-09-28");
+    expect(addDaysIso("2026-03-01", -1)).toBe("2026-02-28");
+    expect(addDaysIso("2026-12-31", 1)).toBe("2027-01-01");
   });
 });

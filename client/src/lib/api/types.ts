@@ -38,3 +38,28 @@ export interface CompanySettings {
   /** Address of the logo image (cache-safe), or null. */
   logoUrl: string | null;
 }
+
+// Master data – Bottles & Products (M02)
+export type BottleType = Schemas["BottleTypeResponse"];
+export type CreateBottleTypeRequest = Schemas["CreateBottleTypeRequest"];
+export type UpdateBottleTypeRequest = Schemas["UpdateBottleTypeRequest"];
+export type Product = Schemas["ProductResponse"];
+export type CreateProductRequest = Schemas["CreateProductRequest"];
+export type UpdateProductRequest = Schemas["UpdateProductRequest"];
+export type CustomerType = Schemas["CustomerTypeResponse"];
+export type Area = Schemas["AreaResponse"];
+export type OldBottleBrand = Schemas["OldBottleBrandResponse"];
+export type CreateOldBottleBrandRequest = Schemas["CreateOldBottleBrandRequest"];
+export type UpdateOldBottleBrandRequest = Schemas["UpdateOldBottleBrandRequest"];
+export type PriceValue = Schemas["PriceValue"];
+/** `current` / `next` are null when there is no such price (springdoc drops "nullable" on object references). */
+export type PriceCell = Omit<Schemas["PriceCell"], "current" | "next"> & {
+  current: PriceValue | null;
+  next: PriceValue | null;
+};
+export type PriceMatrix = Omit<Schemas["PriceMatrixResponse"], "water" | "deposits"> & {
+  water: PriceCell[];
+  deposits: PriceCell[];
+};
+export type PriceHistoryRow = Schemas["PriceHistoryRow"];
+export type SetPriceRequest = Schemas["SetPriceRequest"];

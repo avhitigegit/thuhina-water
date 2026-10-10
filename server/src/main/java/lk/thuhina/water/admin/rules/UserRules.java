@@ -3,6 +3,8 @@ package lk.thuhina.water.admin.rules;
 import java.security.SecureRandom;
 import java.util.regex.Pattern;
 
+import lk.thuhina.water.common.Texts;
+
 /**
  * User rules (M01, prototype {@code Ops.saveUser}) – pure functions, no database.
  * Messages are the prototype's wording; the Users pop-up shows them under the field.
@@ -57,10 +59,6 @@ public final class UserRules {
 
     /** Optional text: trimmed, empty → null. */
     public static String blankToNull(String value) {
-        if (value == null) {
-            return null;
-        }
-        String t = value.trim();
-        return t.isEmpty() ? null : t;
+        return Texts.blankToNull(value);
     }
 }

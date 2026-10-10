@@ -20,7 +20,7 @@ import lk.thuhina.water.common.NotFoundException;
 import lk.thuhina.water.common.ValidationException;
 import lk.thuhina.water.security.CurrentUser;
 import lk.thuhina.water.security.repository.LoginAttemptRepository;
-import org.springframework.dao.OptimisticLockingFailureException;
+import lk.thuhina.water.common.Versions;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,9 +77,7 @@ public class UserService {
     @Transactional
     public UserResponse update(long id, UpdateUserRequest request) {
         AppUser user = find(id);
-        if (request.version() != null && request.version() != user.getVersion()) {
-            throw new OptimisticLockingFailureException("User " + id + " was changed");
-        }
+        Versions.check(request.version(), user.getVersion(), "User " + id);
         String username = AppUser.normalizeUsername(request.username());
         checkUsername(username, id);
         if (isSelf(user) && request.role() != user.getRole()) {

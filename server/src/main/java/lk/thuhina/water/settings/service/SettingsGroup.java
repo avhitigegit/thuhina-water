@@ -25,10 +25,17 @@ public enum SettingsGroup {
 
     /** Feature switches, e.g. {@code dataMigration} shows or hides the Data Migration menu. */
     FEATURES("features", fields(
-            "dataMigration", Type.BOOLEAN));
+            "dataMigration", Type.BOOLEAN)),
+
+    /**
+     * Prices the client has confirmed (M02); the others show "example". Keys {@code DEPOSIT|B20},
+     * {@code WATER|B20|Household}.
+     */
+    PRICES("prices", fields(
+            "confirmed", Type.TEXT_LIST));
 
     /** {@code READ_ONLY} keys are shown but cannot be changed through {@code PUT /settings/{group}}. */
-    public enum Type { TEXT, REQUIRED_TEXT, EMAIL, BOOLEAN, READ_ONLY }
+    public enum Type { TEXT, REQUIRED_TEXT, EMAIL, BOOLEAN, TEXT_LIST, READ_ONLY }
 
     private final String key;
     private final Map<String, Type> fields;
