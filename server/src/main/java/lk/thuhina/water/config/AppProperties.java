@@ -10,7 +10,12 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * Secrets (JWT secret, admin temporary password) come only from the environment, never from Git.
  */
 @ConfigurationProperties(prefix = "app")
-public record AppProperties(Jwt jwt, Cookie cookie, @DefaultValue Login login, @DefaultValue Bootstrap bootstrap) {
+public record AppProperties(Jwt jwt, Cookie cookie, @DefaultValue Login login, @DefaultValue Bootstrap bootstrap,
+                            @DefaultValue Storage storage) {
+
+    /** Folder for stored files such as the company logo (FILES_DIR; {@code /data/files} in Docker). */
+    public record Storage(@DefaultValue("data/files") String dir) {
+    }
 
     /** JWT signing secret (at least 32 characters) and lifetime – 12 hours = one working day (design 8.1). */
     public record Jwt(String secret, @DefaultValue("12h") Duration ttl) {

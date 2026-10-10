@@ -134,7 +134,7 @@ export const ROUTES: RouteInfo[] = [
     path: "/admin",
     module: "Administration",
     title: "Administration",
-    description: "Users, roles and audit log",
+    description: "Users, roles, audit log and company details",
     buildModule: "M01",
   },
 ];

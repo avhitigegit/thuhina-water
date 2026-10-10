@@ -7,7 +7,7 @@ One repository for the whole project.
 | `server/` | Spring Boot API – Java 21, Gradle, PostgreSQL, Flyway |
 | `client/` | Next.js web app – TypeScript, Tailwind, TanStack Query (see `client/README.md`) |
 | `deploy/` | `docker-compose.yml`, `nginx.conf`, `.env.example` |
-| `doc/` | BRD, System Architecture & Design, Tech Stack, **Master Task Breakdown** (build plan and progress) |
+| `doc/` | BRD, System Architecture & Design, Tech Stack, **Master Task Breakdown** (build plan and progress) – kept on the project owner's computer, not in this repository (ignored by Git) |
 | `prototype/` | Approved clickable prototype – the UI and business-rule reference |
 | `.github/` | CI workflows and the pull request template |
 

@@ -10,6 +10,7 @@ import lk.thuhina.water.security.Role;
 import lk.thuhina.water.security.RolePermissions;
 import lk.thuhina.water.security.dto.MeResponse.MenuItem;
 import lk.thuhina.water.security.dto.MeResponse.MenuModule;
+import lk.thuhina.water.security.dto.RolesMatrixResponse;
 import lk.thuhina.water.settings.service.SettingsService;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +27,19 @@ public class MenuService {
 
     private record Page(String key, String title, String path, String viewPermission, String editPermission) {
     }
+
+    /** Access level of a role on a page or right (Roles &amp; access tab). */
+    public enum Level { FULL, VIEW, NONE }
+
+    /** A right that is not a page of its own (design 8.2 rows "Customer agreed prices", "Approve sale over credit limit"). */
+    private record Right(String title, String viewPermission, String editPermission) {
+    }
+
+    private static final List<Right> EXTRA_RIGHTS = List.of(
+            new Right("Customer agreed prices", CUSTOMER_PRICES_VIEW, CUSTOMER_PRICES_EDIT),
+            new Right("Approve sale over credit limit", SALES_APPROVE_OVER_LIMIT, null));
+
+    private static final String REPORTS_ACCOUNTANT = "Sales, Purchasing, Outstanding & aging, Profit, Expenses";
 
     private record Module(String module, String icon, String feature, List<Page> pages) {
     }
@@ -82,5 +96,69 @@ public class MenuService {
             }
         }
         return result;
+    }
+
+    /**
+     * Roles &amp; access tab (M01, design 8.2): every menu page and the special rights × the three roles,
+     * from the same menu and permission map as the sidebar and the endpoint checks.
+     */
+    public RolesMatrixResponse rolesMatrix() {
+        List<Role> roles = List.of(Role.values());
+        List<RolesMatrixResponse.Row> rows = new ArrayList<>();
+        for (Module m : MENU) {
+            for (Page p : m.pages()) {
+                String area = m.pages().size() > 1 ? m.module() + " › " + p.title() : p.title();
+                rows.add(new RolesMatrixResponse.Row(area, roles.stream()
+                        .map(r -> cell(r, p.viewPermission(), p.editPermission(), note(m, p, r)))
+                        .toList()));
+            }
+        }
+        for (Right right : EXTRA_RIGHTS) {
+            rows.add(new RolesMatrixResponse.Row(right.title(), roles.stream()
+                    .map(r -> cell(r, right.viewPermission(), right.editPermission(), null))
+                    .toList()));
+        }
+        return new RolesMatrixResponse(
+                roles.stream().map(r -> new RolesMatrixResponse.RoleColumn(r.name(), r.label())).toList(), rows);
+    }
+
+    /**
+     * FULL / VIEW / NONE as in design 8.2: no view permission → none; edit permission missing → view.
+     * Pages that have no edit permission at all (Dashboard, Daily Delivery List, Reports) are read-only screens:
+     * the Admin is shown as full, the other roles as view (8.2 "View", "View + print").
+     */
+    public static Level level(Role role, String viewPermission, String editPermission) {
+        Set<String> perms = RolePermissions.of(role);
+        if (!perms.contains(viewPermission)) {
+            return Level.NONE;
+        }
+        if (editPermission == null) {
+            return role == Role.ADMIN ? Level.FULL : Level.VIEW;
+        }
+        return perms.contains(editPermission) ? Level.FULL : Level.VIEW;
+    }
+
+    private static RolesMatrixResponse.Cell cell(Role role, String view, String edit, String note) {
+        Level level = level(role, view, edit);
+        return new RolesMatrixResponse.Cell(level.name(), level == Level.NONE ? null : note);
+    }
+
+    /** Extra words in a cell where design 8.2 has them. */
+    private static String note(Module m, Page p, Role role) {
+        Set<String> perms = RolePermissions.of(role);
+        if (p.viewPermission().equals(REPORTS_VIEW)) {
+            return perms.contains(REPORTS_ALL) ? "All 10 reports" : REPORTS_ACCOUNTANT;
+        }
+        if (p.viewPermission().equals(DELIVERY_LIST_VIEW) && !perms.contains(DELIVERY_PLANNING_VIEW)) {
+            return "View + print";
+        }
+        if (p.editPermission() != null && !perms.contains(p.editPermission())
+                && p.viewPermission().equals(QUOTATIONS_VIEW)) {
+            return "View + print";
+        }
+        if (m.feature() != null) {
+            return "When switched on";
+        }
+        return null;
     }
 }

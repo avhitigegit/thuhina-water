@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edit name, username, role and phone */
+        put: operations["update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/{group}": {
         parameters: {
             query?: never;
@@ -13,10 +30,98 @@ export interface paths {
         };
         /** Read a settings group: company, business or features */
         get: operations["get"];
-        /** Change some keys of a settings group; returns the whole group */
-        put: operations["update"];
+        /** Change some keys of a settings group; returns the whole group. The company logo has its own upload */
+        put: operations["update_1"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All users, active first, then by name */
+        get: operations["list"];
+        put?: never;
+        /** Create a user with a temporary password (changed at the first login) */
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Issue a new temporary password – returned only in this response */
+        post: operations["resetPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deactivate a user (logs them out at once; not your own account) */
+        post: operations["deactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/users/{id}/activate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Activate a user */
+        post: operations["activate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/company/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The company logo image (any logged-in user – it appears on printed documents) */
+        get: operations["logoImage"];
+        put?: never;
+        /** Upload the company logo (PNG or JPG, at most 1 MB); returns the company settings */
+        post: operations["uploadLogo"];
+        /** Remove the company logo; returns the company settings */
+        delete: operations["removeLogo"];
         options?: never;
         head?: never;
         patch?: never;
@@ -73,6 +178,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/roles/matrix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Menu pages and special rights × roles → FULL / VIEW / NONE */
+        get: operations["matrix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/me": {
         parameters: {
             query?: never;
@@ -90,10 +212,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Search the audit log, newest first. Dates are business dates (ISO); 'to' includes the whole day */
+        get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/audit-log/filters": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Users, actions and record types for the filter drop-downs */
+        get: operations["filters"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        UpdateUserRequest: {
+            fullName: string;
+            username: string;
+            /** @enum {string} */
+            role: "ADMIN" | "ACCOUNTANT" | "DELIVERY_STAFF";
+            phone?: string;
+            /** Format: int64 */
+            version?: number;
+        };
+        UserResponse: {
+            /** Format: int64 */
+            id: number;
+            username: string;
+            fullName: string;
+            phone: string | null;
+            role: string;
+            roleName: string;
+            active: boolean;
+            mustChangePassword: boolean;
+            /** Format: date-time */
+            lastLoginAt: string | null;
+            /** Format: int64 */
+            version: number;
+        };
         JsonNode: {
             /** @enum {string} */
             nodeType: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
@@ -121,6 +301,18 @@ export interface components {
             float: boolean;
             number: boolean;
             embeddedValue: boolean;
+        };
+        CreateUserRequest: {
+            fullName: string;
+            username: string;
+            /** @enum {string} */
+            role: "ADMIN" | "ACCOUNTANT" | "DELIVERY_STAFF";
+            phone?: string;
+            temporaryPassword: string;
+        };
+        ResetPasswordResponse: {
+            user: components["schemas"]["UserResponse"];
+            temporaryPassword: string;
         };
         LoginRequest: {
             username: string;
@@ -158,6 +350,55 @@ export interface components {
             currentPassword: string;
             newPassword: string;
         };
+        Cell: {
+            level: string;
+            note: string | null;
+        };
+        RoleColumn: {
+            role: string;
+            roleName: string;
+        };
+        RolesMatrixResponse: {
+            roles: components["schemas"]["RoleColumn"][];
+            rows: components["schemas"]["Row"][];
+        };
+        Row: {
+            area: string;
+            access: components["schemas"]["Cell"][];
+        };
+        AuditEntryResponse: {
+            /** Format: int64 */
+            id: number;
+            /** Format: date-time */
+            ts: string;
+            username: string | null;
+            /** @description The user's full name, when the user still exists */
+            fullName: string | null;
+            role: string | null;
+            roleName: string | null;
+            action: string;
+            entity: string;
+            ref: string | null;
+            details: string | null;
+        };
+        PageResponseAuditEntryResponse: {
+            items: components["schemas"]["AuditEntryResponse"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            total: number;
+        };
+        AuditFilterOptions: {
+            users: components["schemas"]["UserOption"][];
+            actions: string[];
+            entities: string[];
+        };
+        UserOption: {
+            username: string;
+            fullName: string | null;
+        };
     };
     responses: never;
     parameters: never;
@@ -167,6 +408,32 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
     get: {
         parameters: {
             query?: never;
@@ -189,7 +456,7 @@ export interface operations {
             };
         };
     };
-    update: {
+    update_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -203,6 +470,183 @@ export interface operations {
                 "application/json": components["schemas"]["JsonNode"];
             };
         };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["JsonNode"];
+                };
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"][];
+                };
+            };
+        };
+    };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    resetPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ResetPasswordResponse"];
+                };
+            };
+        };
+    };
+    deactivate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    activate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["UserResponse"];
+                };
+            };
+        };
+    };
+    logoImage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
+    uploadLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["JsonNode"];
+                };
+            };
+        };
+    };
+    removeLogo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description OK */
             200: {
@@ -281,6 +725,26 @@ export interface operations {
             };
         };
     };
+    matrix: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RolesMatrixResponse"];
+                };
+            };
+        };
+    };
     me: {
         parameters: {
             query?: never;
@@ -297,6 +761,55 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["MeResponse"];
+                };
+            };
+        };
+    };
+    search: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                user?: string;
+                action?: "CREATE" | "UPDATE" | "APPROVE" | "REVERSE" | "IMPORT" | "LOGIN" | "LOGOUT";
+                entity?: string;
+                q?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageResponseAuditEntryResponse"];
+                };
+            };
+        };
+    };
+    filters: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AuditFilterOptions"];
                 };
             };
         };

@@ -11,10 +11,13 @@ import java.util.Optional;
  */
 public enum SettingsGroup {
 
-    /** Company details printed on bills, invoices, receipts and other documents. */
+    /**
+     * Company details printed on bills, invoices, receipts and other documents. {@code logo} is the stored file's key,
+     * set only by the logo upload ({@code POST /settings/company/logo}).
+     */
     COMPANY("company", fields(
-            "name", Type.TEXT, "address", Type.TEXT, "phone", Type.TEXT,
-            "email", Type.TEXT, "regNo", Type.TEXT, "logo", Type.TEXT)),
+            "name", Type.REQUIRED_TEXT, "address", Type.TEXT, "phone", Type.TEXT,
+            "email", Type.EMAIL, "regNo", Type.TEXT, "logo", Type.READ_ONLY)),
 
     /** General business settings. */
     BUSINESS("business", fields(
@@ -24,7 +27,8 @@ public enum SettingsGroup {
     FEATURES("features", fields(
             "dataMigration", Type.BOOLEAN));
 
-    public enum Type { TEXT, BOOLEAN }
+    /** {@code READ_ONLY} keys are shown but cannot be changed through {@code PUT /settings/{group}}. */
+    public enum Type { TEXT, REQUIRED_TEXT, EMAIL, BOOLEAN, READ_ONLY }
 
     private final String key;
     private final Map<String, Type> fields;

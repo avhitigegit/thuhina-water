@@ -179,6 +179,12 @@
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
+  .center {
+    text-align: center;
+  }
+  .nowrap {
+    white-space: nowrap;
+  }
 
   /* Shell */
   .shell {
@@ -516,6 +522,9 @@
   td.actions {
     white-space: nowrap;
     text-align: right;
+  }
+  td.actions .btn + .btn {
+    margin-left: 4px;
   }
   .empty-state {
     text-align: center;
