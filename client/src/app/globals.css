@@ -591,6 +591,22 @@
   .form-grid .full {
     grid-column: 1 / -1;
   }
+  /* Tick-box chips (prototype .chips), e.g. the items a supplier supplies */
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chips label {
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 3px 10px;
+    font-size: 12.5px;
+    cursor: pointer;
+    display: flex;
+    gap: 5px;
+    align-items: center;
+  }
   .field {
     display: flex;
     flex-direction: column;

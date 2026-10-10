@@ -6,11 +6,11 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 
 import lk.thuhina.water.audit.model.AuditAction;
 import lk.thuhina.water.audit.service.AuditService;
 import lk.thuhina.water.common.NotFoundException;
+import lk.thuhina.water.common.Texts;
 import lk.thuhina.water.common.ValidationException;
 import lk.thuhina.water.security.CurrentUser;
 import lk.thuhina.water.settings.model.AppSetting;
@@ -26,7 +26,6 @@ import tools.jackson.databind.node.ObjectNode;
 public class SettingsService {
 
     private static final int MAX_TEXT = 300;
-    private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
     private final AppSettingRepository repository;
     private final AuditService audit;
@@ -136,8 +135,8 @@ public class SettingsService {
                 if (type == SettingsGroup.Type.REQUIRED_TEXT && text.isEmpty()) {
                     yield "Required.";
                 }
-                if (type == SettingsGroup.Type.EMAIL && !text.isEmpty() && !EMAIL.matcher(text).matches()) {
-                    yield "Enter a valid email address.";
+                if (type == SettingsGroup.Type.EMAIL && !Texts.isEmailOrEmpty(text)) {
+                    yield Texts.MSG_EMAIL;
                 }
                 yield null;
             }

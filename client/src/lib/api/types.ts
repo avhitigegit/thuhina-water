@@ -63,3 +63,11 @@ export type PriceMatrix = Omit<Schemas["PriceMatrixResponse"], "water" | "deposi
 };
 export type PriceHistoryRow = Schemas["PriceHistoryRow"];
 export type SetPriceRequest = Schemas["SetPriceRequest"];
+
+// Suppliers & factories (M03)
+export type Supplier = Schemas["SupplierResponse"];
+export type SuppliedItem = Schemas["SuppliedItem"];
+export type SupplierRequest = Schemas["SupplierRequest"];
+export type Factory = Schemas["FactoryResponse"];
+export type FactoryChargeView = Schemas["FactoryChargeView"];
+export type FactoryRequest = Schemas["FactoryRequest"];
