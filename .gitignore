@@ -26,3 +26,6 @@ Thumbs.db
 
 # Local tool settings
 .claude/settings.local.json
+
+# Personal notes (not part of the project)
+/input

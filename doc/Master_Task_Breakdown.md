@@ -163,7 +163,7 @@ M05 – Customers (SERVER)   Tasks: S1–S9
 
 | Module | Branch(es) | Status | Started | Merged to dev | Release tag | Comments |
 |---|---|---|---|---|---|---|
-| M00 Foundation | `feature/M00-foundation-server` / `-client` | ◐ In progress – SERVER merged to dev (PR #2); CLIENT part done, PR to dev next | 09/10/2026 | SERVER 09/10/2026 | | Server: 51 tests green (D15 Spring Boot 4.1). Client: 22 tests green, lint / type-check / build clean; full `docker compose up` checked (D19–D22) |
+| M00 Foundation | `feature/M00-foundation-server` / `-client` | ◐ In progress – SERVER merged to dev (PR #2); CLIENT merged to dev (PR #3); format fix PR next | 09/10/2026 | SERVER 09/10/2026 | | Server: 51 tests green (D15 Spring Boot 4.1). Client: 22 tests green, lint / type-check / build clean; full `docker compose up` checked (D19–D22) |
 | M01 Administration | `feature/M01-administration` | ☐ To do | | | | |
 | M02 Master data | `feature/M02-master-data` | ☐ To do | | | | |
 | M03 Suppliers & factories | `feature/M03-suppliers-factories` | ☐ To do | | | | |
@@ -293,6 +293,7 @@ Admin = full. Accountant = Dashboard, Billing (full), Reports (Sales, Purchasing
 | 09/10/2026 | Amritha / Claude | Checked with the full `docker compose up` (db, api, web, nginx) on `http://localhost`: login page; wrong-password message; `/admin` → login → back to `/admin`; Admin full sidebar; calendar on `/ui-check`; Accountant and Delivery Staff menus and 403 on admin APIs; deactivated user refused; temporary password → change forced (server 403 until changed, then landing page). |
 | 09/10/2026 | Amritha / Claude | Small server change in this branch: `/auth/me` menu modules have a `group` flag (D20); menu test updated – 51 server tests still green. `server/gradlew` marked executable in Git. |
 | 09/10/2026 | Amritha / Claude | After the CLIENT PR is merged: add the required check `Client build & tests` to `main` and `dev`, tick the last acceptance item, set M00 to ☑. `npm audit`: 0 issues in the app packages; 5 "high" only in the ESLint tooling (development only, not in the built app). |
+| 10/10/2026 | Amritha / Claude | CLIENT part merged to `dev` (PR #3, squash). The check `Client build & tests` was red: the Prettier format check failed on `client/README.md` (table spacing), so tests and build did not run in CI. Fixed on `fix/M00-client-format`; all client CI steps pass locally. The `main` and `dev` rulesets were found **disabled** with no target branch and no required checks, which is why the red PR could be merged – to be switched on with both checks required. |
 
 ---
 
