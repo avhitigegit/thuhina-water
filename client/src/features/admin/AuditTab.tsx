@@ -9,18 +9,11 @@ import { DataTable, type Column } from "@/components/shared/DataTable";
 import { DateField } from "@/components/shared/DateField";
 import { Badge } from "@/components/shared/StatusBadge";
 import type { AuditEntry } from "@/lib/api/types";
-import { formatDateTime, todayIso } from "@/lib/format";
+import { addDaysIso, formatDateTime, todayIso } from "@/lib/format";
 import { useAuditFilters, useAuditLog } from "./api";
 import { actionBadgeKind, actionLabel } from "./labels";
 
 const PAGE_SIZE = 50;
-
-/** ISO date `days` before the ISO date `iso`. */
-export function isoMinusDays(iso: string, days: number): string {
-  const [y, m, d] = iso.split("-").map(Number);
-  const date = new Date(Date.UTC(y, m - 1, d - days));
-  return date.toISOString().slice(0, 10);
-}
 
 function useDebounced<T>(value: T, ms: number): T {
   const [v, setV] = useState(value);
@@ -66,7 +59,7 @@ const columns: Column<AuditEntry>[] = [
 
 export function AuditTab() {
   const today = todayIso();
-  const [from, setFrom] = useState<string | null>(isoMinusDays(today, 7));
+  const [from, setFrom] = useState<string | null>(addDaysIso(today, -7));
   const [to, setTo] = useState<string | null>(today);
   const [user, setUser] = useState("");
   const [action, setAction] = useState("");

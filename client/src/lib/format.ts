@@ -35,6 +35,12 @@ export function todayIso(now: Date = new Date()): string {
   }).format(now);
 }
 
+/** ISO date plus (or minus) whole days: addDaysIso("2026-10-05", -7) → "2026-09-28". */
+export function addDaysIso(iso: string, days: number): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
 /** "2026-10-05" (or a timestamp starting with it) → "05/10/2026"; empty for no value. */
 export function formatDate(iso: string | null | undefined): string {
   if (!iso) return "";

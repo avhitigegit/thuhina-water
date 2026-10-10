@@ -114,6 +114,17 @@ public class SettingsService {
         return switch (type) {
             case READ_ONLY -> "This setting cannot be changed here.";
             case BOOLEAN -> v.isBoolean() ? null : "Must be true or false.";
+            case TEXT_LIST -> {
+                if (!v.isArray()) {
+                    yield "Must be a list of texts.";
+                }
+                for (JsonNode item : v) {
+                    if (!item.isString() || item.asString().length() > MAX_TEXT) {
+                        yield "Must be a list of texts.";
+                    }
+                }
+                yield null;
+            }
             case TEXT, REQUIRED_TEXT, EMAIL -> {
                 if (!(v.isNull() || v.isString())) {
                     yield "Must be text.";

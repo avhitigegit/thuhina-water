@@ -39,6 +39,91 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change name, prices or active – not the stock */
+        put: operations["update_2"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/old-bottle-brands/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Stop accepting / accept again, or change the note or bottle type */
+        put: operations["update_3"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-types/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change the description or active – the name cannot change */
+        put: operations["updateCustomerType"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bottle-types/{code}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change the name or active – the size cannot change */
+        put: operations["update_4"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/areas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Rename an area or change active */
+        put: operations["updateArea"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users": {
         parameters: {
             query?: never;
@@ -127,6 +212,95 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/products": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All products by code */
+        get: operations["list_1"];
+        put?: never;
+        /** New product – code P01… on save; opening stock only here */
+        post: operations["create_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change a price from a date (today or later) with a reason – a new entry; history is kept */
+        post: operations["setPrice"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/old-bottle-brands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Accepted brands, active first */
+        get: operations["list_2"];
+        put?: never;
+        /** Add an accepted brand for a bottle type */
+        post: operations["create_2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer types in the order they were added */
+        get: operations["customerTypes"];
+        put?: never;
+        /** New customer type (unique name) */
+        post: operations["createCustomerType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/bottle-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bottle types, largest first; activeOnly=true for the pick lists of sales and purchasing */
+        get: operations["list_3"];
+        put?: never;
+        /** New bottle type – the code is made from the size (19 → B19) */
+        post: operations["create_3"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/logout": {
         parameters: {
             query?: never;
@@ -178,6 +352,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/areas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Areas (delivery routes) by name */
+        get: operations["areas"];
+        put?: never;
+        /** New area (unique name) */
+        post: operations["createArea"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/roles/matrix": {
         parameters: {
             query?: never;
@@ -187,6 +379,40 @@ export interface paths {
         };
         /** Menu pages and special rights × roles → FULL / VIEW / NONE */
         get: operations["matrix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/prices/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every price entry, newest first, marked Current / Scheduled / Old */
+        get: operations["history"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/prices/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Water price grid and deposits on a date (default today), with the next scheduled change */
+        get: operations["current"];
         put?: never;
         post?: never;
         delete?: never;
@@ -302,6 +528,95 @@ export interface components {
             number: boolean;
             embeddedValue: boolean;
         };
+        UpdateProductRequest: {
+            name: string;
+            sellingPrice: number;
+            costPrice?: number;
+            active?: boolean;
+            /** Format: int64 */
+            version?: number;
+        };
+        ProductResponse: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            sellingPrice: number;
+            costPrice: number | null;
+            /** Format: int32 */
+            stockQty: number;
+            active: boolean;
+            /** Format: int64 */
+            version: number;
+        };
+        UpdateOldBottleBrandRequest: {
+            bottleTypeCode: string;
+            note?: string;
+            active?: boolean;
+            /** Format: int64 */
+            version?: number;
+        };
+        OldBottleBrandResponse: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            bottleTypeCode: string;
+            bottleTypeName: string;
+            note: string | null;
+            active: boolean;
+            /** Format: date */
+            addedOn: string;
+            /** Format: int32 */
+            takenIn: number | null;
+            /** Format: int64 */
+            version: number;
+        };
+        UpdateCustomerTypeRequest: {
+            description: string;
+            active: boolean;
+            /** Format: int64 */
+            version: number;
+        };
+        CustomerTypeResponse: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            description: string | null;
+            active: boolean;
+            /** Format: int64 */
+            version: number;
+        };
+        UpdateBottleTypeRequest: {
+            name: string;
+            active?: boolean;
+            /** Format: int64 */
+            version?: number;
+        };
+        BottleTypeResponse: {
+            code: string;
+            name: string;
+            litres: number;
+            active: boolean;
+            deposit: number | null;
+            /** Format: int32 */
+            inCirculation: number | null;
+            /** Format: int64 */
+            version: number;
+        };
+        AreaRequest: {
+            name: string;
+            active?: boolean;
+            /** Format: int64 */
+            version?: number;
+        };
+        AreaResponse: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            active: boolean;
+            /** Format: int64 */
+            version: number;
+        };
         CreateUserRequest: {
             fullName: string;
             username: string;
@@ -313,6 +628,57 @@ export interface components {
         ResetPasswordResponse: {
             user: components["schemas"]["UserResponse"];
             temporaryPassword: string;
+        };
+        CreateProductRequest: {
+            name: string;
+            sellingPrice: number;
+            costPrice?: number;
+            /** Format: int32 */
+            openingStock?: number;
+            active?: boolean;
+        };
+        SetPriceRequest: {
+            /** @enum {string} */
+            kind: "WATER" | "DEPOSIT";
+            bottleTypeCode: string;
+            /** Format: int64 */
+            customerTypeId?: number;
+            price: number;
+            /** Format: date */
+            effectiveFrom: string;
+            reason: string;
+        };
+        PriceHistoryRow: {
+            /** Format: int64 */
+            id: number;
+            kind: string;
+            bottleTypeCode: string;
+            /** Format: int64 */
+            customerTypeId: number | null;
+            label: string;
+            price: number;
+            /** Format: date */
+            effectiveFrom: string;
+            reason: string;
+            createdBy: string;
+            createdByName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            status: string;
+        };
+        CreateOldBottleBrandRequest: {
+            name: string;
+            bottleTypeCode: string;
+            note?: string;
+        };
+        CreateCustomerTypeRequest: {
+            name: string;
+            description?: string;
+        };
+        CreateBottleTypeRequest: {
+            name: string;
+            litres: number;
+            active?: boolean;
         };
         LoginRequest: {
             username: string;
@@ -365,6 +731,40 @@ export interface components {
         Row: {
             area: string;
             access: components["schemas"]["Cell"][];
+        };
+        PriceBottle: {
+            code: string;
+            name: string;
+        };
+        PriceCell: {
+            key: string;
+            kind: string;
+            bottleTypeCode: string;
+            /** Format: int64 */
+            customerTypeId: number | null;
+            current: components["schemas"]["PriceValue"];
+            next: components["schemas"]["PriceValue"];
+            confirmed: boolean;
+        };
+        PriceCustomerType: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+        };
+        PriceMatrixResponse: {
+            /** Format: date */
+            date: string;
+            bottleTypes: components["schemas"]["PriceBottle"][];
+            customerTypes: components["schemas"]["PriceCustomerType"][];
+            water: components["schemas"]["PriceCell"][];
+            deposits: components["schemas"]["PriceCell"][];
+        };
+        PriceValue: {
+            /** Format: int64 */
+            entryId: number;
+            price: number;
+            /** Format: date */
+            effectiveFrom: string;
         };
         AuditEntryResponse: {
             /** Format: int64 */
@@ -478,6 +878,136 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["JsonNode"];
+                };
+            };
+        };
+    };
+    update_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProductRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductResponse"];
+                };
+            };
+        };
+    };
+    update_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateOldBottleBrandRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OldBottleBrandResponse"];
+                };
+            };
+        };
+    };
+    updateCustomerType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateCustomerTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomerTypeResponse"];
+                };
+            };
+        };
+    };
+    update_4: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                code: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBottleTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["BottleTypeResponse"];
+                };
+            };
+        };
+    };
+    updateArea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AreaRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AreaResponse"];
                 };
             };
         };
@@ -659,6 +1189,208 @@ export interface operations {
             };
         };
     };
+    list_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductResponse"][];
+                };
+            };
+        };
+    };
+    create_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProductRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductResponse"];
+                };
+            };
+        };
+    };
+    setPrice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetPriceRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PriceHistoryRow"];
+                };
+            };
+        };
+    };
+    list_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OldBottleBrandResponse"][];
+                };
+            };
+        };
+    };
+    create_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOldBottleBrandRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OldBottleBrandResponse"];
+                };
+            };
+        };
+    };
+    customerTypes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomerTypeResponse"][];
+                };
+            };
+        };
+    };
+    createCustomerType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateCustomerTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomerTypeResponse"];
+                };
+            };
+        };
+    };
+    list_3: {
+        parameters: {
+            query?: {
+                activeOnly?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["BottleTypeResponse"][];
+                };
+            };
+        };
+    };
+    create_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateBottleTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["BottleTypeResponse"];
+                };
+            };
+        };
+    };
     logout: {
         parameters: {
             query?: never;
@@ -725,6 +1457,50 @@ export interface operations {
             };
         };
     };
+    areas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AreaResponse"][];
+                };
+            };
+        };
+    };
+    createArea: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AreaRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AreaResponse"];
+                };
+            };
+        };
+    };
     matrix: {
         parameters: {
             query?: never;
@@ -741,6 +1517,48 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RolesMatrixResponse"];
+                };
+            };
+        };
+    };
+    history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PriceHistoryRow"][];
+                };
+            };
+        };
+    };
+    current: {
+        parameters: {
+            query?: {
+                date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PriceMatrixResponse"];
                 };
             };
         };
