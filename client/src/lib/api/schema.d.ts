@@ -21,6 +21,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/suppliers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change a supplier */
+        put: operations["update_1"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/{group}": {
         parameters: {
             query?: never;
@@ -31,7 +48,7 @@ export interface paths {
         /** Read a settings group: company, business or features */
         get: operations["get"];
         /** Change some keys of a settings group; returns the whole group. The company logo has its own upload */
-        put: operations["update_1"];
+        put: operations["update_2"];
         post?: never;
         delete?: never;
         options?: never;
@@ -48,7 +65,7 @@ export interface paths {
         };
         get?: never;
         /** Change name, prices or active – not the stock */
-        put: operations["update_2"];
+        put: operations["update_3"];
         post?: never;
         delete?: never;
         options?: never;
@@ -65,7 +82,24 @@ export interface paths {
         };
         get?: never;
         /** Stop accepting / accept again, or change the note or bottle type */
-        put: operations["update_3"];
+        put: operations["update_4"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/factories/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change a factory; a changed charge is saved from today and applies to batches sent after saving */
+        put: operations["update_5"];
         post?: never;
         delete?: never;
         options?: never;
@@ -99,7 +133,7 @@ export interface paths {
         };
         get?: never;
         /** Change the name or active – the size cannot change */
-        put: operations["update_4"];
+        put: operations["update_6"];
         post?: never;
         delete?: never;
         options?: never;
@@ -193,6 +227,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All suppliers by code; with item=B20 (or a product code) only the active suppliers of that item */
+        get: operations["list_1"];
+        put?: never;
+        /** New supplier – code S01… on save; at least one supplied item; terms 0/7/14/30/45/60 days */
+        post: operations["create_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/company/logo": {
         parameters: {
             query?: never;
@@ -220,10 +272,10 @@ export interface paths {
             cookie?: never;
         };
         /** All products by code */
-        get: operations["list_1"];
+        get: operations["list_2"];
         put?: never;
         /** New product – code P01… on save; opening stock only here */
-        post: operations["create_1"];
+        post: operations["create_2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -255,10 +307,28 @@ export interface paths {
             cookie?: never;
         };
         /** Accepted brands, active first */
-        get: operations["list_2"];
+        get: operations["list_3"];
         put?: never;
         /** Add an accepted brand for a bottle type */
-        post: operations["create_2"];
+        post: operations["create_3"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/factories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All factories by code, with today's charge per active bottle type */
+        get: operations["list_4"];
+        put?: never;
+        /** New factory – code F01… on save; a charge > 0 for every active bottle type */
+        post: operations["create_4"];
         delete?: never;
         options?: never;
         head?: never;
@@ -291,10 +361,10 @@ export interface paths {
             cookie?: never;
         };
         /** Bottle types, largest first; activeOnly=true for the pick lists of sales and purchasing */
-        get: operations["list_3"];
+        get: operations["list_5"];
         put?: never;
         /** New bottle type – the code is made from the size (19 → B19) */
-        post: operations["create_3"];
+        post: operations["create_5"];
         delete?: never;
         options?: never;
         head?: never;
@@ -421,6 +491,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/factories/{id}/charges": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A factory's charge history, newest first */
+        get: operations["charges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/me": {
         parameters: {
             query?: never;
@@ -500,6 +587,42 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        SupplierRequest: {
+            name: string;
+            contact?: string;
+            phone: string;
+            email?: string;
+            address?: string;
+            /** Format: int32 */
+            termsDays?: number;
+            items?: string[];
+            active?: boolean;
+            /** Format: int64 */
+            version?: number;
+        };
+        SuppliedItem: {
+            code: string;
+            type: string;
+            name: string;
+        };
+        SupplierResponse: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            contact: string | null;
+            phone: string;
+            email: string | null;
+            address: string | null;
+            /** Format: int32 */
+            termsDays: number;
+            termsLabel: string;
+            items: components["schemas"]["SuppliedItem"][];
+            owed: number | null;
+            active: boolean;
+            /** Format: int64 */
+            version: number;
+        };
         JsonNode: {
             /** @enum {string} */
             nodeType: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
@@ -568,6 +691,50 @@ export interface components {
             addedOn: string;
             /** Format: int32 */
             takenIn: number | null;
+            /** Format: int64 */
+            version: number;
+        };
+        FactoryRequest: {
+            name: string;
+            address?: string;
+            contact?: string;
+            phone?: string;
+            email?: string;
+            licence?: string;
+            /** Format: int32 */
+            termsDays?: number;
+            charges?: {
+                [key: string]: number;
+            };
+            active?: boolean;
+            /** Format: int64 */
+            version?: number;
+        };
+        FactoryChargeView: {
+            bottleTypeCode: string;
+            bottleLabel: string;
+            charge: number;
+            /** Format: date */
+            effectiveFrom: string;
+        };
+        FactoryResponse: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            address: string | null;
+            contact: string | null;
+            phone: string | null;
+            email: string | null;
+            licence: string | null;
+            /** Format: int32 */
+            termsDays: number;
+            termsLabel: string;
+            charges: components["schemas"]["FactoryChargeView"][];
+            /** Format: int32 */
+            atFactory: number | null;
+            owed: number | null;
+            active: boolean;
             /** Format: int64 */
             version: number;
         };
@@ -766,6 +933,18 @@ export interface components {
             /** Format: date */
             effectiveFrom: string;
         };
+        FactoryChargeHistoryRow: {
+            /** Format: int64 */
+            id: number;
+            bottleTypeCode: string;
+            charge: number;
+            /** Format: date */
+            effectiveFrom: string;
+            createdBy: string;
+            /** Format: date-time */
+            createdAt: string;
+            current: boolean;
+        };
         AuditEntryResponse: {
             /** Format: int64 */
             id: number;
@@ -834,6 +1013,32 @@ export interface operations {
             };
         };
     };
+    update_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SupplierResponse"];
+                };
+            };
+        };
+    };
     get: {
         parameters: {
             query?: never;
@@ -856,7 +1061,7 @@ export interface operations {
             };
         };
     };
-    update_1: {
+    update_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -882,7 +1087,7 @@ export interface operations {
             };
         };
     };
-    update_2: {
+    update_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -908,7 +1113,7 @@ export interface operations {
             };
         };
     };
-    update_3: {
+    update_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -930,6 +1135,32 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["OldBottleBrandResponse"];
+                };
+            };
+        };
+    };
+    update_5: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactoryRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FactoryResponse"];
                 };
             };
         };
@@ -960,7 +1191,7 @@ export interface operations {
             };
         };
     };
-    update_4: {
+    update_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -1122,6 +1353,52 @@ export interface operations {
             };
         };
     };
+    list_1: {
+        parameters: {
+            query?: {
+                item?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SupplierResponse"][];
+                };
+            };
+        };
+    };
+    create_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SupplierRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SupplierResponse"];
+                };
+            };
+        };
+    };
     logoImage: {
         parameters: {
             query?: never;
@@ -1189,7 +1466,7 @@ export interface operations {
             };
         };
     };
-    list_1: {
+    list_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -1209,7 +1486,7 @@ export interface operations {
             };
         };
     };
-    create_1: {
+    create_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -1257,7 +1534,7 @@ export interface operations {
             };
         };
     };
-    list_2: {
+    list_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -1277,7 +1554,7 @@ export interface operations {
             };
         };
     };
-    create_2: {
+    create_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -1297,6 +1574,50 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["OldBottleBrandResponse"];
+                };
+            };
+        };
+    };
+    list_4: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FactoryResponse"][];
+                };
+            };
+        };
+    };
+    create_4: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactoryRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FactoryResponse"];
                 };
             };
         };
@@ -1345,7 +1666,7 @@ export interface operations {
             };
         };
     };
-    list_3: {
+    list_5: {
         parameters: {
             query?: {
                 activeOnly?: boolean;
@@ -1367,7 +1688,7 @@ export interface operations {
             };
         };
     };
-    create_3: {
+    create_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -1559,6 +1880,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PriceMatrixResponse"];
+                };
+            };
+        };
+    };
+    charges: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FactoryChargeHistoryRow"][];
                 };
             };
         };
