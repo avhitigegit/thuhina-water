@@ -25,6 +25,11 @@ spring:
   threads:
     virtual:
       enabled: true
+  # Uploads: company logo (1 MB, checked by the service), later scanned quotations (5 MB).
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
 
 server:
   port: 8080
@@ -67,6 +72,8 @@ app:
     admin-username: ${ADMIN_USERNAME:}
     admin-temp-password: ${ADMIN_TEMP_PASSWORD:}
     admin-full-name: ${ADMIN_FULL_NAME:System Administrator}
+  storage:
+    dir: ${FILES_DIR:data/files}
 
 logging:
   level:

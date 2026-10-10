@@ -7,6 +7,8 @@ app:
   bootstrap:
     admin-username: First.Admin
     admin-temp-password: Temp-Pass-123
+  storage:
+    dir: ${java.io.tmpdir}/thuhina-water-test-files
 
 logging:
   level:

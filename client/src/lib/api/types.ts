@@ -13,3 +13,28 @@ export type MenuModule = Schemas["MenuModule"];
 export type MenuItem = Schemas["MenuItem"];
 export type LoginRequest = Schemas["LoginRequest"];
 export type ChangePasswordRequest = Schemas["ChangePasswordRequest"];
+
+// Administration (M01)
+export type UserResponse = Schemas["UserResponse"];
+export type CreateUserRequest = Schemas["CreateUserRequest"];
+export type UpdateUserRequest = Schemas["UpdateUserRequest"];
+export type ResetPasswordResponse = Schemas["ResetPasswordResponse"];
+export type RoleCode = CreateUserRequest["role"];
+export type RolesMatrixResponse = Schemas["RolesMatrixResponse"];
+export type AccessCell = Schemas["Cell"];
+export type AuditEntry = Schemas["AuditEntryResponse"];
+export type AuditPage = Schemas["PageResponseAuditEntryResponse"];
+export type AuditFilterOptions = Schemas["AuditFilterOptions"];
+
+/** GET/PUT /settings/company – a JSON object on the server, so typed here (design 4.3 app_setting "company"). */
+export interface CompanySettings {
+  name: string;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  regNo: string | null;
+  /** Stored file key; set only by the logo upload. */
+  logo: string | null;
+  /** Address of the logo image (cache-safe), or null. */
+  logoUrl: string | null;
+}

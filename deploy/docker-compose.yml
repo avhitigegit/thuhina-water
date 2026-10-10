@@ -41,6 +41,10 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:-}
       ADMIN_TEMP_PASSWORD: ${ADMIN_TEMP_PASSWORD:-}
       JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx768m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError}
+      FILES_DIR: /data/files
+    # Uploaded files (company logo, later scanned quotations) – kept across restarts.
+    volumes:
+      - files-data:/data/files
     depends_on:
       db:
         condition: service_healthy
@@ -73,3 +77,4 @@ services:
 
 volumes:
   db-data:
+  files-data:

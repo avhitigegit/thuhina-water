@@ -29,3 +29,6 @@ Thumbs.db
 
 # Personal notes (not part of the project)
 /input
+
+# Project documents – kept only on this computer from M01 on (not in the repository)
+/doc/

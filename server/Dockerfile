@@ -13,7 +13,9 @@ RUN ./gradlew --no-daemon -q bootJar -x test && cp build/libs/*.jar /src/app.jar
 # ---- run stage: JRE only, non-root user
 FROM eclipse-temurin:21-jre
 WORKDIR /app
-RUN groupadd --system app && useradd --system --gid app --home /app app
+# /data/files = uploaded files (company logo …); a volume in deploy/docker-compose.yml.
+RUN groupadd --system app && useradd --system --gid app --home /app app \
+    && mkdir -p /data/files && chown app:app /data/files
 COPY --from=build /src/app.jar app.jar
 USER app
 
@@ -21,6 +23,7 @@ USER app
 # Override JAVA_OPTS in deploy/.env if the server is resized.
 ENV TZ=Asia/Colombo \
     SPRING_PROFILES_ACTIVE=prod \
+    FILES_DIR=/data/files \
     JAVA_OPTS="-Xms256m -Xmx768m -XX:+UseSerialGC -XX:+ExitOnOutOfMemoryError"
 EXPOSE 8080
 ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -Duser.timezone=Asia/Colombo -jar /app/app.jar"]

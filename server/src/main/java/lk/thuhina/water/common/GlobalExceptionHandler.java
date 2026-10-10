@@ -19,6 +19,9 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /**
@@ -70,6 +73,16 @@ public class GlobalExceptionHandler {
             MissingServletRequestParameterException.class})
     ResponseEntity<ErrorResponse> unreadable(Exception e) {
         return ResponseEntity.badRequest().body(ErrorResponse.of(ErrorCodes.VALIDATION, "The request is not valid."));
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    ResponseEntity<ErrorResponse> tooLarge(MaxUploadSizeExceededException e) {
+        return validation(Map.of("file", "The file is too large."));
+    }
+
+    @ExceptionHandler({MissingServletRequestPartException.class, MultipartException.class})
+    ResponseEntity<ErrorResponse> noFile(Exception e) {
+        return validation(Map.of("file", "Choose a file to upload."));
     }
 
     @ExceptionHandler(AccessDeniedException.class)

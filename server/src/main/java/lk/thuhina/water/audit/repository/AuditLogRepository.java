@@ -10,7 +10,7 @@ import org.springframework.data.repository.Repository;
 
 /**
  * Insert-only repository: extends the bare {@link Repository} so no update / delete methods exist.
- * The filtered audit-log query for the Administration page is added in M01.
+ * The filtered search for the Administration page is in {@code AuditQueryService} (Criteria query, read-only).
  */
 public interface AuditLogRepository extends Repository<AuditLog, Long> {
 

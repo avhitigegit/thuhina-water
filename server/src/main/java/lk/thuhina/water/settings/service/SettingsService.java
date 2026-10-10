@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 import lk.thuhina.water.audit.model.AuditAction;
 import lk.thuhina.water.audit.service.AuditService;
@@ -25,6 +26,7 @@ import tools.jackson.databind.node.ObjectNode;
 public class SettingsService {
 
     private static final int MAX_TEXT = 300;
+    private static final Pattern EMAIL = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
 
     private final AppSettingRepository repository;
     private final AuditService audit;
@@ -62,16 +64,9 @@ public class SettingsService {
         }
         Map<String, Object> errors = new LinkedHashMap<>();
         for (Map.Entry<String, JsonNode> e : changes.properties()) {
-            SettingsGroup.Type type = group.fields().get(e.getKey());
-            JsonNode v = e.getValue();
-            if (type == null) {
-                errors.put(e.getKey(), "Unknown setting.");
-            } else if (type == SettingsGroup.Type.BOOLEAN && !v.isBoolean()) {
-                errors.put(e.getKey(), "Must be true or false.");
-            } else if (type == SettingsGroup.Type.TEXT && !(v.isNull() || v.isString())) {
-                errors.put(e.getKey(), "Must be text.");
-            } else if (type == SettingsGroup.Type.TEXT && v.isString() && v.asString().length() > MAX_TEXT) {
-                errors.put(e.getKey(), "Must be at most " + MAX_TEXT + " characters.");
+            String error = check(group.fields().get(e.getKey()), e.getValue());
+            if (error != null) {
+                errors.put(e.getKey(), error);
             }
         }
         if (!errors.isEmpty()) {
@@ -94,6 +89,48 @@ public class SettingsService {
             audit.log(AuditAction.UPDATE, "Setting", group.key(), "Changed " + group.key() + " settings: " + String.join(", ", changed));
         }
         return current;
+    }
+
+    /**
+     * Sets one key without the {@code PUT} rules – for values the server manages itself, such as the company logo
+     * key written by the logo upload. Audited with {@code auditDetails}.
+     */
+    @Transactional
+    public ObjectNode setManaged(SettingsGroup group, String key, JsonNode value, String auditDetails) {
+        AppSetting row = repository.findById(group.key()).orElseGet(() -> new AppSetting(group.key(), "{}"));
+        ObjectNode current = parse(row.getValue());
+        current.set(key, value);
+        row.update(json.writeValueAsString(current), Instant.now(clock), CurrentUser.usernameOrSystem());
+        repository.save(row);
+        audit.log(AuditAction.UPDATE, "Setting", group.key(), auditDetails);
+        return current;
+    }
+
+    /** The error message for a value of this type, or null when it is fine. */
+    private static String check(SettingsGroup.Type type, JsonNode v) {
+        if (type == null) {
+            return "Unknown setting.";
+        }
+        return switch (type) {
+            case READ_ONLY -> "This setting cannot be changed here.";
+            case BOOLEAN -> v.isBoolean() ? null : "Must be true or false.";
+            case TEXT, REQUIRED_TEXT, EMAIL -> {
+                if (!(v.isNull() || v.isString())) {
+                    yield "Must be text.";
+                }
+                String text = v.isNull() ? "" : v.asString().trim();
+                if (text.length() > MAX_TEXT) {
+                    yield "Must be at most " + MAX_TEXT + " characters.";
+                }
+                if (type == SettingsGroup.Type.REQUIRED_TEXT && text.isEmpty()) {
+                    yield "Required.";
+                }
+                if (type == SettingsGroup.Type.EMAIL && !text.isEmpty() && !EMAIL.matcher(text).matches()) {
+                    yield "Enter a valid email address.";
+                }
+                yield null;
+            }
+        };
     }
 
     private ObjectNode read(SettingsGroup group) {

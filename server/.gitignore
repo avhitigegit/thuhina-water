@@ -35,3 +35,6 @@ out/
 
 ### VS Code ###
 .vscode/
+
+### Stored files when the API runs from the IDE (FILES_DIR) ###
+/data/

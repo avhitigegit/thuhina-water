@@ -41,6 +41,7 @@ type Query = Record<string, string | number | boolean | null | undefined>;
 
 export interface RequestOptions {
   method?: "GET" | "POST" | "PUT" | "DELETE";
+  /** JSON body, or FormData for a file upload (the browser sets the multipart header). */
   body?: unknown;
   query?: Query;
   signal?: AbortSignal;
@@ -72,16 +73,17 @@ export function loginUrlForCurrentPage(): string {
 
 export async function api<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = "GET", body, query, signal } = options;
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
   let response: Response;
   try {
     response = await fetch(buildUrl(path, query), {
       method,
       credentials: "include",
       headers:
-        body !== undefined
+        body !== undefined && !isForm
           ? { "Content-Type": "application/json", Accept: "application/json" }
           : { Accept: "application/json" },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: isForm ? (body as FormData) : body !== undefined ? JSON.stringify(body) : undefined,
       signal,
       cache: "no-store",
     });

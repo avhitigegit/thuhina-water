@@ -75,6 +75,21 @@ public class AppUser extends BaseEntity {
         this.tokenVersion++;
     }
 
+    /** Admin reset: a new temporary password that must be changed at the next login; logs the user out. */
+    public void resetPassword(String temporaryHash) {
+        this.passwordHash = temporaryHash;
+        this.mustChangePassword = true;
+        this.tokenVersion++;
+    }
+
+    /** Admin edit of the user's details (M01). The role takes effect on the user's next request. */
+    public void updateDetails(String fullName, String username, String phone, Role role) {
+        this.fullName = fullName;
+        this.username = normalizeUsername(username);
+        this.phone = phone;
+        this.role = role;
+    }
+
     /** Logs the user out everywhere (deactivation, password reset). */
     public void invalidateSessions() {
         this.tokenVersion++;
