@@ -1,16 +1,23 @@
 package lk.thuhina.water.masterdata.service;
 
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
+import jakarta.persistence.EntityManager;
 import lk.thuhina.water.audit.model.AuditAction;
 import lk.thuhina.water.audit.service.AuditService;
+import lk.thuhina.water.common.BusinessDates;
 import lk.thuhina.water.common.Money;
 import lk.thuhina.water.common.NotFoundException;
 import lk.thuhina.water.common.ValidationException;
 import lk.thuhina.water.common.Versions;
+import lk.thuhina.water.ledger.model.Effect;
+import lk.thuhina.water.ledger.model.Posting;
+import lk.thuhina.water.ledger.model.SourceType;
+import lk.thuhina.water.ledger.service.LedgerService;
 import lk.thuhina.water.masterdata.dto.ProductDtos.CreateProductRequest;
 import lk.thuhina.water.masterdata.dto.ProductDtos.ProductResponse;
 import lk.thuhina.water.masterdata.dto.ProductDtos.UpdateProductRequest;
@@ -23,7 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Other products (FR-02): code {@code P01…} on save; name and selling price &gt; 0 required; cost optional; the stock is
- * set only on creation (opening stock) – later only goods receipts, sales and stock adjustments change it.
+ * set only on creation (opening stock, posted to the ledger) – later only goods receipts, sales and stock adjustments
+ * change it (all through the Ledger Engine).
  */
 @Service
 public class ProductService {
@@ -33,11 +41,18 @@ public class ProductService {
     private final ProductRepository repository;
     private final NumberingService numbering;
     private final AuditService audit;
+    private final LedgerService ledger;
+    private final EntityManager entityManager;
+    private final Clock clock;
 
-    public ProductService(ProductRepository repository, NumberingService numbering, AuditService audit) {
+    public ProductService(ProductRepository repository, NumberingService numbering, AuditService audit, LedgerService ledger,
+                          EntityManager entityManager, Clock clock) {
         this.repository = repository;
         this.numbering = numbering;
         this.audit = audit;
+        this.ledger = ledger;
+        this.entityManager = entityManager;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -54,7 +69,13 @@ public class ProductService {
         }
         boolean active = request.active() == null || request.active();
         Product p = repository.saveAndFlush(new Product(numbering.next(SequenceNames.PRODUCT), request.name().trim(), price,
-                cost(request.costPrice()), opening, active));
+                cost(request.costPrice()), 0, active));
+        if (opening > 0) {
+            // Opening stock is a ledger posting like every other stock change, so it shows in Movements.
+            ledger.post(new Posting(SourceType.IMPORT, p.getId(), p.getCode(), BusinessDates.today(clock),
+                    "Opening stock – new product", List.of(Effect.product(p.getCode(), opening))));
+            entityManager.refresh(p);
+        }
         audit.log(AuditAction.CREATE, ENTITY, p.getCode(), p.getName() + " – " + Money.format(p.getSellingPrice())
                 + (opening > 0 ? ", opening stock " + opening : ""));
         return toResponse(p);
