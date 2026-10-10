@@ -18,7 +18,7 @@ class ThuhinaWaterApplicationTests extends IntegrationTest {
     @Test
     void contextLoadsAndMigrationsRun() {
         Integer sequences = jdbc.queryForObject("select count(*) from doc_sequence", Integer.class);
-        assertThat(sequences).isEqualTo(20);
+        assertThat(sequences).isEqualTo(21); // 20 from V001 + DAMAGE (V005)
         String features = jdbc.queryForObject("select value::text from app_setting where key = 'features'", String.class);
         assertThat(features).contains("\"dataMigration\": false");
     }

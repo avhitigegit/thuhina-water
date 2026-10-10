@@ -636,6 +636,11 @@
     border-color: var(--bad);
     background: #fff7f6;
   }
+  .radio-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
   .check {
     display: flex;
     align-items: center;

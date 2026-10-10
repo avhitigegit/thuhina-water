@@ -38,6 +38,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stock/min-levels/{bottleTypeCode}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set the minimum filled level of a bottle type (low-stock alert) */
+        put: operations["setMinLevel"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/{group}": {
         parameters: {
             query?: never;
@@ -245,6 +262,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stock/damage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record company damage – the bottles are written off (never below zero) */
+        post: operations["damage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock/adjustments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Stock adjustment: physical count (bottles or products) or lost bottles */
+        post: operations["adjust"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/settings/company/logo": {
         parameters: {
             query?: never;
@@ -440,6 +491,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stock by status per active bottle type, product stock and low-stock alerts */
+        get: operations["overview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock/movements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stock movements per document and item, newest first; filter by item code and text */
+        get: operations["movements"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock/damages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Damaged bottles, lost bottles and count adjustments, newest first */
+        get: operations["damages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/stock/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Low-stock alerts: filled bottles below the minimum level */
+        get: operations["alerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/roles/matrix": {
         parameters: {
             query?: never;
@@ -623,6 +742,10 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        MinLevelRequest: {
+            /** Format: int32 */
+            minFilled: number;
+        };
         JsonNode: {
             /** @enum {string} */
             nodeType: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
@@ -796,6 +919,60 @@ export interface components {
             user: components["schemas"]["UserResponse"];
             temporaryPassword: string;
         };
+        CompanyDamageRequest: {
+            /** Format: date */
+            date: string;
+            bottleTypeCode: string;
+            /** Format: int32 */
+            qty: number;
+            /** @enum {string} */
+            location: "EMPTY_IN_STORE" | "FILLED_IN_STORE" | "AT_FACTORY" | "DURING_DELIVERY";
+            reason: string;
+            note?: string;
+        };
+        DamageListRow: {
+            ref: string;
+            /** Format: date */
+            date: string;
+            kind: string;
+            itemCode: string;
+            itemName: string;
+            /** Format: int32 */
+            qty: number;
+            responsibility: string | null;
+            where: string | null;
+            customerName: string | null;
+            reason: string;
+            createdBy: string;
+            createdByName: string | null;
+            reversed: boolean;
+        };
+        AdjustmentRequest: {
+            /** Format: date */
+            date: string;
+            itemCode: string;
+            /** @enum {string} */
+            mode: "COUNT" | "LOST";
+            bucket?: string;
+            /** Format: int32 */
+            counted?: number;
+            /** Format: int32 */
+            qty?: number;
+            reason: string;
+        };
+        AdjustmentResponse: {
+            adjNo: string;
+            itemCode: string;
+            bucket: string;
+            mode: string;
+            /** Format: int32 */
+            systemQty: number;
+            /** Format: int32 */
+            countedQty: number | null;
+            /** Format: int32 */
+            delta: number;
+            description: string;
+        };
         CreateProductRequest: {
             name: string;
             sellingPrice: number;
@@ -882,6 +1059,87 @@ export interface components {
         ChangePasswordRequest: {
             currentPassword: string;
             newPassword: string;
+        };
+        BottleStock: {
+            code: string;
+            name: string;
+            label: string;
+            /** Format: int32 */
+            empty: number;
+            /** Format: int32 */
+            factory: number;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            customers: number;
+            /** Format: int32 */
+            writtenOff: number;
+            /** Format: int32 */
+            inCirculation: number;
+            /** Format: int32 */
+            minFilled: number | null;
+            low: boolean;
+        };
+        LowStockAlert: {
+            bottleTypeCode: string;
+            name: string;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            minFilled: number;
+            /** Format: int32 */
+            atFactory: number;
+            message: string;
+        };
+        ProductStock: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            /** Format: int32 */
+            stockQty: number;
+            costPrice: number | null;
+            costValue: number;
+            active: boolean;
+        };
+        StockOverview: {
+            bottles: components["schemas"]["BottleStock"][];
+            products: components["schemas"]["ProductStock"][];
+            alerts: components["schemas"]["LowStockAlert"][];
+        };
+        MovementRow: {
+            /** Format: date */
+            date: string;
+            sourceType: string;
+            docNo: string | null;
+            description: string;
+            itemCode: string;
+            itemName: string;
+            /** Format: int32 */
+            empty: number;
+            /** Format: int32 */
+            factory: number;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            customers: number;
+            /** Format: int32 */
+            writtenOff: number;
+            /** Format: int32 */
+            product: number;
+            createdBy: string;
+            createdByName: string | null;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PageResponseMovementRow: {
+            items: components["schemas"]["MovementRow"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            total: number;
         };
         Cell: {
             level: string;
@@ -1035,6 +1293,34 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["SupplierResponse"];
+                };
+            };
+        };
+    };
+    setMinLevel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bottleTypeCode: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MinLevelRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: number;
+                    };
                 };
             };
         };
@@ -1395,6 +1681,54 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["SupplierResponse"];
+                };
+            };
+        };
+    };
+    damage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CompanyDamageRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DamageListRow"];
+                };
+            };
+        };
+    };
+    adjust: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustmentRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AdjustmentResponse"];
                 };
             };
         };
@@ -1818,6 +2152,91 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AreaResponse"];
+                };
+            };
+        };
+    };
+    overview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["StockOverview"];
+                };
+            };
+        };
+    };
+    movements: {
+        parameters: {
+            query?: {
+                item?: string;
+                q?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageResponseMovementRow"];
+                };
+            };
+        };
+    };
+    damages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DamageListRow"][];
+                };
+            };
+        };
+    };
+    alerts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LowStockAlert"][];
                 };
             };
         };

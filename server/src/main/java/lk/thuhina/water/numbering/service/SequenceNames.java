@@ -23,6 +23,7 @@ public final class SequenceNames {
     public static final String SUPPLIER_PAYMENT = "SUPPLIER_PAYMENT";       // SP-0001
     public static final String EXPENSE = "EXPENSE";                         // EX-0001
     public static final String CUSTOMER_PRICE = "CUSTOMER_PRICE";           // CP0001
+    public static final String DAMAGE = "DAMAGE";                           // DMG-0001
 
     private SequenceNames() {
     }

@@ -71,3 +71,16 @@ export type SupplierRequest = Schemas["SupplierRequest"];
 export type Factory = Schemas["FactoryResponse"];
 export type FactoryChargeView = Schemas["FactoryChargeView"];
 export type FactoryRequest = Schemas["FactoryRequest"];
+
+// Inventory – Stock (M04)
+export type StockOverview = Schemas["StockOverview"];
+export type BottleStock = Schemas["BottleStock"];
+export type ProductStock = Schemas["ProductStock"];
+export type LowStockAlert = Schemas["LowStockAlert"];
+export type MovementRow = Schemas["MovementRow"];
+export type MovementPage = Schemas["PageResponseMovementRow"];
+export type DamageListRow = Schemas["DamageListRow"];
+export type CompanyDamageRequest = Schemas["CompanyDamageRequest"];
+export type DamageLocation = CompanyDamageRequest["location"];
+export type AdjustmentRequest = Schemas["AdjustmentRequest"];
+export type AdjustmentResponse = Schemas["AdjustmentResponse"];
