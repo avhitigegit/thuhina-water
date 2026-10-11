@@ -15,6 +15,7 @@ import lk.thuhina.water.ledger.model.CustomerField;
 import lk.thuhina.water.ledger.rules.LedgerRules;
 import lk.thuhina.water.sales.dto.SalesDtos.BillLink;
 import lk.thuhina.water.sales.dto.SalesDtos.EffectView;
+import lk.thuhina.water.sales.dto.SalesDtos.NextPaperBill;
 import lk.thuhina.water.sales.dto.SalesDtos.PaperBillCheck;
 import lk.thuhina.water.sales.dto.SalesDtos.TxnDetail;
 import lk.thuhina.water.sales.dto.SalesDtos.TxnListResponse;
@@ -98,6 +99,17 @@ public class SalesQueryService {
             return new PaperBillCheck(no, true, r, "Bill " + no + " is already entered – " + r.kindLabel() + ", " + r.customerName()
                     + ", " + BusinessDates.format(r.date()) + ". Do not enter it again.");
         }).orElseGet(() -> new PaperBillCheck(no, false, null, "Bill " + no + " has not been entered yet."));
+    }
+
+    /**
+     * Enter Bills: the suggested next paper bill number = the highest numeric paper bill number entered + 1 (reversals
+     * excluded), or none when no numeric paper bill exists yet. Uses the partial index {@code ix_sales_txn_paper_num}.
+     */
+    @Transactional(readOnly = true)
+    public NextPaperBill nextPaperBill() {
+        Long max = jdbc.queryForObject("select max(paper_bill_no::bigint) from sales_txn where paper_bill_no ~ '^[0-9]{1,18}$' "
+                + "and kind <> 'REVERSAL'", Map.of(), Long.class);
+        return new NextPaperBill(max == null ? null : String.valueOf(max + 1), max == null ? null : String.valueOf(max));
     }
 
     @Transactional(readOnly = true)

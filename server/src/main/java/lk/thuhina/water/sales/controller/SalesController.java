@@ -10,6 +10,7 @@ import lk.thuhina.water.sales.dto.SalesDtos.CollectEmptiesRequest;
 import lk.thuhina.water.sales.dto.SalesDtos.CustomerDamageRequest;
 import lk.thuhina.water.sales.dto.SalesDtos.ExtraOrderRequest;
 import lk.thuhina.water.sales.dto.SalesDtos.FirstPurchaseRequest;
+import lk.thuhina.water.sales.dto.SalesDtos.NextPaperBill;
 import lk.thuhina.water.sales.dto.SalesDtos.PaperBillCheck;
 import lk.thuhina.water.sales.dto.SalesDtos.ProductSaleRequest;
 import lk.thuhina.water.sales.dto.SalesDtos.ReverseRequest;
@@ -186,6 +187,13 @@ public class SalesController {
     @PreAuthorize(VIEW)
     public TxnDetail detail(@PathVariable long id) {
         return queries.detail(id);
+    }
+
+    @Operation(summary = "Suggested next paper bill number for Enter Bills (highest numeric paper bill number + 1)")
+    @GetMapping("/paper-bill/next")
+    @PreAuthorize(EDIT)
+    public NextPaperBill nextPaperBill() {
+        return queries.nextPaperBill();
     }
 
     @Operation(summary = "Is this paper bill number already entered? (\"Bill 41275 has not been entered yet.\")")

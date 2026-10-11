@@ -258,6 +258,10 @@ public final class SalesDtos {
     public record TxnListResponse(List<TxnRow> items, int page, int size, long total) {
     }
 
+    /** Enter Bills: the suggested next paper bill number (highest numeric one + 1) and the highest so far. */
+    public record NextPaperBill(@Schema(nullable = true) String next, @Schema(nullable = true) String highest) {
+    }
+
     /** "Bill 41275 is already entered – …" / "Bill 41275 has not been entered yet." */
     public record PaperBillCheck(String paperBillNo, boolean entered, @Schema(nullable = true) TxnRow txn, String message) {
     }
