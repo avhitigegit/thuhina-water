@@ -221,8 +221,15 @@ class StockIntegrationTest extends IntegrationTest {
         d.put("reason", " ");
         mvc.perform(json(post("/stock/damage"), d))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.details.fields.location").value("Select where the damage happened."))
                 .andExpect(jsonPath("$.details.fields.reason").value("Enter the reason."));
+        // Company damage needs the place (customer damage, M06, is "At customer" and cannot be chosen here).
+        d.put("reason", "Dropped");
+        mvc.perform(json(post("/stock/damage"), d))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fields.location").value("Select where the damage happened."));
+        d.put("location", "AT_CUSTOMER");
+        mvc.perform(json(post("/stock/damage"), d))
+                .andExpect(jsonPath("$.details.fields.location").value("Select where the damage happened."));
     }
 
     @Test

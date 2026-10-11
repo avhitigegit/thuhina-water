@@ -6,6 +6,7 @@ import java.sql.SQLException;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -38,6 +39,7 @@ import lk.thuhina.water.masterdata.repository.AreaRepository;
 import lk.thuhina.water.masterdata.repository.BottleTypeRepository;
 import lk.thuhina.water.masterdata.repository.CustomerTypeRepository;
 import lk.thuhina.water.masterdata.service.PricingService;
+import lk.thuhina.water.sales.model.SalesKind;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -242,10 +244,36 @@ public class CustomerQueryService {
                 new MapSqlParameterSource("code", c.getCode()).addValue("prefix", c.getCode() + " %"),
                 (rs, i) -> new HistoryRow(rs.getTimestamp("ts").toInstant(),
                         rs.getTimestamp("ts").toInstant().atZone(BusinessDates.ZONE).toLocalDate(), kind(rs),
-                        rs.getString("details"), rs.getString("username"), null));
-        Set<String> who = raw.stream().map(HistoryRow::by).filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+                        rs.getString("details"), rs.getString("username"), null, null, null, null, null, null));
+        List<HistoryRow> all = new ArrayList<>(raw);
+        all.addAll(bills(id));
+        all.sort(Comparator.comparing(HistoryRow::date).thenComparing(HistoryRow::at).reversed());
+        Set<String> who = all.stream().map(HistoryRow::by).filter(java.util.Objects::nonNull).collect(Collectors.toSet());
         Map<String, String> names = users.findByUsernameIn(who).stream().collect(Collectors.toMap(AppUser::getUsername, AppUser::getFullName));
-        return raw.stream().map(h -> new HistoryRow(h.at(), h.date(), h.kind(), h.description(), h.by(), names.get(h.by()))).toList();
+        return all.stream().map(h -> new HistoryRow(h.at(), h.date(), h.kind(), h.description(), h.by(), names.get(h.by()), h.txnId(),
+                h.billNo(), h.amount(), h.paid(), h.balance())).toList();
+    }
+
+    /** The customer's bills, oldest first, each with the account balance after it (running Σ amount − paid). */
+    private List<HistoryRow> bills(long customerId) {
+        List<HistoryRow> out = new ArrayList<>();
+        BigDecimal[] running = {Money.ZERO};
+        jdbc.query("select id, bill_no, paper_bill_no, kind, txn_date, amount, paid_on_bill, note, reversed_by_id, created_at, created_by "
+                        + "from sales_txn where customer_id = :c order by txn_date, id",
+                new MapSqlParameterSource("c", customerId), rs -> {
+                    BigDecimal amount = rs.getBigDecimal("amount");
+                    BigDecimal paid = rs.getBigDecimal("paid_on_bill");
+                    running[0] = running[0].add(amount).subtract(paid);
+                    String paper = rs.getString("paper_bill_no");
+                    String note = rs.getString("note");
+                    String text = SalesKind.valueOf(rs.getString("kind")).label() + " – bill " + rs.getString("bill_no")
+                            + (paper == null ? "" : " (paper " + paper + ")") + (rs.getObject("reversed_by_id") == null ? "" : " – reversed")
+                            + (note == null ? "" : ": " + note);
+                    out.add(new HistoryRow(rs.getTimestamp("created_at").toInstant(), rs.getObject("txn_date", LocalDate.class), "SALE",
+                            text, rs.getString("created_by"), null, rs.getLong("id"), rs.getString("bill_no"), amount, paid,
+                            Money.of(running[0])));
+                });
+        return out;
     }
 
     // ------------------------------------------------------------------ helpers

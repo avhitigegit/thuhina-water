@@ -16,9 +16,15 @@ import lk.thuhina.water.inventory.dto.StockDtos.MinLevelRequest;
 import lk.thuhina.water.inventory.dto.StockDtos.MovementRow;
 import lk.thuhina.water.inventory.dto.StockDtos.StockOverview;
 import lk.thuhina.water.inventory.service.StockActionService;
+import lk.thuhina.water.inventory.model.DamageRecord;
 import lk.thuhina.water.inventory.service.StockQueryService;
+import lk.thuhina.water.sales.dto.SalesDtos.CustomerDamageRequest;
+import lk.thuhina.water.sales.dto.SalesDtos.SaleResult;
+import lk.thuhina.water.sales.service.SalesService;
+import lk.thuhina.water.security.CurrentUser;
 import lk.thuhina.water.security.Permissions;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,10 +47,12 @@ public class StockController {
 
     private final StockQueryService queries;
     private final StockActionService actions;
+    private final SalesService sales;
 
-    public StockController(StockQueryService queries, StockActionService actions) {
+    public StockController(StockQueryService queries, StockActionService actions, SalesService sales) {
         this.queries = queries;
         this.actions = actions;
+        this.sales = sales;
     }
 
     @Operation(summary = "Stock by status per active bottle type, product stock and low-stock alerts")
@@ -78,12 +86,21 @@ public class StockController {
         return queries.damagesAndAdjustments();
     }
 
-    @Operation(summary = "Record company damage – the bottles are written off (never below zero)")
+    @Operation(summary = "Record damage – company (written off, never below zero) or customer (a customer-damage bill, M06)")
     @PostMapping("/damage")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize(EDIT)
     public DamageListRow damage(@Valid @RequestBody CompanyDamageRequest request) {
-        return actions.companyDamage(request);
+        if (request.responsibility() != DamageRecord.Responsibility.CUSTOMER) {
+            return actions.companyDamage(request);
+        }
+        if (!CurrentUser.get().map(u -> u.permissions().contains(Permissions.SALES_EDIT)).orElse(false)) {
+            throw new AccessDeniedException("Customer damage is a sale");
+        }
+        SaleResult bill = sales.customerDamage(new CustomerDamageRequest(request.customerId(), request.date(), null,
+                request.bottleTypeCode(), request.qty(), request.mode(), request.giveFilled(), request.reason(), request.note(),
+                request.paid(), request.approveOverLimit()));
+        return queries.damageRowForBill(bill.txn().id());
     }
 
     @Operation(summary = "Stock adjustment: physical count (bottles or products) or lost bottles")

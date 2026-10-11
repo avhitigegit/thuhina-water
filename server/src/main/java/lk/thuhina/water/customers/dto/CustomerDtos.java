@@ -11,6 +11,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lk.thuhina.water.customers.model.PayType;
+import lk.thuhina.water.sales.dto.SalesDtos.TxnDetail;
 
 /** Customers page (FR-08 – FR-13) and agreed prices (FR-05). */
 public final class CustomerDtos {
@@ -23,7 +24,9 @@ public final class CustomerDtos {
     /**
      * New or changed customer. {@code deliveryDay} 1 = Monday … 7 = Sunday; {@code usualQty} per bottle type code.
      * Create only: {@code registeredOn} (default today), {@code agreedPrices} per bottle type with {@code agreedReason}
-     * (from the registration date). Edit only: {@code version}. {@code allowDuplicatePhone} = "Save anyway".
+     * (from the registration date), {@code bottlesGiven} per bottle type on the registration date (first purchases,
+     * M06) with {@code oldBottles} of brand {@code oldBrandId} (default: the first accepted brand), {@code paid} in cash
+     * and {@code approveOverLimit} (Admin). Edit only: {@code version}. {@code allowDuplicatePhone} = "Save anyway".
      */
     public record CustomerRequest(
             @NotBlank(message = MSG_REQUIRED) @Size(max = 120, message = "Name: at most 120 characters.") String name,
@@ -45,7 +48,12 @@ public final class CustomerDtos {
             Map<String, BigDecimal> agreedPrices,
             @Size(max = 250, message = "Reason: at most 250 characters.") String agreedReason,
             Boolean allowDuplicatePhone,
-            Long version) {
+            Long version,
+            Map<String, Integer> bottlesGiven,
+            Integer oldBottles,
+            Long oldBrandId,
+            BigDecimal paid,
+            Boolean approveOverLimit) {
     }
 
     /** Bottles of one type with the customer: held, empties to collect, owed. */
@@ -136,13 +144,24 @@ public final class CustomerDtos {
             long version) {
     }
 
-    /** Result of a save: the customer and, for a new one with agreed prices, how many prices were set. */
-    public record CustomerSaved(CustomerDetail customer, int agreedPricesSet) {
+    /**
+     * Result of a save: the customer and, for a new one, how many agreed prices were set and the first-purchase bills
+     * of the bottles given on the registration date (for "Print bill").
+     */
+    public record CustomerSaved(CustomerDetail customer, int agreedPricesSet, List<TxnDetail> bills) {
     }
 
-    /** One line of the History tab. Sales, payments and invoices are added in M06 / M11. */
+    /**
+     * One line of the History tab: registration, changes, prices (kind REGISTERED / CHANGED / PRICE) and bills
+     * (kind SALE, with the bill, amount, paid and the running account balance after it). Payments and invoices: M11.
+     */
     public record HistoryRow(Instant at, LocalDate date, String kind, String description, String by,
-                             @Schema(nullable = true) String byName) {
+                             @Schema(nullable = true) String byName,
+                             @Schema(nullable = true) Long txnId,
+                             @Schema(nullable = true) String billNo,
+                             @Schema(nullable = true) BigDecimal amount,
+                             @Schema(nullable = true) BigDecimal paid,
+                             @Schema(nullable = true) BigDecimal balance) {
     }
 
     public record DeactivateRequest(

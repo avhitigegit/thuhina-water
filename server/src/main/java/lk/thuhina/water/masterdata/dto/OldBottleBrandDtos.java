@@ -12,7 +12,7 @@ public final class OldBottleBrandDtos {
     private OldBottleBrandDtos() {
     }
 
-    /** {@code takenIn} comes from sales (M06) – null until then. */
+    /** {@code takenIn} = old bottles of this brand taken in so far on bills that are not reversed (M06; null on update). */
     public record OldBottleBrandResponse(
             long id,
             String name,

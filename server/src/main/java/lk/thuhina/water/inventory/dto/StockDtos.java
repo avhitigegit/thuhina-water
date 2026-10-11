@@ -10,7 +10,9 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lk.thuhina.water.inventory.model.DamageLocation;
+import lk.thuhina.water.inventory.model.DamageRecord;
 import lk.thuhina.water.inventory.model.StockAdjustment;
+import lk.thuhina.water.sales.model.DamageMode;
 
 /** Stock page (FR-27 – FR-31): stock by status, damage, adjustments, minimum levels, movements. */
 public final class StockDtos {
@@ -89,14 +91,24 @@ public final class StockDtos {
             boolean reversed) {
     }
 
-    /** Company damage (FR-29): bottles at a place are written off at company cost. */
+    /**
+     * Record damage (FR-29). Company (default): bottles at a {@code location} are written off at company cost.
+     * Customer (M06, BR-06): the customer-damaged bottle sale for {@code customerId} with {@code mode} REPLACE / REDUCE,
+     * {@code giveFilled}, {@code paid} and {@code approveOverLimit}; the location is "At customer".
+     */
     public record CompanyDamageRequest(
             @NotNull(message = "Enter the date.") LocalDate date,
             @NotBlank(message = "Choose the bottle type.") String bottleTypeCode,
             @NotNull(message = "Enter the number of damaged bottles.") Integer qty,
-            @NotNull(message = "Select where the damage happened.") DamageLocation location,
+            DamageLocation location,
             @NotBlank(message = "Enter the reason.") @Size(max = 200, message = "Reason: at most 200 characters.") String reason,
-            @Size(max = 300, message = "Note: at most 300 characters.") String note) {
+            @Size(max = 300, message = "Note: at most 300 characters.") String note,
+            DamageRecord.Responsibility responsibility,
+            Long customerId,
+            DamageMode mode,
+            Boolean giveFilled,
+            BigDecimal paid,
+            Boolean approveOverLimit) {
     }
 
     /**

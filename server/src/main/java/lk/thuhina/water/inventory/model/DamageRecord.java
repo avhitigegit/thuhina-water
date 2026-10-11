@@ -17,7 +17,7 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 /**
- * Damaged bottles (FR-29). Company damage now; customer damage (responsibility CUSTOMER, linked to a bill) in M06.
+ * Damaged bottles (FR-29). Company damage, and customer damage (responsibility CUSTOMER, linked to its bill, M06).
  * The stock change itself is a ledger posting with source DAMAGE.
  */
 @Entity
@@ -60,6 +60,12 @@ public class DamageRecord {
     @Column(name = "customer_id")
     private Long customerId;
 
+    @Column(name = "source_type", length = 20)
+    private String sourceType;
+
+    @Column(name = "source_id")
+    private Long sourceId;
+
     @Column(nullable = false)
     private boolean reversed;
 
@@ -86,6 +92,33 @@ public class DamageRecord {
         d.reason = reason;
         d.note = note;
         return d;
+    }
+
+    /** A customer-damaged bottle (BR-06), recorded "At customer" by the bill {@code billId} (source SALES_TXN). */
+    public static DamageRecord customer(String damageNo, LocalDate date, String bottleTypeCode, int qty, String reason, String note,
+                                        long customerId, long billId) {
+        DamageRecord d = new DamageRecord();
+        d.damageNo = damageNo;
+        d.damageDate = date;
+        d.bottleTypeCode = bottleTypeCode;
+        d.qty = qty;
+        d.responsibility = Responsibility.CUSTOMER;
+        d.location = DamageLocation.AT_CUSTOMER;
+        d.reason = reason;
+        d.note = note;
+        d.customerId = customerId;
+        d.sourceType = "SALES_TXN";
+        d.sourceId = billId;
+        return d;
+    }
+
+    /** The bill was reversed (BR-14). */
+    public void markReversed() {
+        reversed = true;
+    }
+
+    public Long getSourceId() {
+        return sourceId;
     }
 
     public Long getId() {

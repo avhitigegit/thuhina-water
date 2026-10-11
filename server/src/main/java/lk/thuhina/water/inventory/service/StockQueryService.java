@@ -128,6 +128,7 @@ public class StockQueryService {
         dmg.forEach(d -> who.add(d.getCreatedBy()));
         adj.forEach(a -> who.add(a.getCreatedBy()));
         Map<String, String> names = fullNames(who);
+        Map<Long, String> customerNames = customerNames(dmg);
 
         record Sortable(DamageListRow row, java.time.Instant at) {
         }
@@ -135,7 +136,8 @@ public class StockQueryService {
         for (DamageRecord d : dmg) {
             rows.add(new Sortable(new DamageListRow(d.getDamageNo(), d.getDamageDate(), "DAMAGED", d.getBottleTypeCode(),
                     itemNames.getOrDefault(d.getBottleTypeCode(), d.getBottleTypeCode()), d.getQty(),
-                    d.getResponsibility().name(), d.getLocation() == null ? null : d.getLocation().label(), null,
+                    d.getResponsibility().name(), d.getLocation() == null ? null : d.getLocation().label(),
+                    d.getCustomerId() == null ? null : customerNames.get(d.getCustomerId()),
                     d.getReason(), d.getCreatedBy(), names.get(d.getCreatedBy()), d.isReversed()), d.getCreatedAt()));
         }
         for (StockAdjustment a : adj) {
@@ -153,7 +155,29 @@ public class StockQueryService {
         return rows.stream().map(Sortable::row).toList();
     }
 
+    /** The damage record of a customer-damage bill, as a row of the Damage &amp; adjustments tab. */
+    @Transactional(readOnly = true)
+    public DamageListRow damageRowForBill(long billId) {
+        DamageRecord d = damages.findBySourceTypeAndSourceId("SALES_TXN", billId).getFirst();
+        Map<String, String> names = fullNames(Set.of(d.getCreatedBy()));
+        return new DamageListRow(d.getDamageNo(), d.getDamageDate(), "DAMAGED", d.getBottleTypeCode(),
+                itemNames().getOrDefault(d.getBottleTypeCode(), d.getBottleTypeCode()), d.getQty(), d.getResponsibility().name(),
+                d.getLocation().label(), customerNames(List.of(d)).get(d.getCustomerId()), d.getReason(), d.getCreatedBy(),
+                names.get(d.getCreatedBy()), d.isReversed());
+    }
+
     // ------------------------------------------------------------------ helpers
+
+    private Map<Long, String> customerNames(List<DamageRecord> dmg) {
+        Map<Long, String> out = new HashMap<>();
+        List<Long> ids = dmg.stream().map(DamageRecord::getCustomerId).filter(java.util.Objects::nonNull).distinct().toList();
+        if (!ids.isEmpty()) {
+            jdbc.query("select id, name from customer where id in (:ids)", new MapSqlParameterSource("ids", ids), rs -> {
+                out.put(rs.getLong("id"), rs.getString("name"));
+            });
+        }
+        return out;
+    }
 
     private List<BottleStock> bottleRows() {
         Map<String, Map<Bucket, Integer>> balances = new HashMap<>();
