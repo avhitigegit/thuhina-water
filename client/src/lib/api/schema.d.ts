@@ -986,6 +986,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales/paper-bill/next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggested next paper bill number for Enter Bills (highest numeric paper bill number + 1) */
+        get: operations["nextPaperBill"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/roles/matrix": {
         parameters: {
             query?: never;
@@ -1080,6 +1097,23 @@ export interface paths {
         };
         /** A factory's charge history, newest first */
         get: operations["charges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/delivery/due": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customers due on a date (default today; for today also missed customers), with usual quantities, bottles, prices, balance, bills already entered and counts for the info line */
+        get: operations["due"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1276,14 +1310,14 @@ export interface components {
             minFilled: number;
         };
         JsonNode: {
-            /** @enum {string} */
-            nodeType: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
-            string: boolean;
-            integralNumber: boolean;
             missingNode: boolean;
             valueNode: boolean;
             container: boolean;
             object: boolean;
+            /** @enum {string} */
+            nodeType: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
+            string: boolean;
+            integralNumber: boolean;
             pojo: boolean;
             floatingPointNumber: boolean;
             short: boolean;
@@ -2166,6 +2200,10 @@ export interface components {
             txn: components["schemas"]["TxnRow"];
             message: string;
         };
+        NextPaperBill: {
+            next: string | null;
+            highest: string | null;
+        };
         Cell: {
             level: string;
             note: string | null;
@@ -2232,6 +2270,85 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             current: boolean;
+        };
+        DueBottle: {
+            bottleTypeCode: string;
+            label: string;
+            /** Format: int32 */
+            usual: number;
+            /** Format: int32 */
+            held: number;
+            /** Format: int32 */
+            toCollect: number;
+            /** Format: int32 */
+            owed: number;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            empties: number;
+            price: number | null;
+            agreedPrice: boolean;
+            standardPrice: number | null;
+        };
+        DueCounts: {
+            /** Format: int32 */
+            due: number;
+            /** Format: int32 */
+            listed: number;
+            /** Format: int32 */
+            entered: number;
+            /** Format: int32 */
+            noBottles: number;
+            /** Format: int32 */
+            overdue: number;
+        };
+        DueCustomer: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            phone: string;
+            /** Format: int64 */
+            areaId: number;
+            areaName: string;
+            payType: string;
+            payTypeLabel: string;
+            creditLimit: number;
+            balance: number;
+            /** Format: int32 */
+            cycleWeeks: number;
+            /** Format: date */
+            nextDeliveryDate: string;
+            /**
+             * Format: date
+             * @description Next delivery after a bill on this date (FR-46)
+             */
+            nextAfterBill: string;
+            due: boolean;
+            overdue: boolean;
+            /** Format: int32 */
+            daysLate: number;
+            entered: boolean;
+            noBottles: boolean;
+            listed: boolean;
+            enteredBills: components["schemas"]["EnteredBill"][];
+            bottles: components["schemas"]["DueBottle"][];
+        };
+        DueList: {
+            /** Format: date */
+            date: string;
+            dayName: string;
+            today: boolean;
+            counts: components["schemas"]["DueCounts"];
+            items: components["schemas"]["DueCustomer"][];
+        };
+        EnteredBill: {
+            /** Format: int64 */
+            id: number;
+            billNo: string;
+            paperBillNo: string | null;
+            kind: string;
+            kindLabel: string;
         };
         CustomerListResponse: {
             items: components["schemas"]["CustomerListRow"][];
@@ -3988,6 +4105,26 @@ export interface operations {
             };
         };
     };
+    nextPaperBill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["NextPaperBill"];
+                };
+            };
+        };
+    };
     matrix: {
         parameters: {
             query?: never;
@@ -4114,6 +4251,29 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["FactoryChargeHistoryRow"][];
+                };
+            };
+        };
+    };
+    due: {
+        parameters: {
+            query?: {
+                date?: string;
+                area?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DueList"];
                 };
             };
         };

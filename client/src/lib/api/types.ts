@@ -132,3 +132,11 @@ export type SettleOwedRequest = Schemas["SettleOwedRequest"];
 export type ProductSaleRequest = Schemas["ProductSaleRequest"];
 export type PayMethod = NonNullable<ProductSaleRequest["payMethod"]>;
 export type ReverseRequest = Schemas["ReverseRequest"];
+
+// Enter Bills (M07) – due list (design 5.4) and the suggested paper bill number
+export type DueBottle = Schemas["DueBottle"];
+export type EnteredBill = Schemas["EnteredBill"];
+export type DueCustomer = Schemas["DueCustomer"];
+export type DueCounts = Schemas["DueCounts"];
+export type DueList = Schemas["DueList"];
+export type NextPaperBill = Schemas["NextPaperBill"];
