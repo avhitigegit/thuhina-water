@@ -24,6 +24,9 @@ const STOCK: StockOverview = {
       inCirculation: 623,
       minFilled: 150,
       low: true,
+      customersHeld: 400,
+      customersToCollect: 6,
+      customersOwed: 4,
     },
     {
       code: "B10",
@@ -37,6 +40,9 @@ const STOCK: StockOverview = {
       inCirculation: 48,
       minFilled: 25,
       low: false,
+      customersHeld: 0,
+      customersToCollect: 0,
+      customersOwed: 0,
     },
   ],
   products: [

@@ -71,7 +71,10 @@ describe("PricesTab", () => {
   it("shows current prices, the scheduled change and example / confirmed tags", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response(JSON.stringify(MATRIX), { status: 200 })),
+      vi.fn(
+        async (url: string) =>
+          new Response(JSON.stringify(url.startsWith("/api/customer-prices") ? [] : MATRIX), { status: 200 }),
+      ),
     );
     render(wrap(<PricesTab />));
 
@@ -85,7 +88,10 @@ describe("PricesTab", () => {
     const user = userEvent.setup();
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () => new Response(JSON.stringify(MATRIX), { status: 200 })),
+      vi.fn(
+        async (url: string) =>
+          new Response(JSON.stringify(url.startsWith("/api/customer-prices") ? [] : MATRIX), { status: 200 }),
+      ),
     );
     render(wrap(<PricesTab />));
     await user.click(await screen.findByRole("button", { name: "Rs. 175.00" }));

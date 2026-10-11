@@ -161,6 +161,11 @@ public class StockQueryService {
             balances.computeIfAbsent(rs.getString("bottle_type_code"), k -> new EnumMap<>(Bucket.class))
                     .put(Bucket.valueOf(rs.getString("bucket")), rs.getInt("qty"));
         });
+        Map<String, int[]> withCustomers = new HashMap<>();
+        jdbc.query("select bottle_type_code, sum(held), sum(to_collect), sum(owed) from customer_bottle_balance "
+                + "group by bottle_type_code", rs -> {
+                    withCustomers.put(rs.getString(1), new int[] {rs.getInt(2), rs.getInt(3), rs.getInt(4)});
+                });
         Map<String, Integer> mins = minLevels.findAll().stream()
                 .collect(Collectors.toMap(MinStockLevel::getBottleTypeCode, MinStockLevel::getMinFilled));
         List<BottleStock> out = new ArrayList<>();
@@ -171,9 +176,10 @@ public class StockQueryService {
             int filled = q.getOrDefault(Bucket.FILLED, 0);
             int customers = q.getOrDefault(Bucket.CUSTOMERS, 0);
             Integer min = mins.get(b.getCode());
+            int[] wc = withCustomers.getOrDefault(b.getCode(), new int[3]);
             out.add(new BottleStock(b.getCode(), b.getName(), LedgerRules.bottleLabel(b.getLitres()), empty, factory, filled,
                     customers, q.getOrDefault(Bucket.WRITTEN_OFF, 0), empty + factory + filled + customers, min,
-                    min != null && filled < min));
+                    min != null && filled < min, wc[0], wc[1], wc[2]));
         }
         return out;
     }

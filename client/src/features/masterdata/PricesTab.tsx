@@ -4,7 +4,7 @@
  * Prices & deposits tab (FR-04, FR-07, BR-08, prototype bottles-products.html): water price grid (rows = active bottle
  * types, columns = active customer types) and deposits. Click a price to change it from a date with a reason – a new
  * entry; a later date is "scheduled" and shown under the current price. Price history pop-up with
- * Current / Scheduled / Old. (The customer agreed prices card comes with Customers, M05.)
+ * Current / Scheduled / Old, and the customer agreed prices card.
  */
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
@@ -16,6 +16,7 @@ import { FormDialog } from "@/components/shared/FormDialog";
 import { MoneyText } from "@/components/shared/MoneyText";
 import { Badge } from "@/components/shared/StatusBadge";
 import { useCan } from "@/features/auth/access";
+import { AgreedPricesCard } from "@/features/customers/AgreedPricesCard";
 import type { PriceCell, PriceHistoryRow, PriceMatrix } from "@/lib/api/types";
 import { addDaysIso, formatDate, todayIso } from "@/lib/format";
 import { showServerErrors } from "@/lib/forms";
@@ -309,6 +310,8 @@ export function PricesTab() {
           </div>
         )}
       </div>
+
+      <AgreedPricesCard />
 
       {target && <PriceChangeDialog target={target} onClose={() => setTarget(null)} />}
       <PriceHistoryDialog open={historyOpen} onClose={() => setHistoryOpen(false)} />

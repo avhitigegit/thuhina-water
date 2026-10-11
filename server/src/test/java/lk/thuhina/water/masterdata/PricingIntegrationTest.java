@@ -68,10 +68,7 @@ class PricingIntegrationTest extends MasterDataTestSupport {
         assertThat(pricing.standardPrice(type, bottle, jul)).contains(new BigDecimal("175.00"));
         assertThat(pricing.standardPrice(type, bottle, jul.plusDays(1))).contains(new BigDecimal("175.00"));
         assertThat(pricing.deposit(bottle, jul)).contains(new BigDecimal("600.00"));
-        assertThat(pricing.waterPrice(type, bottle, jul)).hasValueSatisfying(w -> {
-            assertThat(w.price()).isEqualByComparingTo("175");
-            assertThat(w.agreed()).isFalse();
-        });
+        // The customer-level water price (agreed price first) is tested with customers (M05).
     }
 
     @Test

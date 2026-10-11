@@ -10,8 +10,9 @@ public final class CustomerTypeAreaDtos {
     private CustomerTypeAreaDtos() {
     }
 
+    /** {@code activeCustomers} = active customers of this type (a type in use cannot be deactivated). */
     public record CustomerTypeResponse(long id, String name, @Schema(nullable = true) String description, boolean active,
-                                       long version) {
+                                       long activeCustomers, long version) {
     }
 
     public record CreateCustomerTypeRequest(
@@ -26,7 +27,7 @@ public final class CustomerTypeAreaDtos {
             Long version) {
     }
 
-    public record AreaResponse(long id, String name, boolean active, long version) {
+    public record AreaResponse(long id, String name, boolean active, long activeCustomers, long version) {
     }
 
     public record AreaRequest(

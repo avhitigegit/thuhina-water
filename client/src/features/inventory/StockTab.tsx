@@ -3,7 +3,7 @@
 /*
  * Stock tab (FR-27, FR-31, prototype inventory/inventory.html): bottles by status – filled in red below the minimum,
  * in circulation, minimum filled editable in the table (saves on change); product stock (red when 3 or fewer) with
- * its cost value. (The "With customers = held + to collect + owed" line comes with Customers, M05.)
+ * its cost value, and what "with customers" is made of (held + empties to collect + owed).
  */
 import { useState, type KeyboardEvent } from "react";
 import { DataTable, type Column } from "@/components/shared/DataTable";
@@ -120,6 +120,14 @@ export function StockTab({ stock }: { stock: StockOverview | undefined }) {
           rowKey={(b) => b.code}
           empty="No active bottle types."
         />
+        {stock?.bottles
+          .filter((b) => b.customers > 0)
+          .map((b) => (
+            <p key={b.code} className="small muted" style={{ marginTop: 6 }}>
+              With customers ({b.label}) = held {b.customersHeld} + empties to collect {b.customersToCollect}{" "}
+              + bottles owed {b.customersOwed}.
+            </p>
+          ))}
         <p className="small muted" style={{ marginTop: 8 }}>
           Stock changes automatically from goods receipts, factory batches, deliveries, collections, old
           bottles handed in and write-offs. Change the minimum level in the table to set the low-stock alert.

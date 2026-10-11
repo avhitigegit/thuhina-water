@@ -19,6 +19,7 @@ import lk.thuhina.water.audit.model.AuditAction;
 import lk.thuhina.water.audit.service.AuditService;
 import lk.thuhina.water.common.BusinessDates;
 import lk.thuhina.water.common.Money;
+import lk.thuhina.water.common.NotFoundException;
 import lk.thuhina.water.common.ValidationException;
 import lk.thuhina.water.masterdata.dto.PriceDtos.PriceBottle;
 import lk.thuhina.water.masterdata.dto.PriceDtos.PriceCell;
@@ -37,6 +38,8 @@ import lk.thuhina.water.masterdata.repository.PriceEntryRepository;
 import lk.thuhina.water.masterdata.rules.MasterDataRules;
 import lk.thuhina.water.settings.service.SettingsGroup;
 import lk.thuhina.water.settings.service.SettingsService;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -45,7 +48,8 @@ import tools.jackson.databind.JsonNode;
  * Pricing Service (design 5.5): <b>every</b> price on a bill comes from here. Standard water prices per bottle type and
  * customer type, and deposits per bottle type, are dated entries; the price for a date is the latest entry on or
  * before it, so future entries are "scheduled" and apply on their date without any job (FR-07, BR-08).
- * M05 adds the customer's agreed price as step 1 of {@link #waterPrice}.
+ * A customer's agreed price (M05, table {@code customer_price}) is step 1 of {@link #waterPrice}; it is read with SQL so
+ * this package does not depend on the customers package.
  */
 @Service
 public class PricingService {
@@ -63,9 +67,11 @@ public class PricingService {
     private final SettingsService settings;
     private final AuditService audit;
     private final Clock clock;
+    private final NamedParameterJdbcTemplate jdbc;
 
     public PricingService(PriceEntryRepository entries, BottleTypeRepository bottleTypes, CustomerTypeRepository customerTypes,
-                          AppUserRepository users, SettingsService settings, AuditService audit, Clock clock) {
+                          AppUserRepository users, SettingsService settings, AuditService audit, Clock clock,
+                          NamedParameterJdbcTemplate jdbc) {
         this.entries = entries;
         this.bottleTypes = bottleTypes;
         this.customerTypes = customerTypes;
@@ -73,6 +79,7 @@ public class PricingService {
         this.settings = settings;
         this.audit = audit;
         this.clock = clock;
+        this.jdbc = jdbc;
     }
 
     // ------------------------------------------------------------------ lookups used by other modules
@@ -84,12 +91,38 @@ public class PricingService {
     }
 
     /**
-     * Water price for a customer of this type. Until M05 there are no agreed prices, so this is the standard price;
-     * M05 changes the first parameter to the customer and checks the agreed price first.
+     * Water price for a customer on a date (design 5.5, BR-08): 1. the customer's agreed price in force on that date;
+     * 2. otherwise the standard price of the customer's type. Empty when neither is set.
      */
     @Transactional(readOnly = true)
-    public Optional<WaterPrice> waterPrice(long customerTypeId, String bottleTypeCode, LocalDate date) {
-        return standardPrice(customerTypeId, bottleTypeCode, date).map(p -> new WaterPrice(p, false, p));
+    public Optional<WaterPrice> waterPrice(long customerId, String bottleTypeCode, LocalDate date) {
+        Long typeId = jdbc.query("select customer_type_id from customer where id = :id",
+                new MapSqlParameterSource("id", customerId), rs -> rs.next() ? rs.getLong(1) : null);
+        if (typeId == null) {
+            throw new NotFoundException("Customer", customerId);
+        }
+        BigDecimal standard = standardPrice(typeId, bottleTypeCode, date).orElse(null);
+        Optional<BigDecimal> agreed = agreedPrice(customerId, bottleTypeCode, date);
+        if (agreed.isPresent()) {
+            return Optional.of(new WaterPrice(agreed.get(), true, standard));
+        }
+        return Optional.ofNullable(standard).map(p -> new WaterPrice(p, false, p));
+    }
+
+    /** Step 1 only: the customer's agreed price in force on the date (latest start; the later saved wins a tie). */
+    @Transactional(readOnly = true)
+    public Optional<BigDecimal> agreedPrice(long customerId, String bottleTypeCode, LocalDate date) {
+        return Optional.ofNullable(jdbc.query("select price from customer_price where customer_id = :c and bottle_type_code = :bt "
+                        + "and not cancelled and valid_from <= :d and (valid_until is null or valid_until >= :d) "
+                        + "order by valid_from desc, id desc limit 1",
+                new MapSqlParameterSource("c", customerId).addValue("bt", bottleTypeCode).addValue("d", date),
+                rs -> rs.next() ? rs.getBigDecimal(1) : null));
+    }
+
+    /** True when the customer pays an agreed price for this bottle type on the date (the "agreed" badge). */
+    @Transactional(readOnly = true)
+    public boolean isAgreed(long customerId, String bottleTypeCode, LocalDate date) {
+        return agreedPrice(customerId, bottleTypeCode, date).isPresent();
     }
 
     /** Deposit per new bottle – the same for every customer (BR-18). */
