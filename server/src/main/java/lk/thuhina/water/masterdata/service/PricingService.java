@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -107,6 +108,42 @@ public class PricingService {
             return Optional.of(new WaterPrice(agreed.get(), true, standard));
         }
         return Optional.ofNullable(standard).map(p -> new WaterPrice(p, false, p));
+    }
+
+    /**
+     * Water prices of many customers at once (Enter Bills, delivery lists): customer id → bottle type → price, by the same
+     * two steps as {@link #waterPrice}. Two queries in all, whatever the number of customers.
+     */
+    @Transactional(readOnly = true)
+    public Map<Long, Map<String, WaterPrice>> waterPrices(Map<Long, Long> customerTypeIds, List<String> bottleTypeCodes, LocalDate date) {
+        Map<Long, Map<String, WaterPrice>> out = new HashMap<>();
+        if (customerTypeIds.isEmpty() || bottleTypeCodes.isEmpty()) {
+            return out;
+        }
+        Map<String, List<PriceEntry>> byKey = allByKey();
+        Map<Long, Map<String, BigDecimal>> agreed = new HashMap<>();
+        jdbc.query("select distinct on (customer_id, bottle_type_code) customer_id, bottle_type_code, price from customer_price "
+                        + "where customer_id in (:ids) and bottle_type_code in (:bts) and not cancelled and valid_from <= :d "
+                        + "and (valid_until is null or valid_until >= :d) order by customer_id, bottle_type_code, valid_from desc, id desc",
+                new MapSqlParameterSource("ids", customerTypeIds.keySet()).addValue("bts", bottleTypeCodes).addValue("d", date),
+                rs -> {
+                    agreed.computeIfAbsent(rs.getLong(1), k -> new HashMap<>()).put(rs.getString(2), rs.getBigDecimal(3));
+                });
+        customerTypeIds.forEach((customerId, typeId) -> {
+            Map<String, WaterPrice> prices = new HashMap<>();
+            for (String bt : bottleTypeCodes) {
+                BigDecimal standard = MasterDataRules.inForce(byKey.getOrDefault(internalKey(Kind.WATER, bt, typeId), List.of()), date)
+                        .map(PriceEntry::getPrice).orElse(null);
+                BigDecimal own = agreed.getOrDefault(customerId, Map.of()).get(bt);
+                if (own != null) {
+                    prices.put(bt, new WaterPrice(own, true, standard));
+                } else if (standard != null) {
+                    prices.put(bt, new WaterPrice(standard, false, standard));
+                }
+            }
+            out.put(customerId, prices);
+        });
+        return out;
     }
 
     /** Step 1 only: the customer's agreed price in force on the date (latest start; the later saved wins a tie). */
