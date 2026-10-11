@@ -22,6 +22,7 @@ import lk.thuhina.water.common.NotFoundException;
 import lk.thuhina.water.common.Texts;
 import lk.thuhina.water.common.ValidationException;
 import lk.thuhina.water.common.Versions;
+import lk.thuhina.water.customers.dto.CustomerDtos;
 import lk.thuhina.water.customers.dto.CustomerDtos.CustomerRequest;
 import lk.thuhina.water.customers.dto.CustomerDtos.CustomerSaved;
 import lk.thuhina.water.customers.dto.CustomerDtos.DeactivateRequest;
@@ -38,6 +39,9 @@ import lk.thuhina.water.masterdata.repository.CustomerTypeRepository;
 import lk.thuhina.water.masterdata.service.PricingService;
 import lk.thuhina.water.numbering.service.NumberingService;
 import lk.thuhina.water.numbering.service.SequenceNames;
+import lk.thuhina.water.sales.dto.SalesDtos.RegistrationPreview;
+import lk.thuhina.water.sales.dto.SalesDtos.TxnDetail;
+import lk.thuhina.water.sales.service.SalesService;
 import lk.thuhina.water.security.CurrentUser;
 import lk.thuhina.water.security.Permissions;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -47,8 +51,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Customers (FR-08 – FR-13): register and edit with every check of the prototype, duplicate-phone warning, code
- * {@code C0001…}, bottle balance and account rows, deactivate / reactivate. Every change is audited with the fields
+ * Customers (FR-08 – FR-13): register (with the bottles given that day as first-purchase bills, M06) and edit with every
+ * check of the prototype, duplicate-phone warning, code {@code C0001…}, bottle balance and account rows, deactivate /
+ * reactivate. Every change is audited with the fields
  * that changed.
  */
 @Service
@@ -69,12 +74,13 @@ public class CustomerService {
     private final PricingService pricing;
     private final NumberingService numbering;
     private final AuditService audit;
+    private final SalesService sales;
     private final NamedParameterJdbcTemplate jdbc;
     private final Clock clock;
 
     public CustomerService(CustomerRepository repository, AreaRepository areas, CustomerTypeRepository types,
                            BottleTypeRepository bottleTypes, CustomerPriceService prices, CustomerQueryService queries,
-                           PricingService pricing, NumberingService numbering, AuditService audit,
+                           PricingService pricing, NumberingService numbering, AuditService audit, SalesService sales,
                            NamedParameterJdbcTemplate jdbc, Clock clock) {
         this.repository = repository;
         this.areas = areas;
@@ -85,6 +91,7 @@ public class CustomerService {
         this.pricing = pricing;
         this.numbering = numbering;
         this.audit = audit;
+        this.sales = sales;
         this.jdbc = jdbc;
         this.clock = clock;
     }
@@ -102,6 +109,14 @@ public class CustomerService {
         }
         Checked v = check(r, null);
         Map<String, BigDecimal> agreed = agreedPrices(r, v.type(), registeredOn);
+        SalesService.GivenBottles given = given(r);
+        if (given.any() || given.oldBottles() != 0 || given.paid().signum() != 0) {
+            if (!CurrentUser.get().map(u -> u.permissions().contains(Permissions.SALES_EDIT)).orElse(false)) {
+                throw new AccessDeniedException("Bottles given need the right to enter sales");
+            }
+            // Old bottles, cash and filled stock are checked before anything is saved.
+            sales.checkRegistration(given, registeredOn);
+        }
 
         Customer c = new Customer(numbering.next(SequenceNames.CUSTOMER), registeredOn);
         apply(c, r, v);
@@ -117,7 +132,28 @@ public class CustomerService {
         for (Map.Entry<String, BigDecimal> e : agreed.entrySet()) {
             prices.set(c.getId(), new SetCustomerPriceRequest(e.getKey(), e.getValue(), registeredOn, null, reason, null));
         }
-        return new CustomerSaved(queries.detail(c.getId()), agreed.size());
+        List<TxnDetail> bills = given.any() ? sales.registrationBills(c.getId(), registeredOn, given) : List.of();
+        return new CustomerSaved(queries.detail(c.getId()), agreed.size(), bills);
+    }
+
+    /**
+     * Live calculation of the bottles given on registration (before saving): prices of the customer type, or the agreed
+     * prices entered, deposits, old bottles, cash paid, credit limit and the filled-stock check.
+     */
+    @Transactional(readOnly = true)
+    public RegistrationPreview previewRegistration(CustomerRequest r) {
+        if (r.customerTypeId() == null) {
+            throw new ValidationException("customerTypeId", CustomerDtos.MSG_REQUIRED);
+        }
+        LocalDate date = r.registeredOn() == null ? today() : r.registeredOn();
+        PayType pay = r.payType() == null ? PayType.CASH : r.payType();
+        return sales.previewRegistration(r.name(), r.customerTypeId(), pay, pay == PayType.CASH ? Money.ZERO : r.creditLimit(), date,
+                r.agreedPrices(), given(r));
+    }
+
+    private static SalesService.GivenBottles given(CustomerRequest r) {
+        return new SalesService.GivenBottles(r.bottlesGiven() == null ? Map.of() : r.bottlesGiven(),
+                r.oldBottles() == null ? 0 : r.oldBottles(), r.oldBrandId(), Money.of(r.paid()), Boolean.TRUE.equals(r.approveOverLimit()));
     }
 
     /** Edit details, delivery and payment. Changed fields are listed in the audit log. */
@@ -128,12 +164,12 @@ public class CustomerService {
         Checked v = check(r, c);
         List<String> changes = changes(c, r, v);
         if (changes.isEmpty()) {
-            return new CustomerSaved(queries.detail(id), 0);
+            return new CustomerSaved(queries.detail(id), 0, List.of());
         }
         apply(c, r, v);
         repository.saveAndFlush(c);
         audit.log(AuditAction.UPDATE, ENTITY, c.getCode(), String.join("; ", changes));
-        return new CustomerSaved(queries.detail(id), 0);
+        return new CustomerSaved(queries.detail(id), 0, List.of());
     }
 
     /** FR-13: inactive from a date (not in the future) with a reason; history is kept. */

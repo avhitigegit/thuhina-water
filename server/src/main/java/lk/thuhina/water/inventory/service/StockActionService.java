@@ -17,6 +17,7 @@ import lk.thuhina.water.inventory.dto.StockDtos.AdjustmentRequest;
 import lk.thuhina.water.inventory.dto.StockDtos.AdjustmentResponse;
 import lk.thuhina.water.inventory.dto.StockDtos.CompanyDamageRequest;
 import lk.thuhina.water.inventory.dto.StockDtos.DamageListRow;
+import lk.thuhina.water.inventory.model.DamageLocation;
 import lk.thuhina.water.inventory.model.DamageRecord;
 import lk.thuhina.water.inventory.model.MinStockLevel;
 import lk.thuhina.water.inventory.model.StockAdjustment;
@@ -76,6 +77,9 @@ public class StockActionService {
     @Transactional
     public DamageListRow companyDamage(CompanyDamageRequest r) {
         checkDate(r.date());
+        if (r.location() == null || r.location() == DamageLocation.AT_CUSTOMER) {
+            throw new ValidationException("location", "Select where the damage happened.");
+        }
         BottleType bottle = bottleTypes.findById(r.bottleTypeCode().trim())
                 .orElseThrow(() -> new ValidationException("bottleTypeCode", "Choose the bottle type."));
         if (r.qty() < 1) {

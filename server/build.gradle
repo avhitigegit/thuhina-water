@@ -34,7 +34,8 @@ dependencies {
 	implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	runtimeOnly 'org.postgresql:postgresql'
-	// OpenPDF and Apache POI are added in the modules that print / export (M06, M12).
+	// PDF bills and documents (M06); Apache POI is added for Excel exports in M12.
+	implementation 'com.github.librepdf:openpdf:2.0.3'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'

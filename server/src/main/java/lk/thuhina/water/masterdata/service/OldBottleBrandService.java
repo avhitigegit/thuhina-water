@@ -1,6 +1,7 @@
 package lk.thuhina.water.masterdata.service;
 
 import java.time.Clock;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -20,6 +21,7 @@ import lk.thuhina.water.masterdata.model.BottleType;
 import lk.thuhina.water.masterdata.model.OldBottleBrand;
 import lk.thuhina.water.masterdata.repository.BottleTypeRepository;
 import lk.thuhina.water.masterdata.repository.OldBottleBrandRepository;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,21 +37,30 @@ public class OldBottleBrandService {
     private final OldBottleBrandRepository repository;
     private final BottleTypeRepository bottleTypes;
     private final AuditService audit;
+    private final NamedParameterJdbcTemplate jdbc;
     private final Clock clock;
 
     public OldBottleBrandService(OldBottleBrandRepository repository, BottleTypeRepository bottleTypes, AuditService audit,
-                                 Clock clock) {
+                                 NamedParameterJdbcTemplate jdbc, Clock clock) {
         this.repository = repository;
         this.bottleTypes = bottleTypes;
         this.audit = audit;
+        this.jdbc = jdbc;
         this.clock = clock;
     }
 
+    /** The brands with the bottles taken in so far (on bills that are not reversed). */
     @Transactional(readOnly = true)
     public List<OldBottleBrandResponse> list() {
         Map<String, String> names = bottleTypes.findAll().stream()
                 .collect(Collectors.toMap(BottleType::getCode, BottleType::getName));
-        return repository.findAllByOrderByActiveDescNameAsc().stream().map(b -> toResponse(b, names.get(b.getBottleTypeCode()))).toList();
+        Map<Long, Integer> takenIn = new HashMap<>();
+        jdbc.query("select l.old_brand_id, sum(l.old_bottles) as n from sales_txn_line l join sales_txn t on t.id = l.txn_id "
+                + "where l.old_brand_id is not null and t.kind <> 'REVERSAL' and t.reversed_by_id is null group by l.old_brand_id", rs -> {
+                    takenIn.put(rs.getLong("old_brand_id"), rs.getInt("n"));
+                });
+        return repository.findAllByOrderByActiveDescNameAsc().stream()
+                .map(b -> toResponse(b, names.get(b.getBottleTypeCode()), takenIn.getOrDefault(b.getId(), 0))).toList();
     }
 
     @Transactional
@@ -62,7 +73,7 @@ public class OldBottleBrandService {
         OldBottleBrand b = repository.saveAndFlush(new OldBottleBrand(name, bottle.getCode(),
                 Texts.blankToNull(request.note()), BusinessDates.today(clock)));
         audit.log(AuditAction.CREATE, ENTITY, b.getName(), "For " + bottle.getName());
-        return toResponse(b, bottle.getName());
+        return toResponse(b, bottle.getName(), 0);
     }
 
     @Transactional
@@ -83,7 +94,7 @@ public class OldBottleBrandService {
             repository.saveAndFlush(b);
             audit.log(AuditAction.UPDATE, ENTITY, b.getName(), details);
         }
-        return toResponse(b, bottle.getName());
+        return toResponse(b, bottle.getName(), null);
     }
 
     private BottleType activeBottle(String code) {
@@ -91,8 +102,8 @@ public class OldBottleBrandService {
                 .orElseThrow(() -> new ValidationException("bottleTypeCode", "Choose an active bottle type."));
     }
 
-    private static OldBottleBrandResponse toResponse(OldBottleBrand b, String bottleName) {
+    private static OldBottleBrandResponse toResponse(OldBottleBrand b, String bottleName, Integer takenIn) {
         return new OldBottleBrandResponse(b.getId(), b.getName(), b.getBottleTypeCode(), bottleName, b.getNote(), b.isActive(),
-                b.getAddedOn(), null, b.getVersion());
+                b.getAddedOn(), takenIn, b.getVersion());
     }
 }

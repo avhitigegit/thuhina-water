@@ -15,6 +15,7 @@ import lk.thuhina.water.customers.dto.CustomerDtos.LookupRow;
 import lk.thuhina.water.customers.model.PayType;
 import lk.thuhina.water.customers.service.CustomerQueryService;
 import lk.thuhina.water.customers.service.CustomerService;
+import lk.thuhina.water.sales.dto.SalesDtos.RegistrationPreview;
 import lk.thuhina.water.security.Permissions;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -84,13 +85,20 @@ public class CustomerController {
         return queries.history(id);
     }
 
-    @Operation(summary = "Register a customer (agreed prices optional, from the registration date). "
-            + "A phone already in use gives DUP_PHONE unless allowDuplicatePhone = true")
+    @Operation(summary = "Register a customer (agreed prices optional, from the registration date) with the bottles given that day "
+            + "as first-purchase bills, all in one transaction. A phone already in use gives DUP_PHONE unless allowDuplicatePhone = true")
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize(EDIT)
     public CustomerSaved register(@Valid @RequestBody CustomerRequest request) {
         return service.create(request);
+    }
+
+    @Operation(summary = "Live calculation of the bottles given on registration (first-purchase bills) – nothing is saved")
+    @PostMapping("/register/preview")
+    @PreAuthorize(EDIT)
+    public RegistrationPreview registerPreview(@RequestBody CustomerRequest request) {
+        return service.previewRegistration(request);
     }
 
     @Operation(summary = "Edit a customer")
