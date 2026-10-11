@@ -2,6 +2,7 @@
 
 /* Stock page API hooks (design 7.2 Inventory). */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { invalidateAfterSale } from "@/features/sales/api";
 import { api } from "@/lib/api/client";
 import type {
   AdjustmentRequest,
@@ -50,10 +51,20 @@ function useStockChange<TVars, TResult>(fn: (vars: TVars) => Promise<TResult>) {
   });
 }
 
-export const useRecordDamage = () =>
-  useStockChange((body: CompanyDamageRequest) =>
-    api<DamageListRow>("/stock/damage", { method: "POST", body }),
-  );
+export function useRecordDamage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: CompanyDamageRequest) => api<DamageListRow>("/stock/damage", { method: "POST", body }),
+    onSuccess: (_r, body) => {
+      if (body.responsibility === "CUSTOMER") invalidateAfterSale(qc);
+      else {
+        qc.invalidateQueries({ queryKey: KEY });
+        qc.invalidateQueries({ queryKey: ["admin", "audit"] });
+      }
+    },
+    meta: { silent: true },
+  });
+}
 
 export const useAdjustStock = () =>
   useStockChange((body: AdjustmentRequest) =>

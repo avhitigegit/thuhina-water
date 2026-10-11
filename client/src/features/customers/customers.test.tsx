@@ -110,6 +110,8 @@ describe("customer form rules", () => {
     termsDays: "30",
     agreedPrices: {},
     agreedReason: "",
+    bottlesGiven: { B20: "2" },
+    oldBottles: "0",
     whatsappOptIn: false,
     whatsappNumber: "",
     notes: "",

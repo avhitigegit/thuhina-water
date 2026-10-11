@@ -29,6 +29,8 @@ export function customerSchema(isNew: boolean, today: string, bottleCodes: strin
       termsDays: z.string(),
       agreedPrices: z.record(z.string(), z.string()),
       agreedReason: z.string().trim().max(250),
+      bottlesGiven: z.record(z.string(), z.string()),
+      oldBottles: z.string().trim(),
       whatsappOptIn: z.boolean(),
       whatsappNumber: z.string().trim(),
       notes: z.string().trim().max(500, "Notes: at most 500 characters."),
@@ -87,6 +89,17 @@ export function customerSchema(isNew: boolean, today: string, bottleCodes: strin
               message: "Enter the agreed price per bottle.",
             });
         }
+        for (const code of bottleCodes) {
+          const q = (v.bottlesGiven[code] ?? "").trim();
+          if (q !== "" && !/^\d+$/.test(q))
+            ctx.addIssue({
+              code: "custom",
+              path: ["bottlesGiven", code],
+              message: "A whole number, 0 or more.",
+            });
+        }
+        if (v.oldBottles !== "" && !/^\d+$/.test(v.oldBottles))
+          ctx.addIssue({ code: "custom", path: ["oldBottles"], message: "A whole number, 0 or more." });
         if (anyPrice && !v.agreedReason)
           ctx.addIssue({
             code: "custom",

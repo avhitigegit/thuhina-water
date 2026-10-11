@@ -19,14 +19,28 @@ function dateUpTo(today: string) {
     .refine((v) => !v || v <= today, `Date cannot be after today.`);
 }
 
+/** Company damage needs the place; customer damage (a customer-damage bill, M06) needs the customer. */
 export function damageSchema(today: string) {
-  return z.object({
-    date: dateUpTo(today),
-    bottleTypeCode: z.string().min(1, "Choose the bottle type."),
-    qty: wholeAtLeast(1, "Enter the number of damaged bottles."),
-    location: z.string().min(1, "Select where the damage happened."),
-    reason: z.string().trim().min(1, "Enter the reason.").max(200, "Reason: at most 200 characters."),
-  });
+  return z
+    .object({
+      responsibility: z.enum(["COMPANY", "CUSTOMER"]),
+      date: dateUpTo(today),
+      bottleTypeCode: z.string().min(1, "Choose the bottle type."),
+      qty: wholeAtLeast(1, "Enter the number of damaged bottles."),
+      location: z.string(),
+      customerId: z.number().nullable(),
+      paid: z
+        .string()
+        .trim()
+        .refine((v) => v === "" || Number(v) >= 0, "Paid amount cannot be negative."),
+      reason: z.string().trim().min(1, "Enter the reason.").max(200, "Reason: at most 200 characters."),
+    })
+    .superRefine((v, ctx) => {
+      if (v.responsibility === "COMPANY" && !v.location)
+        ctx.addIssue({ code: "custom", path: ["location"], message: "Select where the damage happened." });
+      if (v.responsibility === "CUSTOMER" && v.customerId === null)
+        ctx.addIssue({ code: "custom", path: ["customerId"], message: "Select a customer." });
+    });
 }
 export type DamageValues = z.input<ReturnType<typeof damageSchema>>;
 

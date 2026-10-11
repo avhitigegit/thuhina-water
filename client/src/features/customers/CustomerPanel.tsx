@@ -3,8 +3,9 @@
 /*
  * Customer side panel (FR-11, prototype assets/js/customer-panel.js) – shared by Customers, and later Billing and
  * Sales. Header, banners (inactive, over the credit limit, delivery overdue), actions by permission, balance cards,
- * delivery and price summary, tabs History · Payments · Invoices · Prices. Sales actions open their screens (M06 –
- * M11); payments and invoices fill in with Billing (M11).
+ * delivery and price summary, tabs History · Payments · Invoices · Prices. First purchase / Extra order / Collect
+ * empties / Settle owed open their sale pop-ups here (M06); Enter bill opens the daily grid (M07). The History tab
+ * lists the bills with charge, paid and the running balance; payments and invoices fill in with Billing (M11).
  */
 import Link from "next/link";
 import { useState } from "react";
@@ -14,6 +15,8 @@ import { SidePanel } from "@/components/shared/SidePanel";
 import { Badge, StatusBadge } from "@/components/shared/StatusBadge";
 import { Tabs } from "@/components/shared/Tabs";
 import { useCan } from "@/features/auth/access";
+import { NewSaleDialog } from "@/features/sales/SaleDialogs";
+import type { SaleKind } from "@/features/sales/labels";
 import type { CustomerDetail, CustomerHistoryRow, CustomerPriceRow } from "@/lib/api/types";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { P } from "@/lib/permissions";
@@ -25,20 +28,62 @@ import { StatusDialog } from "./StatusDialog";
 
 type PanelTab = "hist" | "pay" | "inv" | "price";
 
-const historyColumns: Column<CustomerHistoryRow>[] = [
-  { key: "date", header: "Date", cell: (h) => <span className="nowrap">{formatDateTime(h.at)}</span> },
-  {
-    key: "entry",
-    header: "Entry",
-    cell: (h) => (
-      <Badge kind={h.kind === "REGISTERED" ? "ok" : h.kind === "PRICE" ? "info" : ""}>
-        {h.kind === "REGISTERED" ? "Registered" : h.kind === "PRICE" ? "Price" : "Changed"}
-      </Badge>
-    ),
-  },
-  { key: "details", header: "Details", cell: (h) => <span className="small">{h.description}</span> },
-  { key: "by", header: "By", cell: (h) => h.byName ?? h.by },
-];
+const ENTRY: Record<string, { label: string; kind: "ok" | "info" | "" | "dark" }> = {
+  REGISTERED: { label: "Registered", kind: "ok" },
+  PRICE: { label: "Price", kind: "info" },
+  CHANGED: { label: "Changed", kind: "" },
+  SALE: { label: "Bill", kind: "dark" },
+};
+
+/** History: registration, changes, prices and bills (bill date; bill number links to Sales & Bills). */
+function historyColumns(canSeeBills: boolean): Column<CustomerHistoryRow>[] {
+  return [
+    {
+      key: "date",
+      header: "Date",
+      cell: (h) => (
+        <span className="nowrap">{h.kind === "SALE" ? formatDate(h.date) : formatDateTime(h.at)}</span>
+      ),
+    },
+    {
+      key: "entry",
+      header: "Entry",
+      cell: (h) => {
+        const e = ENTRY[h.kind] ?? ENTRY.CHANGED;
+        return (
+          <>
+            <Badge kind={e.kind}>{e.label}</Badge>
+            {h.billNo && (
+              <div className="small mono">
+                {canSeeBills ? <Link href={`/sales/bills?bill=${h.billNo}`}>{h.billNo}</Link> : h.billNo}
+              </div>
+            )}
+          </>
+        );
+      },
+    },
+    { key: "details", header: "Details", cell: (h) => <span className="small">{h.description}</span> },
+    {
+      key: "charge",
+      header: "Charge",
+      align: "num",
+      cell: (h) => (h.amount != null && Number(h.amount) !== 0 ? formatMoney(h.amount) : ""),
+    },
+    {
+      key: "paid",
+      header: "Paid",
+      align: "num",
+      cell: (h) => (h.paid != null && Number(h.paid) !== 0 ? formatMoney(h.paid) : ""),
+    },
+    {
+      key: "balance",
+      header: "Balance",
+      align: "num",
+      cell: (h) => (h.balance != null ? formatMoney(h.balance) : ""),
+    },
+    { key: "by", header: "By", cell: (h) => <span className="small">{h.byName ?? h.by}</span> },
+  ];
+}
 
 const priceColumns: Column<CustomerPriceRow>[] = [
   { key: "bottle", header: "Bottle", cell: (e) => e.label },
@@ -82,6 +127,7 @@ const priceColumns: Column<CustomerPriceRow>[] = [
 function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDetail) => void }) {
   const canEdit = useCan(P.CUSTOMERS_EDIT);
   const canSell = useCan(P.SALES_EDIT);
+  const canSeeBills = useCan(P.SALES_VIEW);
   const canBill = useCan(P.BILLING_VIEW);
   const canPay = useCan(P.BILLING_EDIT);
   const canQuote = useCan(P.QUOTATIONS_EDIT);
@@ -89,6 +135,7 @@ function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDeta
   const canSetPrices = useCan(P.CUSTOMER_PRICES_EDIT);
   const [tab, setTab] = useState<PanelTab>("hist");
   const [dialog, setDialog] = useState<"prices" | "status" | null>(null);
+  const [sale, setSale] = useState<SaleKind | null>(null);
   const history = useCustomerHistory(c.id);
   const prices = useCustomerPrices(c.id, canSeePrices && tab === "price");
   const active = c.status === "ACTIVE";
@@ -96,7 +143,11 @@ function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDeta
   const toCollect = c.bottles.reduce((s, b) => s + b.toCollect, 0);
   const owed = c.bottles.reduce((s, b) => s + b.owed, 0);
   const anyAgreed = c.prices.some((p) => p.agreed);
-  const sales = (kind: string) => `/sales/bills?new=${kind}&cust=${c.code}`;
+  const saleButton = (kind: SaleKind, label: string, primary?: boolean) => (
+    <button className={primary ? "btn primary" : "btn"} type="button" onClick={() => setSale(kind)}>
+      {label}
+    </button>
+  );
 
   return (
     <>
@@ -140,25 +191,9 @@ function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDeta
               <Link className="btn primary" href={`/sales/enter-bills?cust=${c.code}`}>
                 Enter bill
               </Link>
-              {held > 0 ? (
-                <Link className="btn" href={sales("extra")}>
-                  Extra order
-                </Link>
-              ) : (
-                <Link className="btn primary" href={sales("first")}>
-                  First purchase
-                </Link>
-              )}
-              {toCollect > 0 && (
-                <Link className="btn" href={sales("collect")}>
-                  Collect empties
-                </Link>
-              )}
-              {owed > 0 && (
-                <Link className="btn" href={sales("owed")}>
-                  Settle owed
-                </Link>
-              )}
+              {held > 0 ? saleButton("extra", "Extra order") : saleButton("first", "First purchase", true)}
+              {toCollect > 0 && saleButton("collect", "Collect empties")}
+              {owed > 0 && saleButton("owed", "Settle owed")}
             </>
           )}
           {canPay && c.outstanding > 0 && (
@@ -273,7 +308,7 @@ function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDeta
         />
         {tab === "hist" && (
           <DataTable
-            columns={historyColumns}
+            columns={historyColumns(canSeeBills)}
             rows={history.data}
             loading={history.isPending}
             rowKey={(h, i) => `${h.at}-${i}`}
@@ -301,6 +336,20 @@ function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDeta
 
       {dialog === "prices" && <CustomerPriceDialog customer={c} onClose={() => setDialog(null)} />}
       {dialog === "status" && <StatusDialog customer={c} onClose={() => setDialog(null)} />}
+      {sale && (
+        <NewSaleDialog
+          kind={sale}
+          initialCustomer={{
+            id: c.id,
+            code: c.code,
+            name: c.name,
+            phone: c.phone,
+            areaName: c.areaName,
+            status: c.status,
+          }}
+          onClose={() => setSale(null)}
+        />
+      )}
     </>
   );
 }
