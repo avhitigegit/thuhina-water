@@ -124,6 +124,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/customers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Everything for the side panel: details, balances, outstanding, delivery, water prices */
+        get: operations["detail"];
+        /** Edit a customer */
+        put: operations["update_6"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customer-types/{id}": {
         parameters: {
             query?: never;
@@ -150,7 +168,7 @@ export interface paths {
         };
         get?: never;
         /** Change the name or active – the size cannot change */
-        put: operations["update_6"];
+        put: operations["update_7"];
         post?: never;
         delete?: never;
         options?: never;
@@ -386,6 +404,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/customers/{id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reactivate – a past next delivery moves to the next delivery day from today */
+        post: operations["reactivate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}/prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A customer's agreed prices, newest first, with In force / Scheduled / Ended / Replaced / Cancelled */
+        get: operations["history"];
+        put?: never;
+        /** Set an agreed price from a date (optionally until a date); closes or cancels overlapping ones */
+        post: operations["set"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}/prices/end": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Back to the standard price from a date */
+        post: operations["end"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Deactivate from a date with a reason – history is kept */
+        post: operations["deactivate_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/register": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Register a customer (agreed prices optional, from the registration date). A phone already in use gives DUP_PHONE unless allowDuplicatePhone = true */
+        post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customer-types": {
         parameters: {
             query?: never;
@@ -576,6 +680,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/pricing/water": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Water price for a customer, bottle type and date (default today): agreed price first, else standard */
+        get: operations["waterPrice"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/prices/history": {
         parameters: {
             query?: never;
@@ -584,7 +705,7 @@ export interface paths {
             cookie?: never;
         };
         /** Every price entry, newest first, marked Current / Scheduled / Old */
-        get: operations["history"];
+        get: operations["history_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -619,6 +740,74 @@ export interface paths {
         };
         /** A factory's charge history, newest first */
         get: operations["charges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customers with search (name, code, address; phone digits from 3), filters and paging. status ACTIVE (default) / INACTIVE / ALL; price STANDARD / AGREED; day 1 = Monday … 7 = Sunday */
+        get: operations["list_6"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer history – registration, changes, status and prices (sales and payments come later) */
+        get: operations["history_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/lookup": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Picker lookup: code (C0017), number (17), phone digits (9+) or part of the name; at most 10 */
+        get: operations["lookup"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** All customers' agreed prices: status=current (in force and scheduled, default) or all */
+        get: operations["list_7"];
         put?: never;
         post?: never;
         delete?: never;
@@ -861,6 +1050,115 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        CustomerRequest: {
+            name: string;
+            address: string;
+            /** Format: int64 */
+            areaId: number;
+            phone: string;
+            /** Format: int64 */
+            customerTypeId: number;
+            /** Format: int32 */
+            deliveryDay: number;
+            /** Format: int32 */
+            cycleWeeks: number;
+            /** Format: date */
+            nextDeliveryDate: string;
+            usualQty?: {
+                [key: string]: number;
+            };
+            /** @enum {string} */
+            payType: "CASH" | "CREDIT" | "MONTHLY_BILL";
+            creditLimit?: number;
+            /** Format: int32 */
+            termsDays?: number;
+            notes?: string;
+            whatsappOptIn?: boolean;
+            whatsappNumber?: string;
+            /** Format: date */
+            registeredOn?: string;
+            agreedPrices?: {
+                [key: string]: number;
+            };
+            agreedReason?: string;
+            allowDuplicatePhone?: boolean;
+            /** Format: int64 */
+            version?: number;
+        };
+        BottleBalance: {
+            bottleTypeCode: string;
+            label: string;
+            /** Format: int32 */
+            held: number;
+            /** Format: int32 */
+            toCollect: number;
+            /** Format: int32 */
+            owed: number;
+        };
+        CustomerDetail: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            address: string;
+            /** Format: int64 */
+            areaId: number;
+            areaName: string;
+            phone: string;
+            /** Format: int64 */
+            customerTypeId: number;
+            typeName: string;
+            /** Format: int32 */
+            deliveryDay: number;
+            /** Format: int32 */
+            cycleWeeks: number;
+            /** Format: date */
+            nextDeliveryDate: string;
+            usualQty: {
+                [key: string]: number;
+            };
+            payType: string;
+            creditLimit: number;
+            /** Format: int32 */
+            termsDays: number;
+            /** Format: date */
+            registeredOn: string;
+            status: string;
+            /** Format: date */
+            statusDate: string | null;
+            statusReason: string | null;
+            notes: string | null;
+            whatsappOptIn: boolean;
+            whatsappNumber: string | null;
+            bottles: components["schemas"]["BottleBalance"][];
+            outstanding: number;
+            overLimit: boolean;
+            overdue: boolean;
+            prices: components["schemas"]["WaterPriceView"][];
+            /** Format: int64 */
+            version: number;
+        };
+        CustomerSaved: {
+            customer: components["schemas"]["CustomerDetail"];
+            /** Format: int32 */
+            agreedPricesSet: number;
+        };
+        ScheduledPrice: {
+            price: number;
+            /** Format: date */
+            from: string;
+        };
+        WaterPriceView: {
+            bottleTypeCode: string;
+            label: string;
+            price: number | null;
+            agreed: boolean;
+            standard: number | null;
+            next: components["schemas"]["ScheduledPrice"];
+            /** Format: int32 */
+            bottlesPerMonth: number;
+            fillingCharge: number | null;
+        };
         UpdateCustomerTypeRequest: {
             description: string;
             active: boolean;
@@ -873,6 +1171,8 @@ export interface components {
             name: string;
             description: string | null;
             active: boolean;
+            /** Format: int64 */
+            activeCustomers: number;
             /** Format: int64 */
             version: number;
         };
@@ -904,6 +1204,8 @@ export interface components {
             id: number;
             name: string;
             active: boolean;
+            /** Format: int64 */
+            activeCustomers: number;
             /** Format: int64 */
             version: number;
         };
@@ -1015,6 +1317,56 @@ export interface components {
             bottleTypeCode: string;
             note?: string;
         };
+        SetCustomerPriceRequest: {
+            bottleTypeCode: string;
+            price: number;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            until?: string;
+            reason: string;
+            /** Format: int64 */
+            quotationId?: number;
+        };
+        CustomerPriceRow: {
+            /** Format: int64 */
+            id: number;
+            cpNo: string;
+            /** Format: int64 */
+            customerId: number;
+            customerCode: string;
+            customerName: string;
+            customerTypeName: string;
+            bottleTypeCode: string;
+            label: string;
+            price: number;
+            standardAtSet: number | null;
+            standardNow: number | null;
+            /** Format: date */
+            validFrom: string;
+            /** Format: date */
+            validUntil: string | null;
+            reason: string;
+            /** Format: int64 */
+            quotationId: number | null;
+            state: string;
+            cancelReason: string | null;
+            createdBy: string;
+            createdByName: string | null;
+            /** Format: int32 */
+            bottlesPerMonth: number;
+        };
+        EndCustomerPriceRequest: {
+            bottleTypeCode: string;
+            /** Format: date */
+            from: string;
+            reason: string;
+        };
+        DeactivateRequest: {
+            /** Format: date */
+            date: string;
+            reason: string;
+        };
         CreateCustomerTypeRequest: {
             name: string;
             description?: string;
@@ -1079,6 +1431,12 @@ export interface components {
             /** Format: int32 */
             minFilled: number | null;
             low: boolean;
+            /** Format: int32 */
+            customersHeld: number;
+            /** Format: int32 */
+            customersToCollect: number;
+            /** Format: int32 */
+            customersOwed: number;
         };
         LowStockAlert: {
             bottleTypeCode: string;
@@ -1157,6 +1515,11 @@ export interface components {
             area: string;
             access: components["schemas"]["Cell"][];
         };
+        WaterPriceResponse: {
+            price: number;
+            agreed: boolean;
+            standard: number | null;
+        };
         PriceBottle: {
             code: string;
             name: string;
@@ -1202,6 +1565,71 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             current: boolean;
+        };
+        CustomerListResponse: {
+            items: components["schemas"]["CustomerListRow"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            total: number;
+            /** Format: int64 */
+            all: number;
+            /** Format: int64 */
+            active: number;
+            /** Format: int64 */
+            inactive: number;
+        };
+        CustomerListRow: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            address: string;
+            areaName: string;
+            phone: string;
+            typeName: string;
+            /** Format: int32 */
+            deliveryDay: number;
+            /** Format: int32 */
+            cycleWeeks: number;
+            /** Format: date */
+            nextDeliveryDate: string;
+            payType: string;
+            creditLimit: number;
+            status: string;
+            /** Format: date */
+            statusDate: string | null;
+            statusReason: string | null;
+            bottles: components["schemas"]["BottleBalance"][];
+            /** Format: int32 */
+            toCollect: number;
+            /** Format: int32 */
+            owed: number;
+            balance: number;
+            overLimit: boolean;
+            /** @description e.g. "20L Rs. 270.00" when the customer has an agreed price today */
+            agreed: string | null;
+        };
+        HistoryRow: {
+            /** Format: date-time */
+            at: string;
+            /** Format: date */
+            date: string;
+            kind: string;
+            description: string;
+            by: string;
+            byName: string | null;
+        };
+        LookupRow: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            phone: string;
+            areaName: string;
+            status: string;
         };
         AuditEntryResponse: {
             /** Format: int64 */
@@ -1451,6 +1879,54 @@ export interface operations {
             };
         };
     };
+    detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomerDetail"];
+                };
+            };
+        };
+    };
+    update_6: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomerSaved"];
+                };
+            };
+        };
+    };
     updateCustomerType: {
         parameters: {
             query?: never;
@@ -1477,7 +1953,7 @@ export interface operations {
             };
         };
     };
-    update_6: {
+    update_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -1956,6 +2432,146 @@ export interface operations {
             };
         };
     };
+    reactivate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    history: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomerPriceRow"][];
+                };
+            };
+        };
+    };
+    set: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCustomerPriceRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomerPriceRow"];
+                };
+            };
+        };
+    };
+    end: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EndCustomerPriceRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    deactivate_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeactivateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    register: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomerSaved"];
+                };
+            };
+        };
+    };
     customerTypes: {
         parameters: {
             query?: never;
@@ -2261,7 +2877,31 @@ export interface operations {
             };
         };
     };
-    history: {
+    waterPrice: {
+        parameters: {
+            query: {
+                customerId: number;
+                bottleType: string;
+                date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["WaterPriceResponse"];
+                };
+            };
+        };
+    };
+    history_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -2321,6 +2961,103 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["FactoryChargeHistoryRow"][];
+                };
+            };
+        };
+    };
+    list_6: {
+        parameters: {
+            query?: {
+                q?: string;
+                area?: number;
+                day?: number;
+                type?: number;
+                pay?: "CASH" | "CREDIT" | "MONTHLY_BILL";
+                status?: string;
+                price?: string;
+                page?: number;
+                size?: number;
+                sort?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomerListResponse"];
+                };
+            };
+        };
+    };
+    history_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["HistoryRow"][];
+                };
+            };
+        };
+    };
+    lookup: {
+        parameters: {
+            query: {
+                q: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["LookupRow"][];
+                };
+            };
+        };
+    };
+    list_7: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomerPriceRow"][];
                 };
             };
         };

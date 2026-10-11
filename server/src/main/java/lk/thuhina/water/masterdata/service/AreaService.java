@@ -11,6 +11,7 @@ import lk.thuhina.water.masterdata.dto.CustomerTypeAreaDtos.AreaRequest;
 import lk.thuhina.water.masterdata.dto.CustomerTypeAreaDtos.AreaResponse;
 import lk.thuhina.water.masterdata.model.Area;
 import lk.thuhina.water.masterdata.repository.AreaRepository;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,15 +24,21 @@ public class AreaService {
 
     private final AreaRepository repository;
     private final AuditService audit;
+    private final JdbcTemplate jdbc;
 
-    public AreaService(AreaRepository repository, AuditService audit) {
+    public AreaService(AreaRepository repository, AuditService audit, JdbcTemplate jdbc) {
         this.repository = repository;
         this.audit = audit;
+        this.jdbc = jdbc;
     }
 
     @Transactional(readOnly = true)
     public List<AreaResponse> list() {
-        return repository.findAllByOrderByNameAsc().stream().map(AreaService::toResponse).toList();
+        java.util.Map<Long, Long> counts = new java.util.HashMap<>();
+        jdbc.query("select area_id, count(*) from customer where status = 'ACTIVE' group by area_id", rs -> {
+            counts.put(rs.getLong(1), rs.getLong(2));
+        });
+        return repository.findAllByOrderByNameAsc().stream().map(a -> toResponse(a, counts.getOrDefault(a.getId(), 0L))).toList();
     }
 
     @Transactional
@@ -70,6 +77,10 @@ public class AreaService {
     }
 
     private static AreaResponse toResponse(Area a) {
-        return new AreaResponse(a.getId(), a.getName(), a.isActive(), a.getVersion());
+        return toResponse(a, 0);
+    }
+
+    private static AreaResponse toResponse(Area a, long activeCustomers) {
+        return new AreaResponse(a.getId(), a.getName(), a.isActive(), activeCustomers, a.getVersion());
     }
 }

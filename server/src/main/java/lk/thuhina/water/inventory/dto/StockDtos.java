@@ -18,7 +18,10 @@ public final class StockDtos {
     private StockDtos() {
     }
 
-    /** One bottle type: the five buckets, in circulation (all but written off), the minimum filled level. */
+    /**
+     * One bottle type: the five buckets, in circulation (all but written off), the minimum filled level, and what
+     * "with customers" is made of (held + empties to collect + bottles owed, summed over customers).
+     */
     public record BottleStock(
             String code,
             String name,
@@ -30,7 +33,10 @@ public final class StockDtos {
             int writtenOff,
             int inCirculation,
             @Schema(nullable = true) Integer minFilled,
-            boolean low) {
+            boolean low,
+            int customersHeld,
+            int customersToCollect,
+            int customersOwed) {
     }
 
     /** Product stock with its cost value (stock × cost price). */

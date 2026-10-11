@@ -636,6 +636,43 @@
     border-color: var(--bad);
     background: #fff7f6;
   }
+  /* Balance cards (prototype .balances / .bal) – customer side panel */
+  .balances {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+  }
+  .bal {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    background: #fbfcfd;
+  }
+  .bal .label {
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  .bal .value {
+    font-size: 1.15rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .bal.hl {
+    border-color: #f1d49d;
+    background: #fffaf0;
+  }
+  .bal.bad {
+    border-color: #f2c2bd;
+    background: #fff8f7;
+  }
+  .section-title {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 16px 0 8px;
+    font-weight: 600;
+  }
   .radio-row {
     display: flex;
     gap: 16px;

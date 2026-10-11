@@ -84,3 +84,21 @@ export type CompanyDamageRequest = Schemas["CompanyDamageRequest"];
 export type DamageLocation = CompanyDamageRequest["location"];
 export type AdjustmentRequest = Schemas["AdjustmentRequest"];
 export type AdjustmentResponse = Schemas["AdjustmentResponse"];
+
+// Customers (M05)
+export type CustomerRequest = Schemas["CustomerRequest"];
+export type PayType = CustomerRequest["payType"];
+export type CustomerListRow = Schemas["CustomerListRow"];
+export type CustomerList = Schemas["CustomerListResponse"];
+export type CustomerBottles = Schemas["BottleBalance"];
+export type ScheduledPrice = Schemas["ScheduledPrice"];
+/** `next` is null when no agreed-price change is scheduled (springdoc drops "nullable" on object references). */
+export type WaterPriceView = Omit<Schemas["WaterPriceView"], "next"> & { next: ScheduledPrice | null };
+export type CustomerDetail = Omit<Schemas["CustomerDetail"], "prices"> & { prices: WaterPriceView[] };
+export type CustomerSaved = { customer: CustomerDetail; agreedPricesSet: number };
+export type CustomerHistoryRow = Schemas["HistoryRow"];
+export type CustomerLookupRow = Schemas["LookupRow"];
+export type CustomerPriceRow = Schemas["CustomerPriceRow"];
+export type SetCustomerPriceRequest = Schemas["SetCustomerPriceRequest"];
+export type EndCustomerPriceRequest = Schemas["EndCustomerPriceRequest"];
+export type DeactivateRequest = Schemas["DeactivateRequest"];
