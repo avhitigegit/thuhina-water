@@ -1,19 +1,25 @@
 "use client";
 
 /*
- * Record damage (FR-29, BR-05) and Stock adjustment (FR-30) pop-ups (prototype inventory/inventory.html).
- * Company damage only for now – the Customer option comes with Sales (M06).
+ * Record damage (FR-29, BR-05, BR-06) and Stock adjustment (FR-30) pop-ups (prototype inventory/inventory.html).
+ * Damage is Company (written off at company cost, with the place) or Customer (a customer-damage bill: the customer
+ * pays a new filled bottle – deposit + water; over the credit limit needs Admin approval).
  */
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { Controller, useForm, useWatch, type Resolver } from "react-hook-form";
 import { DateField } from "@/components/shared/DateField";
 import { FormDialog } from "@/components/shared/FormDialog";
-import { useCurrentUser } from "@/features/auth/access";
+import { useCan, useCurrentUser } from "@/features/auth/access";
+import { CustomerPicker } from "@/features/customers/CustomerPicker";
 import { useBottleTypes } from "@/features/masterdata/api";
-import type { StockOverview } from "@/lib/api/types";
+import { useSalePreview } from "@/features/sales/api";
+import { CREDIT_LIMIT, CreditApprovalDialog } from "@/features/sales/CreditApprovalDialog";
+import { ApiError } from "@/lib/api/client";
+import type { CustomerLookupRow, StockOverview } from "@/lib/api/types";
 import { formatMoney, todayIso } from "@/lib/format";
 import { showServerErrors } from "@/lib/forms";
+import { P } from "@/lib/permissions";
 import { toast } from "@/lib/toast";
 import { useAdjustStock, useRecordDamage } from "./api";
 import { ADJUSTABLE, DAMAGE_LOCATIONS } from "./labels";
@@ -23,139 +29,256 @@ export function DamageDialog({ stock, onClose }: { stock: StockOverview; onClose
   const today = todayIso();
   const record = useRecordDamage();
   const bottleTypes = useBottleTypes();
+  const canSell = useCan(P.SALES_EDIT);
   const [error, setError] = useState("");
+  const [customer, setCustomer] = useState<CustomerLookupRow | null>(null);
+  const [creditError, setCreditError] = useState<ApiError | null>(null);
   const firstBottle = stock.bottles[0]?.code ?? "";
   const {
     register,
     control,
     handleSubmit,
+    setValue,
     setError: setFieldError,
     formState: { errors },
   } = useForm<DamageValues>({
     resolver: zodResolver(damageSchema(today)) as unknown as Resolver<DamageValues>,
     defaultValues: {
+      responsibility: "COMPANY",
       date: today,
       bottleTypeCode: firstBottle,
       qty: "1",
       location: "FILLED_IN_STORE",
+      customerId: null,
+      paid: "",
       reason: "",
     },
   });
-  const [bottle, qty] = useWatch({ control, name: ["bottleTypeCode", "qty"] });
+  const [responsibility, bottle, qty, date, paid, reason] = useWatch({
+    control,
+    name: ["responsibility", "bottleTypeCode", "qty", "date", "paid", "reason"],
+  });
+  const forCustomer = responsibility === "CUSTOMER";
   const deposit = bottleTypes.data?.find((b) => b.code === bottle)?.deposit ?? 0;
   const value = (Number(qty) || 0) * deposit;
+  // Customer damage from this pop-up: the customer buys a filled replacement (Sales & Bills has more options).
+  const preview = useSalePreview(
+    "damage",
+    forCustomer && customer && date
+      ? {
+          customerId: customer.id,
+          date,
+          bottleTypeCode: bottle,
+          qty: Number(qty) || 0,
+          mode: "REPLACE",
+          giveFilled: true,
+          reason: reason.trim(),
+          paid: paid.trim() === "" ? undefined : Number(paid) || 0,
+        }
+      : null,
+  );
+  const p = forCustomer && customer ? preview.data : undefined;
 
-  const submit = handleSubmit((v) => {
+  function send(v: DamageValues, approveOverLimit: boolean) {
     setError("");
     record.mutate(
-      {
-        date: v.date as string,
-        bottleTypeCode: v.bottleTypeCode,
-        qty: Number(v.qty),
-        location: v.location as (typeof DAMAGE_LOCATIONS)[number]["value"],
-        reason: v.reason,
-      },
+      forCustomer
+        ? {
+            responsibility: "CUSTOMER",
+            date: v.date as string,
+            bottleTypeCode: v.bottleTypeCode,
+            qty: Number(v.qty),
+            reason: v.reason,
+            customerId: v.customerId ?? undefined,
+            mode: "REPLACE",
+            giveFilled: true,
+            paid: v.paid.trim() === "" ? 0 : Number(v.paid),
+            approveOverLimit,
+          }
+        : {
+            responsibility: "COMPANY",
+            date: v.date as string,
+            bottleTypeCode: v.bottleTypeCode,
+            qty: Number(v.qty),
+            location: v.location as (typeof DAMAGE_LOCATIONS)[number]["value"],
+            reason: v.reason,
+          },
       {
         onSuccess: () => {
-          toast("Damage recorded and written off", "ok");
+          setCreditError(null);
+          toast(forCustomer ? "Customer damage recorded" : "Damage recorded and written off", "ok");
           onClose();
         },
-        onError: (err) =>
+        onError: (err) => {
+          if (err instanceof ApiError && err.code === CREDIT_LIMIT) {
+            setCreditError(err);
+            return;
+          }
+          setCreditError(null);
           setError(
             showServerErrors(
               err,
-              ["date", "bottleTypeCode", "qty", "location", "reason"] as const,
+              ["date", "bottleTypeCode", "qty", "location", "reason", "customerId", "paid"] as const,
               setFieldError,
             ) ?? "",
-          ),
+          );
+        },
       },
     );
-  });
+  }
+
+  const submit = handleSubmit((v) => send(v, false));
 
   return (
-    <FormDialog
-      open
-      wide
-      onOpenChange={(o) => !o && onClose()}
-      title="Record damaged bottles"
-      onSubmit={() => void submit()}
-      submitting={record.isPending}
-    >
-      {error && <div className="banner bad">{error}</div>}
-      <div className="radio-row" style={{ marginBottom: 10 }}>
-        <label className="check">
-          <input type="radio" checked readOnly /> <b>Company</b> – in store, at factory or during delivery
-          (written off at company cost)
-        </label>
-        <label className="check muted" title="Comes with Sales & Bills (M06)">
-          <input type="radio" disabled /> Customer – customer pays for a new bottle (from Sales &amp; Bills)
-        </label>
-      </div>
-      <div className="form-grid">
-        <div className="field req">
-          <label htmlFor="dmg-date">Date</label>
-          <Controller
-            control={control}
-            name="date"
-            render={({ field }) => (
-              <DateField
-                id="dmg-date"
-                value={field.value}
-                onChange={field.onChange}
-                invalid={!!errors.date}
-              />
+    <>
+      <FormDialog
+        open
+        wide
+        onOpenChange={(o) => !o && onClose()}
+        title="Record damaged bottles"
+        onSubmit={() => void submit()}
+        submitting={record.isPending || !!creditError}
+      >
+        {error && <div className="banner bad">{error}</div>}
+        <div className="radio-row" style={{ marginBottom: 10 }}>
+          <label className="check">
+            <input type="radio" value="COMPANY" {...register("responsibility")} /> <b>Company</b> – in store,
+            at factory or during delivery (written off at company cost)
+          </label>
+          <label
+            className={canSell ? "check" : "check muted"}
+            title={canSell ? undefined : "Only users who enter sales can record customer damage"}
+          >
+            <input type="radio" value="CUSTOMER" disabled={!canSell} {...register("responsibility")} />{" "}
+            <b>Customer</b> – customer pays for a new bottle
+          </label>
+        </div>
+        <div className="form-grid">
+          <div className="field req">
+            <label htmlFor="dmg-date">Date</label>
+            <Controller
+              control={control}
+              name="date"
+              render={({ field }) => (
+                <DateField
+                  id="dmg-date"
+                  value={field.value}
+                  onChange={field.onChange}
+                  invalid={!!errors.date}
+                />
+              )}
+            />
+            {errors.date && <span className="error">{errors.date.message}</span>}
+          </div>
+          <div className="field req">
+            <label htmlFor="dmg-bottle">Bottle</label>
+            <select id="dmg-bottle" {...register("bottleTypeCode")}>
+              {stock.bottles.map((b) => (
+                <option key={b.code} value={b.code}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+            {errors.bottleTypeCode && <span className="error">{errors.bottleTypeCode.message}</span>}
+          </div>
+          <div className="field req">
+            <label htmlFor="dmg-qty">Quantity</label>
+            <input
+              id="dmg-qty"
+              type="number"
+              min="1"
+              className={errors.qty ? "invalid num" : "num"}
+              {...register("qty")}
+            />
+            {errors.qty && <span className="error">{errors.qty.message}</span>}
+          </div>
+          {forCustomer ? (
+            <>
+              <div className="field req span2">
+                <label htmlFor="dmg-customer">Customer</label>
+                <CustomerPicker
+                  id="dmg-customer"
+                  value={customer}
+                  invalid={!!errors.customerId}
+                  onChange={(c) => {
+                    setCustomer(c);
+                    setValue("customerId", c?.id ?? null, { shouldValidate: !!errors.customerId });
+                  }}
+                />
+                {errors.customerId && <span className="error">{errors.customerId.message}</span>}
+              </div>
+              <div className="field">
+                <label htmlFor="dmg-paid">Paid now (Rs.)</label>
+                <input
+                  id="dmg-paid"
+                  type="number"
+                  min="0"
+                  className={errors.paid ? "invalid num" : "num"}
+                  {...register("paid")}
+                />
+                {errors.paid && <span className="error">{errors.paid.message}</span>}
+              </div>
+            </>
+          ) : (
+            <div className="field req">
+              <label htmlFor="dmg-where">Where</label>
+              <select id="dmg-where" {...register("location")}>
+                {DAMAGE_LOCATIONS.map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+              {errors.location && <span className="error">{errors.location.message}</span>}
+            </div>
+          )}
+          <div className="field req full">
+            <label htmlFor="dmg-reason">Reason</label>
+            <input
+              id="dmg-reason"
+              placeholder={
+                forCustomer ? "e.g. Bottle cracked – dropped by customer" : "e.g. Dropped while loading"
+              }
+              className={errors.reason ? "invalid" : undefined}
+              {...register("reason")}
+            />
+            {errors.reason && <span className="error">{errors.reason.message}</span>}
+          </div>
+        </div>
+        {forCustomer ? (
+          <div style={{ marginTop: 10 }}>
+            {p?.problems
+              .filter((x) => x.field !== "reason")
+              .map((x) => (
+                <div key={x.message} className="banner bad">
+                  {x.message}
+                </div>
+              ))}
+            {p ? (
+              <p className="small">
+                Customer pays a new bottle (deposit) {formatMoney(p.deposit)} + water {formatMoney(p.water)} ={" "}
+                <b>{formatMoney(p.amount)}</b>. The damaged bottle is written off and a filled replacement is
+                given. For more options use Sales &amp; Bills → Customer-damaged bottle.
+              </p>
+            ) : (
+              <p className="small muted">Select the customer to see the charge.</p>
             )}
-          />
-          {errors.date && <span className="error">{errors.date.message}</span>}
-        </div>
-        <div className="field req">
-          <label htmlFor="dmg-bottle">Bottle</label>
-          <select id="dmg-bottle" {...register("bottleTypeCode")}>
-            {stock.bottles.map((b) => (
-              <option key={b.code} value={b.code}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-          {errors.bottleTypeCode && <span className="error">{errors.bottleTypeCode.message}</span>}
-        </div>
-        <div className="field req">
-          <label htmlFor="dmg-qty">Quantity</label>
-          <input
-            id="dmg-qty"
-            type="number"
-            min="1"
-            className={errors.qty ? "invalid num" : "num"}
-            {...register("qty")}
-          />
-          {errors.qty && <span className="error">{errors.qty.message}</span>}
-        </div>
-        <div className="field req">
-          <label htmlFor="dmg-where">Where</label>
-          <select id="dmg-where" {...register("location")}>
-            {DAMAGE_LOCATIONS.map((l) => (
-              <option key={l.value} value={l.value}>
-                {l.label}
-              </option>
-            ))}
-          </select>
-          {errors.location && <span className="error">{errors.location.message}</span>}
-        </div>
-        <div className="field req full">
-          <label htmlFor="dmg-reason">Reason</label>
-          <input
-            id="dmg-reason"
-            placeholder="e.g. Dropped while loading"
-            className={errors.reason ? "invalid" : undefined}
-            {...register("reason")}
-          />
-          {errors.reason && <span className="error">{errors.reason.message}</span>}
-        </div>
-      </div>
-      <p className="small muted" style={{ marginTop: 10 }}>
-        The bottles are disposed of and written off. Value: {formatMoney(value)}.
-      </p>
-    </FormDialog>
+          </div>
+        ) : (
+          <p className="small muted" style={{ marginTop: 10 }}>
+            The bottles are disposed of and written off. Value: {formatMoney(value)}.
+          </p>
+        )}
+      </FormDialog>
+      {creditError && (
+        <CreditApprovalDialog
+          error={creditError}
+          busy={record.isPending}
+          onApprove={() => void handleSubmit((v) => send(v, true))()}
+          onClose={() => setCreditError(null)}
+        />
+      )}
+    </>
   );
 }
 

@@ -14,8 +14,10 @@ import type {
   CustomerType,
   DeactivateRequest,
   EndCustomerPriceRequest,
+  RegistrationPreview,
   SetCustomerPriceRequest,
 } from "@/lib/api/types";
+import { useDebounced } from "@/lib/useDebounced";
 
 const KEY = ["customers"] as const;
 
@@ -83,7 +85,10 @@ export function useAreas() {
   });
 }
 
-/** A customer change reloads every customer screen, the price lists, stock (with customers) and the audit log. */
+/**
+ * A customer change reloads every customer screen, the price lists, stock (with customers), bills (registration
+ * with bottles) and the audit log.
+ */
 function useCustomerChange<TVars, TResult>(fn: (vars: TVars) => Promise<TResult>) {
   const qc = useQueryClient();
   return useMutation({
@@ -91,6 +96,8 @@ function useCustomerChange<TVars, TResult>(fn: (vars: TVars) => Promise<TResult>
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEY });
       qc.invalidateQueries({ queryKey: ["masterdata"] });
+      qc.invalidateQueries({ queryKey: ["inventory"] });
+      qc.invalidateQueries({ queryKey: ["sales"] });
       qc.invalidateQueries({ queryKey: ["admin", "audit"] });
     },
     meta: { silent: true },
@@ -136,3 +143,16 @@ export const useSaveArea = () =>
       ? api<Area>("/areas", { method: "POST", body })
       : api<Area>(`/areas/${id}`, { method: "PUT", body }),
   );
+
+/** Live calculation of the bottles given on the registration date (first-purchase bills; nothing is saved). */
+export function useRegistrationPreview(body: CustomerRequest | null) {
+  const debounced = useDebounced(body);
+  return useQuery({
+    queryKey: [...KEY, "register-preview", debounced],
+    queryFn: ({ signal }) =>
+      api<RegistrationPreview>("/customers/register/preview", { method: "POST", body: debounced, signal }),
+    enabled: debounced !== null,
+    placeholderData: keepPreviousData,
+    meta: { silent: true },
+  });
+}

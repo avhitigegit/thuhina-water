@@ -7,7 +7,7 @@ import { AccessProvider } from "@/features/auth/access";
 import type { MeResponse, StockOverview } from "@/lib/api/types";
 import { P } from "@/lib/permissions";
 import { adjustmentSchema, damageSchema } from "./schemas";
-import { AdjustmentDialog } from "./StockDialogs";
+import { AdjustmentDialog, DamageDialog } from "./StockDialogs";
 import { StockTab } from "./StockTab";
 
 const STOCK: StockOverview = {
@@ -82,10 +82,13 @@ describe("stock form rules", () => {
   const today = "2026-10-11";
   it("damage: date not after today, qty ≥ 1, place and reason", () => {
     const r = damageSchema(today).safeParse({
+      responsibility: "COMPANY",
       date: "2026-10-12",
       bottleTypeCode: "B20",
       qty: "0",
       location: "",
+      customerId: null,
+      paid: "",
       reason: " ",
     });
     expect(Object.fromEntries((r.error?.issues ?? []).map((i) => [String(i.path[0]), i.message]))).toEqual({
@@ -93,6 +96,23 @@ describe("stock form rules", () => {
       qty: "Enter the number of damaged bottles.",
       location: "Select where the damage happened.",
       reason: "Enter the reason.",
+    });
+  });
+
+  it("damage by a customer needs the customer, not the place", () => {
+    const r = damageSchema(today).safeParse({
+      responsibility: "CUSTOMER",
+      date: today,
+      bottleTypeCode: "B20",
+      qty: "1",
+      location: "",
+      customerId: null,
+      paid: "-5",
+      reason: "Cracked",
+    });
+    expect(Object.fromEntries((r.error?.issues ?? []).map((i) => [String(i.path[0]), i.message]))).toEqual({
+      customerId: "Select a customer.",
+      paid: "Paid amount cannot be negative.",
     });
   });
 
@@ -165,5 +185,39 @@ describe("AdjustmentDialog", () => {
     expect(within(dialog).getByLabelText("In system")).toHaveValue("2");
     expect(within(dialog).getByLabelText("Counted")).toBeInTheDocument();
     expect(within(dialog).getByText("Recorded by Nimal Perera.")).toBeInTheDocument();
+  });
+});
+
+describe("DamageDialog", () => {
+  it("Customer damage needs the right to enter sales; it asks for the customer instead of the place", async () => {
+    const user = userEvent.setup();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response("[]", { status: 200 })),
+    );
+    const { unmount } = render(wrap(<DamageDialog stock={STOCK} onClose={vi.fn()} />));
+    let dialog = screen.getByRole("dialog", { name: "Record damaged bottles" });
+    expect(within(dialog).getByRole("radio", { name: /Customer/ })).toBeDisabled();
+    unmount();
+
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <AccessProvider
+          value={{ me: { ...ME, permissions: [...ME.permissions, P.SALES_EDIT] }, viewOnly: false }}
+        >
+          <DamageDialog stock={STOCK} onClose={vi.fn()} />
+        </AccessProvider>
+      </QueryClientProvider>,
+    );
+    dialog = screen.getByRole("dialog", { name: "Record damaged bottles" });
+    expect(within(dialog).getByLabelText("Where")).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("radio", { name: /Customer/ }));
+    expect(within(dialog).queryByLabelText("Where")).not.toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Customer")).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("Paid now (Rs.)")).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText("Reason"), "Cracked");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(await within(dialog).findByText("Select a customer.")).toBeInTheDocument();
   });
 });

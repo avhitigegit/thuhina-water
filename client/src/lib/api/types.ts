@@ -95,10 +95,40 @@ export type ScheduledPrice = Schemas["ScheduledPrice"];
 /** `next` is null when no agreed-price change is scheduled (springdoc drops "nullable" on object references). */
 export type WaterPriceView = Omit<Schemas["WaterPriceView"], "next"> & { next: ScheduledPrice | null };
 export type CustomerDetail = Omit<Schemas["CustomerDetail"], "prices"> & { prices: WaterPriceView[] };
-export type CustomerSaved = { customer: CustomerDetail; agreedPricesSet: number };
+/** `bills` = the first-purchase bills of the bottles given on the registration date (empty when editing). */
+export type CustomerSaved = { customer: CustomerDetail; agreedPricesSet: number; bills: TxnDetail[] };
 export type CustomerHistoryRow = Schemas["HistoryRow"];
 export type CustomerLookupRow = Schemas["LookupRow"];
 export type CustomerPriceRow = Schemas["CustomerPriceRow"];
 export type SetCustomerPriceRequest = Schemas["SetCustomerPriceRequest"];
 export type EndCustomerPriceRequest = Schemas["EndCustomerPriceRequest"];
 export type DeactivateRequest = Schemas["DeactivateRequest"];
+
+// Sales & Bills (M06)
+export type SaleLine = Schemas["SaleLine"];
+export type SaleProblem = Schemas["Problem"];
+export type BottlesAfter = Schemas["BottlesAfter"];
+export type CreditView = Schemas["CreditView"];
+/** `credit` is null without a customer (walk-in product sale). */
+export type SalePreview = Omit<Schemas["SalePreview"], "credit"> & { credit: CreditView | null };
+export type RegistrationPreview = Schemas["RegistrationPreview"];
+export type BillLink = Schemas["BillLink"];
+export type TxnRow = Schemas["TxnRow"];
+export type TxnList = Schemas["TxnListResponse"];
+/** `reversalOf` / `reversedBy` are null when there is no such link. */
+export type TxnDetail = Omit<Schemas["TxnDetail"], "reversalOf" | "reversedBy"> & {
+  reversalOf: BillLink | null;
+  reversedBy: BillLink | null;
+};
+export type ScheduleChange = Schemas["ScheduleChange"];
+/** `schedule` is null for bills that do not move the next delivery. */
+export type SaleResult = { txn: TxnDetail; schedule: ScheduleChange | null };
+export type PaperBillCheck = Omit<Schemas["PaperBillCheck"], "txn"> & { txn: TxnRow | null };
+export type FirstPurchaseRequest = Schemas["FirstPurchaseRequest"];
+export type ExtraOrderRequest = Schemas["ExtraOrderRequest"];
+export type CollectEmptiesRequest = Schemas["CollectEmptiesRequest"];
+export type CustomerDamageRequest = Schemas["CustomerDamageRequest"];
+export type SettleOwedRequest = Schemas["SettleOwedRequest"];
+export type ProductSaleRequest = Schemas["ProductSaleRequest"];
+export type PayMethod = NonNullable<ProductSaleRequest["payMethod"]>;
+export type ReverseRequest = Schemas["ReverseRequest"];

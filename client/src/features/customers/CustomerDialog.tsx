@@ -4,8 +4,10 @@
  * New / Edit customer pop-up (FR-05, FR-08 – FR-10, FR-13, prototype master-data/customers.html "edit"):
  * details · Delivery (registration date, day, cycle, next delivery – filled automatically with the next delivery day
  * after the registration date, editable) · Water price (agreed prices for a new customer; price now + "Change
- * prices…" when editing) · Payment · WhatsApp · Notes · Status (edit). A phone already in use asks "Save anyway?".
- * (The "bottles given on the registration date" section comes with Sales, M06.)
+ * prices…" when editing) · Payment · Bottles given on the registration date (new customer, FR-08 + FR-32: filled per
+ * bottle type, old bottles, cash paid, live calculation from /customers/register/preview) · WhatsApp · Notes · Status
+ * (edit). A phone already in use asks "Save anyway?"; over the credit limit asks for Admin approval. A new customer
+ * and the first-purchase bills are saved together; the "Customer registered" pop-up lists the bills to print.
  */
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
@@ -14,9 +16,11 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { DateField } from "@/components/shared/DateField";
 import { FormDialog } from "@/components/shared/FormDialog";
 import { useCan } from "@/features/auth/access";
-import { useBottleTypes, usePriceMatrix } from "@/features/masterdata/api";
+import { useBottleTypes, useOldBottleBrands, usePriceMatrix } from "@/features/masterdata/api";
+import { openBillPdf } from "@/features/sales/BillDialog";
+import { CREDIT_LIMIT, CreditApprovalDialog } from "@/features/sales/CreditApprovalDialog";
 import { ApiError } from "@/lib/api/client";
-import type { CustomerDetail, CustomerRequest } from "@/lib/api/types";
+import type { CustomerDetail, CustomerRequest, CustomerSaved, RegistrationPreview } from "@/lib/api/types";
 import { formatDate, formatMoney, todayIso } from "@/lib/format";
 import { showServerErrors } from "@/lib/forms";
 import { P } from "@/lib/permissions";
@@ -27,6 +31,7 @@ import {
   useCustomerTypes,
   useDeactivateCustomer,
   useReactivateCustomer,
+  useRegistrationPreview,
   useSaveCustomer,
 } from "./api";
 import { CustomerPriceDialog } from "./CustomerPriceDialog";
@@ -89,6 +94,8 @@ function CustomerForm({
   const isNew = customer === null;
   const today = todayIso();
   const canPrices = useCan(P.CUSTOMER_PRICES_EDIT);
+  // Bottles given on the registration date are sales (first purchases).
+  const canSell = useCan(P.SALES_EDIT);
   const areas = useAreas();
   const types = useCustomerTypes();
   const bottleTypes = useBottleTypes();
@@ -100,6 +107,13 @@ function CustomerForm({
   const [error, setError] = useState("");
   const [dupMessage, setDupMessage] = useState<string | null>(null);
   const [pricesOpen, setPricesOpen] = useState(false);
+  const [creditError, setCreditError] = useState<ApiError | null>(null);
+  const [registered, setRegistered] = useState<CustomerSaved | null>(null);
+  // "Save anyway" for a duplicate phone is kept when the Admin then approves the credit limit.
+  const [allowDup, setAllowDup] = useState(false);
+  // Cash paid on the registration bills: the total for Cash customers (0 otherwise) until typed in.
+  const [paidText, setPaidText] = useState<string | null>(null);
+  const brands = useOldBottleBrands();
   const [status, setStatus] = useState({
     value: customer?.status ?? "ACTIVE",
     date: today as string | null,
@@ -141,6 +155,8 @@ function CustomerForm({
       termsDays: String(customer && customer.termsDays > 0 ? customer.termsDays : 30),
       agreedPrices: {},
       agreedReason: "",
+      bottlesGiven: {},
+      oldBottles: "0",
       whatsappOptIn: customer?.whatsappOptIn ?? false,
       whatsappNumber: customer?.whatsappNumber ?? "",
       notes: customer?.notes ?? "",
@@ -150,6 +166,47 @@ function CustomerForm({
     control,
     name: ["payType", "customerTypeId", "nextDeliveryDate", "deliveryDay", "agreedPrices"],
   });
+  const [given, oldBottles, registeredOn, creditLimit, name] = useWatch({
+    control,
+    name: ["bottlesGiven", "oldBottles", "registeredOn", "creditLimit", "name"],
+  });
+
+  // Bottles given on the registration date start as 2 of the main bottle type (prototype), once the types load.
+  const mainBottle = bottles[0]?.code;
+  useEffect(() => {
+    if (isNew && canSell && mainBottle && !getValues(`bottlesGiven.${mainBottle}`))
+      setValue(`bottlesGiven.${mainBottle}`, "2");
+  }, [isNew, canSell, mainBottle, getValues, setValue]);
+
+  const whole = (v: string | undefined) => (/^\d+$/.test((v ?? "").trim()) ? Number(v) : 0);
+  const givenNumbers = Object.fromEntries(bottles.map((b) => [b.code, whole(given?.[b.code])]));
+  const anyGiven = canSell && Object.values(givenNumbers).some((q) => q > 0);
+  const agreedNumbers = Object.fromEntries(
+    Object.entries(agreedPrices ?? {})
+      .filter(([, p]) => Number(p) > 0)
+      .map(([k, p]) => [k, Number(p)]),
+  );
+  const regPreview = useRegistrationPreview(
+    isNew && anyGiven && typeId && registeredOn
+      ? ({
+          name,
+          customerTypeId: Number(typeId),
+          registeredOn,
+          payType,
+          creditLimit: payType === "CASH" ? 0 : Number(creditLimit) || 0,
+          agreedPrices: agreedNumbers,
+          bottlesGiven: givenNumbers,
+          oldBottles: whole(oldBottles),
+          paid: paidText === null ? undefined : Number(paidText) || 0,
+        } as unknown as CustomerRequest)
+      : null,
+  );
+  const rp = anyGiven ? regPreview.data : undefined;
+  const paidValue = paidText ?? (rp ? String(payType === "CASH" ? Number(rp.amount) : 0) : "");
+  const paidNumber = Number(paidValue) || 0;
+  const oldBrandNames = (brands.data ?? [])
+    .filter((b) => b.active && b.bottleTypeCode === mainBottle)
+    .map((b) => b.name);
 
   // A new customer starts as Household once the types have loaded (the prototype's default).
   const household = types.data?.find((t) => t.name === "Household" && t.active)?.id;
@@ -171,8 +228,9 @@ function CustomerForm({
       setValue("nextDeliveryDate", nextDeliveryAfter(fromDate, Number(dayValue)), { shouldValidate: false });
   }
 
-  function send(v: CustomerValues, allowDuplicatePhone: boolean) {
+  function send(v: CustomerValues, allowDuplicatePhone: boolean, approveOverLimit = false) {
     setError("");
+    setAllowDup(allowDuplicatePhone);
     const body: CustomerRequest = {
       name: v.name,
       phone: v.phone,
@@ -199,6 +257,12 @@ function CustomerForm({
                 .map(([k, p]) => [k, Number(p)]),
             ),
             agreedReason: v.agreedReason,
+            bottlesGiven: canSell
+              ? Object.fromEntries(bottles.map((b) => [b.code, whole(v.bottlesGiven[b.code])]))
+              : {},
+            oldBottles: canSell ? whole(v.oldBottles) : 0,
+            paid: anyGiven ? paidNumber : 0,
+            approveOverLimit,
           }
         : { version: customer.version }),
     };
@@ -207,6 +271,12 @@ function CustomerForm({
       {
         onSuccess: async (saved) => {
           setDupMessage(null);
+          setCreditError(null);
+          if (isNew) {
+            // "Customer registered" with the bills to print; the panel opens when it is closed.
+            setRegistered(saved);
+            return;
+          }
           if (!isNew && status.value !== customer.status) {
             try {
               if (status.value === "INACTIVE") {
@@ -226,11 +296,9 @@ function CustomerForm({
             }
           }
           toast(
-            isNew
-              ? `Customer ${saved.customer.code} added`
-              : status.value !== customer.status
-                ? `Customer updated – now ${status.value === "ACTIVE" ? "Active" : "Inactive"}`
-                : "Customer updated",
+            status.value !== customer.status
+              ? `Customer updated – now ${status.value === "ACTIVE" ? "Active" : "Inactive"}`
+              : "Customer updated",
             "ok",
           );
           onSaved?.(saved.customer);
@@ -241,6 +309,12 @@ function CustomerForm({
             setDupMessage(err.message);
             return;
           }
+          if (err instanceof ApiError && err.code === CREDIT_LIMIT) {
+            setDupMessage(null);
+            setCreditError(err);
+            return;
+          }
+          setCreditError(null);
           setError(showServerErrors(err, SERVER_FIELDS, setFieldError) ?? "");
         },
       },
@@ -274,12 +348,12 @@ function CustomerForm({
   return (
     <>
       <FormDialog
-        open
+        open={!registered}
         wide
         onOpenChange={(o) => !o && onClose()}
         title={isNew ? "New customer" : `Edit ${customer.name}`}
         onSubmit={() => void submit()}
-        submitting={save.isPending || deactivate.isPending || reactivate.isPending}
+        submitting={save.isPending || deactivate.isPending || reactivate.isPending || !!creditError}
       >
         {error && <div className="banner bad">{error}</div>}
         <div className="form-grid">
@@ -520,6 +594,56 @@ function CustomerForm({
               </div>
             </>
           )}
+          {isNew && canSell && (
+            <>
+              <div className="section-title full">Bottles given on the registration date</div>
+              {bottles.map((b) => (
+                <div className="field" key={b.code}>
+                  <label htmlFor={`cu-given-${b.code}`}>Filled {b.litres}L bottles given</label>
+                  <input
+                    id={`cu-given-${b.code}`}
+                    type="number"
+                    min="0"
+                    className={errors.bottlesGiven?.[b.code] ? "invalid num" : "num"}
+                    {...register(`bottlesGiven.${b.code}`)}
+                  />
+                  {errors.bottlesGiven?.[b.code] && (
+                    <span className="error">{errors.bottlesGiven[b.code]?.message}</span>
+                  )}
+                </div>
+              ))}
+              <div className="field">
+                <label htmlFor="cu-oldBottles">
+                  {oldBrandNames.length
+                    ? `Old ${oldBrandNames.join(" / ")} bottles handed in`
+                    : "Old bottles handed in"}
+                </label>
+                <input
+                  id="cu-oldBottles"
+                  type="number"
+                  min="0"
+                  className={errors.oldBottles ? "invalid num" : "num"}
+                  {...register("oldBottles")}
+                />
+                {errors.oldBottles && <span className="error">{errors.oldBottles.message}</span>}
+              </div>
+              <div className="field">
+                <label htmlFor="cu-paid">Cash paid now (Rs.)</label>
+                <input
+                  id="cu-paid"
+                  type="number"
+                  min="0"
+                  className="num"
+                  value={paidValue}
+                  disabled={!anyGiven}
+                  onChange={(e) => setPaidText(e.target.value)}
+                />
+              </div>
+              <div className="full">
+                <RegistrationSummary preview={rp} paid={paidNumber} anyGiven={anyGiven} />
+              </div>
+            </>
+          )}
           <label className="check" style={{ alignSelf: "end" }}>
             <input type="checkbox" {...register("whatsappOptIn")} /> Send WhatsApp messages
           </label>
@@ -634,6 +758,118 @@ function CustomerForm({
       {pricesOpen && customer && (
         <CustomerPriceDialog customer={customer} onClose={() => setPricesOpen(false)} />
       )}
+      {creditError && (
+        <CreditApprovalDialog
+          error={creditError}
+          busy={save.isPending}
+          onApprove={() => void handleSubmit((v) => send(v, allowDup, true))()}
+          onClose={() => setCreditError(null)}
+        />
+      )}
+      {registered && (
+        <RegisteredDialog
+          saved={registered}
+          onClose={() => {
+            onSaved?.(registered.customer);
+            onClose();
+          }}
+        />
+      )}
     </>
+  );
+}
+
+/**
+ * Live summary of the bottles given (prototype firstCalc): "2 × 20L: water Rs. 700.00 + deposit 1 × Rs. 1,000.00
+ * (1 old bottle – no deposit)", total, paid and what goes to the account; problems such as "Only 2 filled 20L
+ * bottles in store." in red.
+ */
+function RegistrationSummary({
+  preview,
+  paid,
+  anyGiven,
+}: {
+  preview: RegistrationPreview | undefined;
+  paid: number;
+  anyGiven: boolean;
+}) {
+  if (!anyGiven)
+    return (
+      <p className="small muted">
+        No bottles given now – you can record the first purchase later from Sales &amp; Bills.
+      </p>
+    );
+  if (!preview) return null;
+  const amount = Number(preview.amount);
+  return (
+    <>
+      {preview.problems.length > 0 && (
+        <div className="banner bad" style={{ margin: "0 0 8px" }}>
+          {preview.problems.map((p) => (
+            <div key={p.message}>{p.message}</div>
+          ))}
+        </div>
+      )}
+      <div className="banner info" style={{ margin: 0 }} data-testid="registration-summary">
+        {preview.lines.map((l) => (
+          <div key={l.bottleTypeCode ?? l.label}>
+            {l.filled} × {l.label}: water {formatMoney((l.unitPrice ?? 0) * l.filled)}
+            {l.agreedPrice && " (agreed price)"} + deposit {l.depositCount} × {formatMoney(l.depositUnit)}
+            {l.oldBottles > 0 && ` (${l.oldBottles} old bottle${l.oldBottles > 1 ? "s" : ""} – no deposit)`}
+          </div>
+        ))}
+        <b>Total {formatMoney(amount)}</b> · paid {formatMoney(paid)}
+        {amount - paid > 0 && ` · ${formatMoney(amount - paid)} to the account`}
+        {preview.credit.exceeds && (
+          <div style={{ color: "var(--bad)" }}>
+            Over the credit limit ({formatMoney(preview.credit.limit)}) – Admin approval is needed.
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+/** "Customer registered" (prototype): code, the bills of the bottles given (Print bill), next delivery. */
+function RegisteredDialog({ saved, onClose }: { saved: CustomerSaved; onClose: () => void }) {
+  const c = saved.customer;
+  const bills = saved.bills ?? [];
+  return (
+    <FormDialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title="Customer registered"
+      extraButtons={
+        bills.length > 0 && (
+          <button type="button" className="btn" onClick={() => bills.forEach((b) => openBillPdf(b.id))}>
+            Print bill
+          </button>
+        )
+      }
+    >
+      <p>
+        <b>{c.name}</b> saved as <b>{c.code}</b>.
+      </p>
+      {bills.length ? (
+        <p>
+          Bottles given:
+          {bills.map((b) => (
+            <span key={b.id}>
+              <br />
+              {b.lines.map((l) => `${l.filled} × ${l.label}`).join(", ")} – bill {b.billNo} (
+              {formatMoney(b.amount)})
+            </span>
+          ))}
+        </p>
+      ) : (
+        <p>No bottles given yet.</p>
+      )}
+      <p>
+        Next delivery:{" "}
+        <b>
+          {dayName(isoWeekday(c.nextDeliveryDate))} {formatDate(c.nextDeliveryDate)}
+        </b>
+      </p>
+    </FormDialog>
   );
 }

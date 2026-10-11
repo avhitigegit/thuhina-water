@@ -289,7 +289,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Record company damage – the bottles are written off (never below zero) */
+        /** Record damage – company (written off, never below zero) or customer (a customer-damage bill, M06) */
         post: operations["damage"];
         delete?: never;
         options?: never;
@@ -328,6 +328,261 @@ export interface paths {
         post: operations["uploadLogo"];
         /** Remove the company logo; returns the company settings */
         delete: operations["removeLogo"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/txns/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reverse a bill with a reason – a REVERSAL bill cancels its stock, bottles and money */
+        post: operations["reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/settle-owed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Settle bottles owed: RETURN the bottles or pay the DEPOSIT */
+        post: operations["settleOwed"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/settle-owed/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Live calculation of settling bottles owed */
+        post: operations["settleOwedPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/product-sale": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Product sale to a customer or a walk-in (walk-in pays in full) */
+        post: operations["productSale"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/product-sale/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Live calculation of a product sale (with discount and stock warnings) */
+        post: operations["productSalePreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/first-purchase": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** First purchase: water + deposit per bottle; accepted old bottles waive the deposit */
+        post: operations["firstPurchase"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/first-purchase/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Live calculation of a first purchase */
+        post: operations["firstPurchasePreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/extra-order": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Extra order: deposits only for bottles beyond the empties returned */
+        post: operations["extraOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/extra-order/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Live calculation of an extra order */
+        post: operations["extraOrderPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/customer-damage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Customer-damaged bottle: REPLACE (charge deposit, + water when given filled) or REDUCE the holding */
+        post: operations["customerDamage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/customer-damage/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Live calculation of a customer-damaged bottle */
+        post: operations["customerDamagePreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/collect-empties": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Collect empties left at the door earlier (no charge) */
+        post: operations["collectEmpties"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/collect-empties/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Live calculation of collecting empties */
+        post: operations["collectEmptiesPreview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/bills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Exchange or Left at door from a paper bill (paper bill number required); moves the next delivery on */
+        post: operations["bill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/bills/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Live calculation of a delivery bill – nothing is saved */
+        post: operations["billPreview"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -482,8 +737,25 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Register a customer (agreed prices optional, from the registration date). A phone already in use gives DUP_PHONE unless allowDuplicatePhone = true */
+        /** Register a customer (agreed prices optional, from the registration date) with the bottles given that day as first-purchase bills, all in one transaction. A phone already in use gives DUP_PHONE unless allowDuplicatePhone = true */
         post: operations["register"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customers/register/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Live calculation of the bottles given on registration (first-purchase bills) – nothing is saved */
+        post: operations["registerPreview"];
         delete?: never;
         options?: never;
         head?: never;
@@ -663,6 +935,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/sales/txns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bills, newest first. q = part of the system or paper bill number; kind; customerId; from / to dates */
+        get: operations["list_6"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/txns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bill details: lines, amounts, ledger effects, user, links to its reversal */
+        get: operations["detail_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sales/paper-bill/{no}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Is this paper bill number already entered? ("Bill 41275 has not been entered yet.") */
+        get: operations["paperBill"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/roles/matrix": {
         parameters: {
             query?: never;
@@ -672,6 +995,23 @@ export interface paths {
         };
         /** Menu pages and special rights × roles → FULL / VIEW / NONE */
         get: operations["matrix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/print/bill/{txnId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bill PDF (A5) – opens in the browser to print */
+        get: operations["bill_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -756,7 +1096,7 @@ export interface paths {
             cookie?: never;
         };
         /** Customers with search (name, code, address; phone digits from 3), filters and paging. status ACTIVE (default) / INACTIVE / ALL; price STANDARD / AGREED; day 1 = Monday … 7 = Sunday */
-        get: operations["list_6"];
+        get: operations["list_7"];
         put?: never;
         post?: never;
         delete?: never;
@@ -807,7 +1147,7 @@ export interface paths {
             cookie?: never;
         };
         /** All customers' agreed prices: status=current (in force and scheduled, default) or all */
-        get: operations["list_7"];
+        get: operations["list_8"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1084,6 +1424,23 @@ export interface components {
             allowDuplicatePhone?: boolean;
             /** Format: int64 */
             version?: number;
+            bottlesGiven?: {
+                [key: string]: number;
+            };
+            /** Format: int32 */
+            oldBottles?: number;
+            /** Format: int64 */
+            oldBrandId?: number;
+            paid?: number;
+            approveOverLimit?: boolean;
+        };
+        BillLink: {
+            /** Format: int64 */
+            id: number;
+            billNo: string;
+            /** Format: date */
+            date: string;
+            note: string | null;
         };
         BottleBalance: {
             bottleTypeCode: string;
@@ -1142,11 +1499,90 @@ export interface components {
             customer: components["schemas"]["CustomerDetail"];
             /** Format: int32 */
             agreedPricesSet: number;
+            bills: components["schemas"]["TxnDetail"][];
+        };
+        EffectView: {
+            item: string;
+            place: string;
+            /** Format: int32 */
+            change: number;
+        };
+        SaleLine: {
+            bottleTypeCode: string | null;
+            productCode: string | null;
+            label: string;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            empties: number;
+            unitPrice: number | null;
+            agreedPrice: boolean;
+            depositUnit: number | null;
+            /** Format: int32 */
+            depositCount: number;
+            /** Format: int32 */
+            oldBottles: number;
+            /** Format: int64 */
+            oldBrandId: number | null;
+            /** Format: int32 */
+            newBottles: number;
+            /** Format: int32 */
+            owedAdded: number;
+            /** Format: int32 */
+            owedCleared: number;
+            /** Format: int32 */
+            toCollectAdded: number;
+            /** Format: int32 */
+            toCollectCleared: number;
+            /** Format: int32 */
+            damaged: number;
+            /** Format: int32 */
+            qty: number;
+            unitCost: number | null;
+            lineAmount: number;
         };
         ScheduledPrice: {
             price: number;
             /** Format: date */
             from: string;
+        };
+        TxnDetail: {
+            /** Format: int64 */
+            id: number;
+            billNo: string;
+            paperBillNo: string | null;
+            kind: string;
+            kindLabel: string;
+            /** Format: date */
+            date: string;
+            /** Format: int64 */
+            customerId: number | null;
+            customerCode: string | null;
+            customerName: string;
+            customerAddress: string | null;
+            customerPhone: string | null;
+            payType: string | null;
+            lines: components["schemas"]["SaleLine"][];
+            water: number;
+            deposit: number;
+            product: number;
+            productCost: number;
+            amount: number;
+            paid: number;
+            payMethod: string | null;
+            note: string | null;
+            phoneConfirmed: boolean;
+            damageMode: string | null;
+            settleMethod: string | null;
+            creditOverrideBy: string | null;
+            creditOverrideByName: string | null;
+            reversalOf: components["schemas"]["BillLink"];
+            reversedBy: components["schemas"]["BillLink"];
+            effects: components["schemas"]["EffectView"][];
+            createdBy: string;
+            createdByName: string | null;
+            /** Format: date-time */
+            createdAt: string;
         };
         WaterPriceView: {
             bottleTypeCode: string;
@@ -1228,9 +1664,18 @@ export interface components {
             /** Format: int32 */
             qty: number;
             /** @enum {string} */
-            location: "EMPTY_IN_STORE" | "FILLED_IN_STORE" | "AT_FACTORY" | "DURING_DELIVERY";
+            location?: "EMPTY_IN_STORE" | "FILLED_IN_STORE" | "AT_FACTORY" | "DURING_DELIVERY" | "AT_CUSTOMER";
             reason: string;
             note?: string;
+            /** @enum {string} */
+            responsibility?: "COMPANY" | "CUSTOMER";
+            /** Format: int64 */
+            customerId?: number;
+            /** @enum {string} */
+            mode?: "REPLACE" | "REDUCE";
+            giveFilled?: boolean;
+            paid?: number;
+            approveOverLimit?: boolean;
         };
         DamageListRow: {
             ref: string;
@@ -1274,6 +1719,181 @@ export interface components {
             /** Format: int32 */
             delta: number;
             description: string;
+        };
+        ReverseRequest: {
+            reason: string;
+        };
+        SaleResult: {
+            txn: components["schemas"]["TxnDetail"];
+            schedule: components["schemas"]["ScheduleChange"];
+        };
+        ScheduleChange: {
+            /** Format: date */
+            before: string;
+            /** Format: date */
+            after: string;
+        };
+        SettleOwedRequest: {
+            /** Format: int64 */
+            customerId: number;
+            /** Format: date */
+            date: string;
+            paperBillNo?: string;
+            bottleTypeCode: string;
+            /** Format: int32 */
+            qty?: number;
+            /** @enum {string} */
+            method?: "RETURN" | "DEPOSIT";
+            paid?: number;
+            note?: string;
+            approveOverLimit?: boolean;
+        };
+        BottlesAfter: {
+            bottleTypeCode: string;
+            label: string;
+            /** Format: int32 */
+            held: number;
+            /** Format: int32 */
+            toCollect: number;
+            /** Format: int32 */
+            owed: number;
+            /** Format: int32 */
+            heldChange: number;
+            /** Format: int32 */
+            toCollectChange: number;
+            /** Format: int32 */
+            owedChange: number;
+        };
+        CreditView: {
+            balance: number;
+            after: number;
+            limit: number;
+            exceeds: boolean;
+        };
+        Problem: {
+            field: string | null;
+            code: string;
+            message: string;
+        };
+        SalePreview: {
+            lines: components["schemas"]["SaleLine"][];
+            water: number;
+            deposit: number;
+            product: number;
+            amount: number;
+            paid: number;
+            after: components["schemas"]["BottlesAfter"][];
+            credit: components["schemas"]["CreditView"];
+            problems: components["schemas"]["Problem"][];
+            warnings: string[];
+        };
+        ProductItemRequest: {
+            productCode: string;
+            /** Format: int32 */
+            qty: number;
+            unitPrice: number;
+        };
+        ProductSaleRequest: {
+            /** Format: int64 */
+            customerId?: number;
+            walkInName?: string;
+            /** Format: date */
+            date: string;
+            paperBillNo?: string;
+            items?: components["schemas"]["ProductItemRequest"][];
+            paid?: number;
+            /** @enum {string} */
+            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            note?: string;
+            approveOverLimit?: boolean;
+        };
+        FirstPurchaseRequest: {
+            /** Format: int64 */
+            customerId: number;
+            /** Format: date */
+            date: string;
+            paperBillNo?: string;
+            bottleTypeCode: string;
+            /** Format: int32 */
+            qty?: number;
+            /** Format: int32 */
+            oldBottles?: number;
+            /** Format: int64 */
+            oldBrandId?: number;
+            paid?: number;
+            note?: string;
+            approveOverLimit?: boolean;
+        };
+        ExtraOrderRequest: {
+            /** Format: int64 */
+            customerId: number;
+            /** Format: date */
+            date: string;
+            paperBillNo?: string;
+            bottleTypeCode: string;
+            /** Format: int32 */
+            filled?: number;
+            /** Format: int32 */
+            empties?: number;
+            /** Format: int32 */
+            oldBottles?: number;
+            /** Format: int64 */
+            oldBrandId?: number;
+            paid?: number;
+            note?: string;
+            approveOverLimit?: boolean;
+        };
+        CustomerDamageRequest: {
+            /** Format: int64 */
+            customerId: number;
+            /** Format: date */
+            date: string;
+            paperBillNo?: string;
+            bottleTypeCode: string;
+            /** Format: int32 */
+            qty?: number;
+            /** @enum {string} */
+            mode?: "REPLACE" | "REDUCE";
+            giveFilled?: boolean;
+            reason?: string;
+            note?: string;
+            paid?: number;
+            approveOverLimit?: boolean;
+        };
+        CollectEmptiesRequest: {
+            /** Format: int64 */
+            customerId: number;
+            /** Format: date */
+            date: string;
+            paperBillNo?: string;
+            bottleTypeCode: string;
+            /** Format: int32 */
+            qty?: number;
+            note?: string;
+        };
+        BillLineRequest: {
+            bottleTypeCode: string;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            empties: number;
+        };
+        BillRequest: {
+            /** Format: int64 */
+            customerId: number;
+            /** Format: date */
+            date: string;
+            paperBillNo?: string;
+            /**
+             * @description EXCHANGE (default) or LEFT_AT_DOOR
+             * @enum {string}
+             */
+            kind?: "FIRST_PURCHASE" | "EXCHANGE" | "LEFT_AT_DOOR" | "COLLECT_EMPTIES" | "EXTRA_ORDER" | "PRODUCT_SALE" | "CUSTOMER_DAMAGE" | "OWED_SETTLEMENT" | "OPENING_BALANCE" | "REVERSAL";
+            lines?: components["schemas"]["BillLineRequest"][];
+            paid?: number;
+            note?: string;
+            phoneConfirmed?: boolean;
+            approveOverLimit?: boolean;
         };
         CreateProductRequest: {
             name: string;
@@ -1366,6 +1986,15 @@ export interface components {
             /** Format: date */
             date: string;
             reason: string;
+        };
+        RegistrationPreview: {
+            lines: components["schemas"]["SaleLine"][];
+            water: number;
+            deposit: number;
+            amount: number;
+            paid: number;
+            credit: components["schemas"]["CreditView"];
+            problems: components["schemas"]["Problem"][];
         };
         CreateCustomerTypeRequest: {
             name: string;
@@ -1499,6 +2128,44 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        TxnListResponse: {
+            items: components["schemas"]["TxnRow"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            total: number;
+        };
+        TxnRow: {
+            /** Format: int64 */
+            id: number;
+            billNo: string;
+            paperBillNo: string | null;
+            kind: string;
+            kindLabel: string;
+            /** Format: date */
+            date: string;
+            /** Format: int64 */
+            customerId: number | null;
+            customerCode: string | null;
+            customerName: string;
+            walkIn: boolean;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            empties: number;
+            amount: number;
+            paid: number;
+            reversed: boolean;
+            reversalOfBillNo: string | null;
+        };
+        PaperBillCheck: {
+            paperBillNo: string;
+            entered: boolean;
+            txn: components["schemas"]["TxnRow"];
+            message: string;
+        };
         Cell: {
             level: string;
             note: string | null;
@@ -1621,6 +2288,12 @@ export interface components {
             description: string;
             by: string;
             byName: string | null;
+            /** Format: int64 */
+            txnId: number | null;
+            billNo: string | null;
+            amount: number | null;
+            paid: number | null;
+            balance: number | null;
         };
         LookupRow: {
             /** Format: int64 */
@@ -2276,6 +2949,368 @@ export interface operations {
             };
         };
     };
+    reverse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReverseRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SaleResult"];
+                };
+            };
+        };
+    };
+    settleOwed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettleOwedRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SaleResult"];
+                };
+            };
+        };
+    };
+    settleOwedPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettleOwedRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SalePreview"];
+                };
+            };
+        };
+    };
+    productSale: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductSaleRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SaleResult"];
+                };
+            };
+        };
+    };
+    productSalePreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProductSaleRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SalePreview"];
+                };
+            };
+        };
+    };
+    firstPurchase: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FirstPurchaseRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SaleResult"];
+                };
+            };
+        };
+    };
+    firstPurchasePreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FirstPurchaseRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SalePreview"];
+                };
+            };
+        };
+    };
+    extraOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtraOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SaleResult"];
+                };
+            };
+        };
+    };
+    extraOrderPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtraOrderRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SalePreview"];
+                };
+            };
+        };
+    };
+    customerDamage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerDamageRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SaleResult"];
+                };
+            };
+        };
+    };
+    customerDamagePreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerDamageRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SalePreview"];
+                };
+            };
+        };
+    };
+    collectEmpties: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectEmptiesRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SaleResult"];
+                };
+            };
+        };
+    };
+    collectEmptiesPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CollectEmptiesRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SalePreview"];
+                };
+            };
+        };
+    };
+    bill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SaleResult"];
+                };
+            };
+        };
+    };
+    billPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SalePreview"];
+                };
+            };
+        };
+    };
     list_2: {
         parameters: {
             query?: never;
@@ -2572,6 +3607,30 @@ export interface operations {
             };
         };
     };
+    registerPreview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RegistrationPreview"];
+                };
+            };
+        };
+    };
     customerTypes: {
         parameters: {
             query?: never;
@@ -2857,6 +3916,78 @@ export interface operations {
             };
         };
     };
+    list_6: {
+        parameters: {
+            query?: {
+                q?: string;
+                customerId?: number;
+                kind?: "FIRST_PURCHASE" | "EXCHANGE" | "LEFT_AT_DOOR" | "COLLECT_EMPTIES" | "EXTRA_ORDER" | "PRODUCT_SALE" | "CUSTOMER_DAMAGE" | "OWED_SETTLEMENT" | "OPENING_BALANCE" | "REVERSAL";
+                from?: string;
+                to?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TxnListResponse"];
+                };
+            };
+        };
+    };
+    detail_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TxnDetail"];
+                };
+            };
+        };
+    };
+    paperBill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                no: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PaperBillCheck"];
+                };
+            };
+        };
+    };
     matrix: {
         parameters: {
             query?: never;
@@ -2873,6 +4004,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RolesMatrixResponse"];
+                };
+            };
+        };
+    };
+    bill_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                txnId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
                 };
             };
         };
@@ -2965,7 +4118,7 @@ export interface operations {
             };
         };
     };
-    list_6: {
+    list_7: {
         parameters: {
             query?: {
                 q?: string;
@@ -3040,7 +4193,7 @@ export interface operations {
             };
         };
     };
-    list_7: {
+    list_8: {
         parameters: {
             query?: {
                 status?: string;
