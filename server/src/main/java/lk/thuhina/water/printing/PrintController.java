@@ -25,10 +25,12 @@ public class PrintController {
 
     private final BillPrintService bills;
     private final DeliveryPrintService delivery;
+    private final PurchaseOrderPrintService purchaseOrders;
 
-    public PrintController(BillPrintService bills, DeliveryPrintService delivery) {
+    public PrintController(BillPrintService bills, DeliveryPrintService delivery, PurchaseOrderPrintService purchaseOrders) {
         this.bills = bills;
         this.delivery = delivery;
+        this.purchaseOrders = purchaseOrders;
     }
 
     @Operation(summary = "Bill PDF (A5) – opens in the browser to print")
@@ -55,6 +57,13 @@ public class PrintController {
                                             @RequestParam(required = false) Long area) {
         byte[] pdf = delivery.loadSheet(date, area);
         return pdf(pdf, "load-sheet-" + (date == null ? "tomorrow" : date) + ".pdf");
+    }
+
+    @Operation(summary = "Purchase order PDF (A4) – DRAFT / CANCELLED watermark while not valid for supply")
+    @GetMapping(value = "/purchase-order/{id}", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAuthority('" + Permissions.PURCHASING_VIEW + "')")
+    public ResponseEntity<byte[]> purchaseOrder(@PathVariable long id) {
+        return pdf(purchaseOrders.purchaseOrder(id), purchaseOrders.poNo(id) + ".pdf");
     }
 
     private static ResponseEntity<byte[]> pdf(byte[] pdf, String filename) {

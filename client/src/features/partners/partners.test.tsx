@@ -20,7 +20,7 @@ const SUPPLIER: Supplier = {
   termsDays: 30,
   termsLabel: "30 days",
   items: [{ code: "B20", type: "BOTTLE", name: "Empty 20L Bottle" }],
-  owed: null,
+  owed: 0,
   active: true,
   version: 0,
 };

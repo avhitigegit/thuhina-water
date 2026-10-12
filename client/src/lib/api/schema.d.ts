@@ -73,6 +73,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/purchase-orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A purchase order with lines, history and receipts */
+        get: operations["detail"];
+        /** Change a Draft: quantities and prices (qty 0 removes the line), expected date, notes */
+        put: operations["update_3"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products/{id}": {
         parameters: {
             query?: never;
@@ -82,7 +100,7 @@ export interface paths {
         };
         get?: never;
         /** Change name, prices or active – not the stock */
-        put: operations["update_3"];
+        put: operations["update_4"];
         post?: never;
         delete?: never;
         options?: never;
@@ -99,7 +117,7 @@ export interface paths {
         };
         get?: never;
         /** Stop accepting / accept again, or change the note or bottle type */
-        put: operations["update_4"];
+        put: operations["update_5"];
         post?: never;
         delete?: never;
         options?: never;
@@ -116,7 +134,7 @@ export interface paths {
         };
         get?: never;
         /** Change a factory; a changed charge is saved from today and applies to batches sent after saving */
-        put: operations["update_5"];
+        put: operations["update_6"];
         post?: never;
         delete?: never;
         options?: never;
@@ -132,9 +150,9 @@ export interface paths {
             cookie?: never;
         };
         /** Everything for the side panel: details, balances, outstanding, delivery, water prices */
-        get: operations["detail"];
+        get: operations["detail_1"];
         /** Edit a customer */
-        put: operations["update_6"];
+        put: operations["update_7"];
         post?: never;
         delete?: never;
         options?: never;
@@ -168,7 +186,7 @@ export interface paths {
         };
         get?: never;
         /** Change the name or active – the size cannot change */
-        put: operations["update_7"];
+        put: operations["update_8"];
         post?: never;
         delete?: never;
         options?: never;
@@ -274,6 +292,24 @@ export interface paths {
         put?: never;
         /** New supplier – code S01… on save; at least one supplied item; terms 0/7/14/30/45/60 days */
         post: operations["create_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supplier-payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Payments made, newest first (supplier optional) */
+        get: operations["list_2"];
+        put?: never;
+        /** Record a payment (SP-0001) – reference required unless cash */
+        post: operations["create_2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -588,6 +624,161 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/quotations/{id}/create-po": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create the purchase order (Draft) from the chosen quotation */
+        post: operations["createPo"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quotations/{id}/choose": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Choose a quotation (reason required; not when expired; one per request) */
+        post: operations["choose"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quotations/{id}/attachment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The scanned quotation – opens in the browser */
+        get: operations["attachment"];
+        put?: never;
+        /** Attach the scanned quotation (PDF, JPG or PNG, at most 5 MB); replaces an earlier file */
+        post: operations["attach"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quotation-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quotation requests, newest first (status OPEN / QUOTES_RECEIVED / SELECTED / CLOSED optional) */
+        get: operations["list_3"];
+        put?: never;
+        /** New quotation request – number QR-2026-001 on save; items with qty > 0; suppliers asked */
+        post: operations["create_3"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quotation-requests/{id}/quotations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Record a supplier quotation (SQ-0001) – unit price per item, blank = not quoted */
+        post: operations["addQuotation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/purchase-orders/{id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approved → Sent (marked as sent to the supplier) */
+        post: operations["send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/purchase-orders/{id}/receipts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive goods (GRN-0001) against a Sent / Partly received PO – good items go into stock */
+        post: operations["receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/purchase-orders/{id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancel a Draft or Approved PO (reason required) */
+        post: operations["cancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/purchase-orders/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Draft → Approved */
+        post: operations["approve"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/products": {
         parameters: {
             query?: never;
@@ -596,10 +787,10 @@ export interface paths {
             cookie?: never;
         };
         /** All products by code */
-        get: operations["list_2"];
+        get: operations["list_4"];
         put?: never;
         /** New product – code P01… on save; opening stock only here */
-        post: operations["create_2"];
+        post: operations["create_4"];
         delete?: never;
         options?: never;
         head?: never;
@@ -631,10 +822,10 @@ export interface paths {
             cookie?: never;
         };
         /** Accepted brands, active first */
-        get: operations["list_3"];
+        get: operations["list_5"];
         put?: never;
         /** Add an accepted brand for a bottle type */
-        post: operations["create_3"];
+        post: operations["create_5"];
         delete?: never;
         options?: never;
         head?: never;
@@ -649,10 +840,10 @@ export interface paths {
             cookie?: never;
         };
         /** All factories by code, with today's charge per active bottle type */
-        get: operations["list_4"];
+        get: operations["list_6"];
         put?: never;
         /** New factory – code F01… on save; a charge > 0 for every active bottle type */
-        post: operations["create_4"];
+        post: operations["create_6"];
         delete?: never;
         options?: never;
         head?: never;
@@ -788,10 +979,10 @@ export interface paths {
             cookie?: never;
         };
         /** Bottle types, largest first; activeOnly=true for the pick lists of sales and purchasing */
-        get: operations["list_5"];
+        get: operations["list_7"];
         put?: never;
         /** New bottle type – the code is made from the size (19 → B19) */
-        post: operations["create_5"];
+        post: operations["create_7"];
         delete?: never;
         options?: never;
         head?: never;
@@ -861,6 +1052,23 @@ export interface paths {
         put?: never;
         /** New area (unique name) */
         post: operations["createArea"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/supplier-balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Owed per supplier = goods received − paid, with the oldest unpaid receipt */
+        get: operations["balances"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -943,7 +1151,7 @@ export interface paths {
             cookie?: never;
         };
         /** Bills, newest first. q = part of the system or paper bill number; kind; customerId; from / to dates */
-        get: operations["list_6"];
+        get: operations["list_8"];
         put?: never;
         post?: never;
         delete?: never;
@@ -960,7 +1168,7 @@ export interface paths {
             cookie?: never;
         };
         /** Bill details: lines, amounts, ledger effects, user, links to its reversal */
-        get: operations["detail_1"];
+        get: operations["detail_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1012,6 +1220,74 @@ export interface paths {
         };
         /** Menu pages and special rights × roles → FULL / VIEW / NONE */
         get: operations["matrix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quotation-requests/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A request with the side-by-side comparison of its quotations */
+        get: operations["detail_3"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/quotation-requests/suggested-suppliers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Active suppliers of any of the items – ticked for the user on a new request */
+        get: operations["suggestedSuppliers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/purchase-orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Purchase orders, newest first, with the next step (status optional) */
+        get: operations["list_9"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/print/purchase-order/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Purchase order PDF (A4) – DRAFT / CANCELLED watermark while not valid for supply */
+        get: operations["purchaseOrder"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1198,7 +1474,7 @@ export interface paths {
             cookie?: never;
         };
         /** Customers with search (name, code, address; phone digits from 3), filters and paging. status ACTIVE (default) / INACTIVE / ALL; price STANDARD / AGREED; day 1 = Monday … 7 = Sunday */
-        get: operations["list_7"];
+        get: operations["list_10"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1249,7 +1525,7 @@ export interface paths {
             cookie?: never;
         };
         /** All customers' agreed prices: status=current (in force and scheduled, default) or all */
-        get: operations["list_8"];
+        get: operations["list_11"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1368,7 +1644,7 @@ export interface components {
             termsDays: number;
             termsLabel: string;
             items: components["schemas"]["SuppliedItem"][];
-            owed: number | null;
+            owed: number;
             active: boolean;
             /** Format: int64 */
             version: number;
@@ -1404,6 +1680,120 @@ export interface components {
             float: boolean;
             number: boolean;
             embeddedValue: boolean;
+        };
+        PoLineInput: {
+            itemCode: string;
+            /** Format: int32 */
+            qty: number;
+            unitPrice: number;
+        };
+        PoUpdateRequest: {
+            /** Format: date */
+            expectedDate: string;
+            notes?: string;
+            lines?: components["schemas"]["PoLineInput"][];
+            /** Format: int64 */
+            version?: number;
+        };
+        PoDetail: {
+            /** Format: int64 */
+            id: number;
+            poNo: string;
+            /** Format: date */
+            date: string;
+            /** Format: date */
+            expectedDate: string;
+            status: string;
+            statusLabel: string;
+            nextStep: string | null;
+            supplier: components["schemas"]["SupplierInfo"];
+            /** Format: int64 */
+            qrId: number;
+            qrNo: string;
+            /** Format: int64 */
+            quotationId: number;
+            quoteNo: string;
+            supplierRef: string | null;
+            notes: string | null;
+            lines: components["schemas"]["PoLineView"][];
+            total: number;
+            receivedValue: number;
+            createdByName: string;
+            approvedByName: string | null;
+            /** Format: date */
+            approvedOn: string | null;
+            /** Format: date */
+            sentOn: string | null;
+            cancelReason: string | null;
+            history: components["schemas"]["PoHistoryRow"][];
+            receipts: components["schemas"]["ReceiptView"][];
+            editable: boolean;
+            canCancel: boolean;
+            canReceive: boolean;
+            /** Format: int64 */
+            version: number;
+        };
+        PoHistoryRow: {
+            status: string;
+            statusLabel: string;
+            /** Format: date-time */
+            ts: string;
+            username: string;
+            userName: string;
+            note: string | null;
+        };
+        PoLineView: {
+            /** Format: int64 */
+            id: number;
+            itemType: string;
+            itemCode: string;
+            name: string;
+            /** Format: int32 */
+            qty: number;
+            unitPrice: number;
+            amount: number;
+            /** Format: int32 */
+            receivedQty: number;
+            /** Format: int32 */
+            damagedQty: number;
+            /** Format: int32 */
+            stillDue: number;
+        };
+        ReceiptLineView: {
+            itemCode: string;
+            name: string;
+            /** Format: int32 */
+            received: number;
+            /** Format: int32 */
+            damaged: number;
+            /** Format: int32 */
+            good: number;
+            unitPrice: number;
+            value: number;
+        };
+        ReceiptView: {
+            /** Format: int64 */
+            id: number;
+            grnNo: string;
+            /** Format: date */
+            date: string;
+            deliveryNote: string | null;
+            note: string | null;
+            value: number;
+            createdByName: string;
+            lines: components["schemas"]["ReceiptLineView"][];
+        };
+        SupplierInfo: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            contact: string | null;
+            phone: string;
+            address: string | null;
+            /** Format: int32 */
+            termsDays: number;
+            termsLabel: string;
         };
         UpdateProductRequest: {
             name: string;
@@ -1759,6 +2149,42 @@ export interface components {
             user: components["schemas"]["UserResponse"];
             temporaryPassword: string;
         };
+        PaymentRequest: {
+            /** Format: int64 */
+            supplierId?: number;
+            /** Format: date */
+            date: string;
+            amount?: number;
+            /** @enum {string} */
+            method?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            reference?: string;
+            /** Format: int64 */
+            poId?: number;
+            note?: string;
+        };
+        PaymentRow: {
+            /** Format: int64 */
+            id: number;
+            spNo: string;
+            /** Format: date */
+            date: string;
+            supplier: components["schemas"]["SupplierLink"];
+            /** Format: int64 */
+            poId: number | null;
+            poNo: string | null;
+            method: string;
+            methodLabel: string;
+            reference: string | null;
+            amount: number;
+            note: string | null;
+            createdByName: string;
+        };
+        SupplierLink: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+        };
         CompanyDamageRequest: {
             /** Format: date */
             date: string;
@@ -1997,6 +2423,138 @@ export interface components {
             phoneConfirmed?: boolean;
             approveOverLimit?: boolean;
         };
+        ReasonRequest: {
+            reason: string;
+        };
+        AskedSupplier: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            quoted: boolean;
+        };
+        ItemQty: {
+            itemCode: string;
+            itemType: string;
+            name: string;
+            /** Format: int32 */
+            qty: number;
+        };
+        PoLink: {
+            /** Format: int64 */
+            id: number;
+            poNo: string;
+            status: string;
+            statusLabel: string;
+        };
+        QrDetail: {
+            /** Format: int64 */
+            id: number;
+            qrNo: string;
+            /** Format: date */
+            date: string;
+            /** Format: date */
+            requiredBy: string | null;
+            note: string | null;
+            status: string;
+            statusLabel: string;
+            createdByName: string;
+            items: components["schemas"]["ItemQty"][];
+            suppliers: components["schemas"]["AskedSupplier"][];
+            quotations: components["schemas"]["QuoteColumn"][];
+            po: components["schemas"]["PoLink"];
+            canAddQuotation: boolean;
+            canChoose: boolean;
+            canCreatePo: boolean;
+            /** Format: int64 */
+            version: number;
+        };
+        QuoteColumn: {
+            /** Format: int64 */
+            id: number;
+            quoteNo: string;
+            supplier: components["schemas"]["SupplierLink"];
+            supplierRef: string | null;
+            /** Format: date */
+            date: string;
+            /** Format: date */
+            validUntil: string;
+            expired: boolean;
+            /** Format: int32 */
+            deliveryDays: number;
+            notes: string | null;
+            attachmentName: string | null;
+            attachmentFile: boolean;
+            prices: components["schemas"]["QuotePrice"][];
+            total: number;
+            complete: boolean;
+            selected: boolean;
+            selectionReason: string | null;
+            selectedByName: string | null;
+            /** Format: date */
+            selectedOn: string | null;
+        };
+        QuotePrice: {
+            itemCode: string;
+            unitPrice: number | null;
+            lineTotal: number | null;
+            lowest: boolean;
+        };
+        AttachmentResponse: {
+            /** Format: int64 */
+            quotationId: number;
+            attachmentName: string;
+        };
+        QrItemInput: {
+            itemCode: string;
+            /** Format: int32 */
+            qty: number;
+        };
+        QrRequest: {
+            /** Format: date */
+            date: string;
+            /** Format: date */
+            requiredBy?: string;
+            note?: string;
+            items?: components["schemas"]["QrItemInput"][];
+            supplierIds?: number[];
+        };
+        PriceInput: {
+            itemCode: string;
+            unitPrice: number;
+        };
+        QuotationRequestBody: {
+            /** Format: int64 */
+            supplierId?: number;
+            supplierRef?: string;
+            /** Format: date */
+            date: string;
+            /** Format: date */
+            validUntil?: string;
+            /** Format: int32 */
+            deliveryDays?: number;
+            prices?: components["schemas"]["PriceInput"][];
+            notes?: string;
+        };
+        ReceiptLineInput: {
+            /** Format: int64 */
+            poLineId: number;
+            /** Format: int32 */
+            received: number;
+            /** Format: int32 */
+            damaged: number;
+        };
+        ReceiptRequest: {
+            /** Format: date */
+            date: string;
+            deliveryNote?: string;
+            note?: string;
+            lines?: components["schemas"]["ReceiptLineInput"][];
+        };
+        ReceiptResult: {
+            receipt: components["schemas"]["ReceiptView"];
+            po: components["schemas"]["PoDetail"];
+        };
         CreateProductRequest: {
             name: string;
             sellingPrice: number;
@@ -2143,6 +2701,23 @@ export interface components {
             currentPassword: string;
             newPassword: string;
         };
+        SupplierBalance: {
+            /** Format: int64 */
+            supplierId: number;
+            code: string;
+            name: string;
+            /** Format: int32 */
+            termsDays: number;
+            termsLabel: string;
+            received: number;
+            paid: number;
+            owed: number;
+            /** Format: date */
+            oldestUnpaidDate: string | null;
+            /** Format: int32 */
+            oldestUnpaidDays: number | null;
+            overdue: boolean;
+        };
         BottleStock: {
             code: string;
             name: string;
@@ -2287,6 +2862,45 @@ export interface components {
         Row: {
             area: string;
             access: components["schemas"]["Cell"][];
+        };
+        QrRow: {
+            /** Format: int64 */
+            id: number;
+            qrNo: string;
+            /** Format: date */
+            date: string;
+            /** Format: date */
+            requiredBy: string | null;
+            note: string | null;
+            status: string;
+            statusLabel: string;
+            items: components["schemas"]["ItemQty"][];
+            /** Format: int32 */
+            suppliersAsked: number;
+            /** Format: int32 */
+            quotations: number;
+            chosen: components["schemas"]["SupplierLink"];
+            po: components["schemas"]["PoLink"];
+        };
+        PoRow: {
+            /** Format: int64 */
+            id: number;
+            poNo: string;
+            /** Format: date */
+            date: string;
+            /** Format: date */
+            expectedDate: string;
+            supplier: components["schemas"]["SupplierLink"];
+            qrNo: string;
+            items: components["schemas"]["ItemQty"][];
+            total: number;
+            /** Format: int32 */
+            received: number;
+            /** Format: int32 */
+            ordered: number;
+            status: string;
+            statusLabel: string;
+            nextStep: string | null;
         };
         WaterPriceResponse: {
             price: number;
@@ -2810,7 +3424,55 @@ export interface operations {
             };
         };
     };
+    detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PoDetail"];
+                };
+            };
+        };
+    };
     update_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PoUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PoDetail"];
+                };
+            };
+        };
+    };
+    update_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -2836,7 +3498,7 @@ export interface operations {
             };
         };
     };
-    update_4: {
+    update_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -2862,7 +3524,7 @@ export interface operations {
             };
         };
     };
-    update_5: {
+    update_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -2888,7 +3550,7 @@ export interface operations {
             };
         };
     };
-    detail: {
+    detail_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -2910,7 +3572,7 @@ export interface operations {
             };
         };
     };
-    update_6: {
+    update_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -2962,7 +3624,7 @@ export interface operations {
             };
         };
     };
-    update_7: {
+    update_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -3166,6 +3828,52 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["SupplierResponse"];
+                };
+            };
+        };
+    };
+    list_2: {
+        parameters: {
+            query?: {
+                supplier?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PaymentRow"][];
+                };
+            };
+        };
+    };
+    create_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PaymentRow"];
                 };
             };
         };
@@ -3647,7 +4355,274 @@ export interface operations {
             };
         };
     };
-    list_2: {
+    createPo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PoDetail"];
+                };
+            };
+        };
+    };
+    choose: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["QrDetail"];
+                };
+            };
+        };
+    };
+    attachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
+    attach: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AttachmentResponse"];
+                };
+            };
+        };
+    };
+    list_3: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["QrRow"][];
+                };
+            };
+        };
+    };
+    create_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QrRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["QrDetail"];
+                };
+            };
+        };
+    };
+    addQuotation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuotationRequestBody"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["QrDetail"];
+                };
+            };
+        };
+    };
+    send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PoDetail"];
+                };
+            };
+        };
+    };
+    receive: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReceiptRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReceiptResult"];
+                };
+            };
+        };
+    };
+    cancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReasonRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PoDetail"];
+                };
+            };
+        };
+    };
+    approve: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PoDetail"];
+                };
+            };
+        };
+    };
+    list_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -3667,7 +4642,7 @@ export interface operations {
             };
         };
     };
-    create_2: {
+    create_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -3715,7 +4690,7 @@ export interface operations {
             };
         };
     };
-    list_3: {
+    list_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -3735,7 +4710,7 @@ export interface operations {
             };
         };
     };
-    create_3: {
+    create_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -3759,7 +4734,7 @@ export interface operations {
             };
         };
     };
-    list_4: {
+    list_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -3779,7 +4754,7 @@ export interface operations {
             };
         };
     };
-    create_4: {
+    create_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -4011,7 +4986,7 @@ export interface operations {
             };
         };
     };
-    list_5: {
+    list_7: {
         parameters: {
             query?: {
                 activeOnly?: boolean;
@@ -4033,7 +5008,7 @@ export interface operations {
             };
         };
     };
-    create_5: {
+    create_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -4167,6 +5142,26 @@ export interface operations {
             };
         };
     };
+    balances: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SupplierBalance"][];
+                };
+            };
+        };
+    };
     overview: {
         parameters: {
             query?: never;
@@ -4252,7 +5247,7 @@ export interface operations {
             };
         };
     };
-    list_6: {
+    list_8: {
         parameters: {
             query?: {
                 q?: string;
@@ -4280,7 +5275,7 @@ export interface operations {
             };
         };
     };
-    detail_1: {
+    detail_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -4360,6 +5355,94 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RolesMatrixResponse"];
+                };
+            };
+        };
+    };
+    detail_3: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["QrDetail"];
+                };
+            };
+        };
+    };
+    suggestedSuppliers: {
+        parameters: {
+            query?: {
+                items?: string[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SupplierLink"][];
+                };
+            };
+        };
+    };
+    list_9: {
+        parameters: {
+            query?: {
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PoRow"][];
+                };
+            };
+        };
+    };
+    purchaseOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
                 };
             };
         };
@@ -4590,7 +5673,7 @@ export interface operations {
             };
         };
     };
-    list_7: {
+    list_10: {
         parameters: {
             query?: {
                 q?: string;
@@ -4665,7 +5748,7 @@ export interface operations {
             };
         };
     };
-    list_8: {
+    list_11: {
         parameters: {
             query?: {
                 status?: string;

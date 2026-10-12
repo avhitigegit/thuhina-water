@@ -19,7 +19,7 @@ public final class SupplierDtos {
     public record SuppliedItem(String code, String type, String name) {
     }
 
-    /** {@code owed} comes with Purchasing (M09) – null until then. */
+    /** {@code owed} = value of goods received − payments (Purchasing, M09); 0.00 when nothing is owed. */
     public record SupplierResponse(
             long id,
             String code,
@@ -31,7 +31,7 @@ public final class SupplierDtos {
             int termsDays,
             String termsLabel,
             List<SuppliedItem> items,
-            @Schema(nullable = true) BigDecimal owed,
+            BigDecimal owed,
             boolean active,
             long version) {
     }

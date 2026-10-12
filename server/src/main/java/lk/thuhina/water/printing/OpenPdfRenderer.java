@@ -13,14 +13,18 @@ import com.lowagie.text.PageSize;
 import com.lowagie.text.Paragraph;
 import com.lowagie.text.Phrase;
 import com.lowagie.text.Rectangle;
+import com.lowagie.text.pdf.ColumnText;
+import com.lowagie.text.pdf.PdfContentByte;
+import com.lowagie.text.pdf.PdfGState;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
+import com.lowagie.text.pdf.PdfPageEventHelper;
 import com.lowagie.text.pdf.PdfWriter;
 import org.springframework.stereotype.Component;
 
 /**
  * {@link PdfRenderer} with OpenPDF: Helvetica, the layout of the prototype's printed documents – A5 portrait for bills, A4
- * landscape for the delivery and load sheets.
+ * portrait for purchase orders, A4 landscape for the delivery and load sheets; an optional watermark (DRAFT, CANCELLED).
  */
 @Component
 public class OpenPdfRenderer implements PdfRenderer {
@@ -37,9 +41,15 @@ public class OpenPdfRenderer implements PdfRenderer {
     @Override
     public byte[] render(CompanyHeader company, PrintDocument d) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        Document doc = d.page() == PrintDocument.Page.A4_LANDSCAPE ? new Document(PageSize.A4.rotate(), 28, 28, 28, 28)
-                : new Document(PageSize.A5, 30, 30, 30, 30);
-        PdfWriter.getInstance(doc, out);
+        Document doc = switch (d.page()) {
+            case A4_LANDSCAPE -> new Document(PageSize.A4.rotate(), 28, 28, 28, 28);
+            case A4_PORTRAIT -> new Document(PageSize.A4, 36, 36, 36, 36);
+            case A5_PORTRAIT -> new Document(PageSize.A5, 30, 30, 30, 30);
+        };
+        PdfWriter writer = PdfWriter.getInstance(doc, out);
+        if (d.watermark() != null && !d.watermark().isBlank()) {
+            writer.setPageEvent(new Watermark(d.watermark()));
+        }
         doc.addTitle(d.title() + (d.meta().isEmpty() ? "" : " " + d.meta().getFirst()));
         doc.addCreator("Thuhina Water");
         doc.open();
@@ -171,6 +181,30 @@ public class OpenPdfRenderer implements PdfRenderer {
             t.addCell(c);
         }
         return t;
+    }
+
+    /** Large light text across the middle of every page (DRAFT, CANCELLED). */
+    private static final class Watermark extends PdfPageEventHelper {
+
+        private static final Font FONT = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 80, Font.NORMAL, new Color(200, 30, 30));
+
+        private final String text;
+
+        Watermark(String text) {
+            this.text = text;
+        }
+
+        @Override
+        public void onEndPage(PdfWriter writer, Document document) {
+            PdfContentByte canvas = writer.getDirectContentUnder();
+            canvas.saveState();
+            PdfGState state = new PdfGState();
+            state.setFillOpacity(0.12f);
+            canvas.setGState(state);
+            Rectangle page = document.getPageSize();
+            ColumnText.showTextAligned(canvas, Element.ALIGN_CENTER, new Phrase(text, FONT), page.getWidth() / 2, page.getHeight() / 2, 45);
+            canvas.restoreState();
+        }
     }
 
     private static PdfPCell cell(Phrase content, int align) {

@@ -151,3 +151,37 @@ export type Planning = Omit<Schemas["Planning"], "routes"> & { routes: PlanRoute
 export type ReadyCheck = Schemas["ReadyCheck"];
 export type Requirement = Schemas["Requirement"];
 export type RequirementDay = Schemas["RequirementDay"];
+
+// Purchasing (M09)
+export type ItemQty = Schemas["ItemQty"];
+export type SupplierLink = Schemas["SupplierLink"];
+export type PoLink = Schemas["PoLink"];
+export type QrRequest = Schemas["QrRequest"];
+/** `chosen` and `po` are null until a quotation is chosen / a PO is made (the generator drops null on object fields). */
+export type QrRow = Omit<Schemas["QrRow"], "chosen" | "po"> & {
+  chosen: SupplierLink | null;
+  po: PoLink | null;
+};
+export type QrDetail = Omit<Schemas["QrDetail"], "po"> & { po: PoLink | null };
+export type AskedSupplier = Schemas["AskedSupplier"];
+export type QuoteColumn = Schemas["QuoteColumn"];
+export type QuotePrice = Schemas["QuotePrice"];
+/** A blank unit price (null) = not quoted (the generator makes nested fields required). */
+export type QuotationRequestBody = Omit<Schemas["QuotationRequestBody"], "prices"> & {
+  prices: { itemCode: string; unitPrice: number | null }[];
+};
+export type AttachmentResponse = Schemas["AttachmentResponse"];
+export type PoRow = Schemas["PoRow"];
+export type PoDetail = Schemas["PoDetail"];
+export type PoLineView = Schemas["PoLineView"];
+/** qty 0 removes a line; its price may then be left out. */
+export type PoUpdateRequest = Omit<Schemas["PoUpdateRequest"], "lines"> & {
+  lines: { itemCode: string; qty: number; unitPrice: number | null }[];
+};
+export type PoHistoryRow = Schemas["PoHistoryRow"];
+export type ReceiptView = Schemas["ReceiptView"];
+export type ReceiptRequest = Schemas["ReceiptRequest"];
+export type ReceiptResult = Schemas["ReceiptResult"];
+export type SupplierBalance = Schemas["SupplierBalance"];
+export type PaymentRequest = Schemas["PaymentRequest"];
+export type PaymentRow = Schemas["PaymentRow"];
