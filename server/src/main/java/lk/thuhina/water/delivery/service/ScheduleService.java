@@ -8,17 +8,22 @@ import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import lk.thuhina.water.common.BusinessDates;
+import lk.thuhina.water.common.Money;
 import lk.thuhina.water.customers.model.PayType;
+import lk.thuhina.water.delivery.dto.DeliveryDtos.BottleQty;
 import lk.thuhina.water.delivery.dto.DeliveryDtos.DueBottle;
 import lk.thuhina.water.delivery.dto.DeliveryDtos.DueCounts;
 import lk.thuhina.water.delivery.dto.DeliveryDtos.DueCustomer;
 import lk.thuhina.water.delivery.dto.DeliveryDtos.DueList;
+import lk.thuhina.water.delivery.dto.DeliveryDtos.DueTotals;
 import lk.thuhina.water.delivery.dto.DeliveryDtos.EnteredBill;
 import lk.thuhina.water.delivery.rules.ScheduleRules;
 import lk.thuhina.water.ledger.rules.LedgerRules;
@@ -43,7 +48,7 @@ public class ScheduleService {
     static final List<String> DELIVERY_KINDS = List.of(SalesKind.EXCHANGE.name(), SalesKind.LEFT_AT_DOOR.name(),
             SalesKind.FIRST_PURCHASE.name(), SalesKind.EXTRA_ORDER.name());
 
-    private static final int CHUNK = 1000;
+    static final int CHUNK = 1000;
 
     private final NamedParameterJdbcTemplate jdbc;
     private final PricingService pricing;
@@ -55,44 +60,94 @@ public class ScheduleService {
         this.clock = clock;
     }
 
-    private record Row(long id, String code, String name, String phone, long areaId, String areaName, PayType payType,
-                       BigDecimal creditLimit, BigDecimal balance, int cycleWeeks, LocalDate next, LocalDate registeredOn,
-                       DayOfWeek day, long customerTypeId) {
+    private record Row(long id, String code, String name, String phone, String address, String notes, long areaId, String areaName,
+                       PayType payType, BigDecimal creditLimit, BigDecimal balance, int cycleWeeks, LocalDate next,
+                       LocalDate registeredOn, DayOfWeek day, long customerTypeId) {
     }
 
-    private record Bottle(String code, String label) {
+    /** An active bottle type: code, label (20L) and name, largest first. */
+    public record BottleInfo(String code, String label, String name) {
     }
 
     private record Have(int held, int toCollect, int owed) {
     }
 
+    /** Bottles needed on one day (FR-45): per bottle type, the usual quantities and the number of customers taking it. */
+    public record DayNeed(LocalDate date, Map<String, Integer> qty, Map<String, Integer> customers) {
+    }
+
+    public LocalDate today() {
+        return BusinessDates.today(clock);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BottleInfo> activeBottles() {
+        return jdbc.query("select code, name, litres from bottle_type where active order by litres desc, code", Map.of(),
+                (rs, i) -> new BottleInfo(rs.getString("code"), LedgerRules.bottleLabel(rs.getBigDecimal("litres")), rs.getString("name")));
+    }
+
     /** The due list for {@code date} (default today), optionally for one area. Future dates are allowed (planning). */
     @Transactional(readOnly = true)
     public DueList dueList(LocalDate date, Long areaId) {
-        LocalDate today = BusinessDates.today(clock);
-        LocalDate d = date == null ? today : date;
-        boolean isToday = d.equals(today);
+        LocalDate d = date == null ? today() : date;
+        List<BottleInfo> bottles = activeBottles();
+        List<DueCustomer> items = customers(d, areaId, false, true, bottles);
+        int listed = 0;
+        int done = 0;
+        int noBottles = 0;
+        int overdue = 0;
+        int toCollect = 0;
+        int owed = 0;
+        BigDecimal money = Money.ZERO;
+        Map<String, Integer> load = new LinkedHashMap<>();
+        bottles.forEach(b -> load.put(b.code(), 0));
+        for (DueCustomer c : items) {
+            listed += c.listed() ? 1 : 0;
+            done += c.entered() ? 1 : 0;
+            noBottles += !c.entered() && c.noBottles() ? 1 : 0;
+            overdue += c.overdue() ? 1 : 0;
+            for (DueBottle b : c.bottles()) {
+                load.merge(b.bottleTypeCode(), b.usual(), Integer::sum);
+                toCollect += b.toCollect();
+                owed += b.owed();
+            }
+            if (c.balance().signum() > 0) {
+                money = money.add(c.balance());
+            }
+        }
+        List<BottleQty> loadQty = bottles.stream().map(b -> new BottleQty(b.code(), b.label(), load.get(b.code()))).toList();
+        return new DueList(d, dayName(d), d.equals(today()), new DueCounts(items.size(), listed, done, noBottles, overdue),
+                new DueTotals(loadQty, toCollect, owed, Money.of(money)), items);
+    }
 
+    /**
+     * Customers for {@code d} with their bottles, balance and bills entered on {@code d}, ordered by area then name.
+     * {@code all} = every active customer (Delivery Planning "All customers"), otherwise only those due (and, for today,
+     * missed). Prices are read only when {@code withPrices} (Enter Bills).
+     */
+    @Transactional(readOnly = true)
+    public List<DueCustomer> customers(LocalDate d, Long areaId, boolean all, boolean withPrices, List<BottleInfo> bottles) {
+        boolean isToday = d.equals(today());
         MapSqlParameterSource p = new MapSqlParameterSource("d", d).addValue("dow", d.getDayOfWeek().getValue());
-        String sql = "select c.id, c.code, c.name, c.phone, c.area_id, a.name as area_name, c.pay_type, c.credit_limit, "
-                + "coalesce(acc.balance, 0) as balance, c.cycle_weeks, c.next_delivery_date, c.registered_on, c.delivery_day, "
-                + "c.customer_type_id from customer c join area a on a.id = c.area_id "
-                + "left join customer_account acc on acc.customer_id = c.id where c.status = 'ACTIVE' and ("
-                + "(c.delivery_day = :dow and c.registered_on <= :d and mod(:d - c.next_delivery_date, 7 * c.cycle_weeks) = 0)"
-                + (isToday ? " or c.next_delivery_date < :d" : "") + ")";
+        String sql = "select c.id, c.code, c.name, c.phone, c.address, c.notes, c.area_id, a.name as area_name, c.pay_type, "
+                + "c.credit_limit, coalesce(acc.balance, 0) as balance, c.cycle_weeks, c.next_delivery_date, c.registered_on, "
+                + "c.delivery_day, c.customer_type_id from customer c join area a on a.id = c.area_id "
+                + "left join customer_account acc on acc.customer_id = c.id where c.status = 'ACTIVE'";
+        if (!all) {
+            sql += " and ((c.delivery_day = :dow and c.registered_on <= :d and mod(:d - c.next_delivery_date, 7 * c.cycle_weeks) = 0)"
+                    + (isToday ? " or c.next_delivery_date < :d" : "") + ")";
+        }
         if (areaId != null) {
             sql += " and c.area_id = :area";
             p.addValue("area", areaId);
         }
         sql += " order by a.name, c.name, c.id";
         List<Row> rows = jdbc.query(sql, p, (rs, i) -> new Row(rs.getLong("id"), rs.getString("code"), rs.getString("name"),
-                rs.getString("phone"), rs.getLong("area_id"), rs.getString("area_name"), PayType.valueOf(rs.getString("pay_type")),
-                rs.getBigDecimal("credit_limit"), rs.getBigDecimal("balance"), rs.getInt("cycle_weeks"),
-                rs.getObject("next_delivery_date", LocalDate.class), rs.getObject("registered_on", LocalDate.class),
-                DayOfWeek.of(rs.getInt("delivery_day")), rs.getLong("customer_type_id")));
+                rs.getString("phone"), rs.getString("address"), rs.getString("notes"), rs.getLong("area_id"), rs.getString("area_name"),
+                PayType.valueOf(rs.getString("pay_type")), rs.getBigDecimal("credit_limit"), rs.getBigDecimal("balance"),
+                rs.getInt("cycle_weeks"), rs.getObject("next_delivery_date", LocalDate.class),
+                rs.getObject("registered_on", LocalDate.class), DayOfWeek.of(rs.getInt("delivery_day")), rs.getLong("customer_type_id")));
 
-        List<Bottle> bottles = jdbc.query("select code, litres from bottle_type where active order by litres desc, code",
-                Map.of(), (rs, i) -> new Bottle(rs.getString("code"), LedgerRules.bottleLabel(rs.getBigDecimal("litres"))));
         List<Long> ids = rows.stream().map(Row::id).toList();
         Map<Long, Map<String, Integer>> usual = new HashMap<>();
         Map<Long, Map<String, Have>> have = new HashMap<>();
@@ -115,22 +170,20 @@ public class ScheduleService {
                         rs.getString("bill_no"), rs.getString("paper_bill_no"), kind.name(), kind.label()));
             });
         }
-        Map<Long, Long> types = new LinkedHashMap<>();
-        rows.forEach(r -> types.put(r.id(), r.customerTypeId()));
-        Map<Long, Map<String, WaterPrice>> prices = pricing.waterPrices(types, bottles.stream().map(Bottle::code).toList(), d);
+        Map<Long, Map<String, WaterPrice>> prices = Map.of();
+        if (withPrices) {
+            Map<Long, Long> types = new LinkedHashMap<>();
+            rows.forEach(r -> types.put(r.id(), r.customerTypeId()));
+            prices = pricing.waterPrices(types, bottles.stream().map(BottleInfo::code).toList(), d);
+        }
 
         List<DueCustomer> items = new ArrayList<>();
-        int due = 0;
-        int listed = 0;
-        int done = 0;
-        int noBottles = 0;
-        int overdue = 0;
         for (Row r : rows) {
             boolean isDue = ScheduleRules.isDue(true, r.registeredOn(), r.day(), r.cycleWeeks(), r.next(), d);
             boolean late = isToday && r.next().isBefore(d);
             List<DueBottle> lines = new ArrayList<>();
             int heldTotal = 0;
-            for (Bottle b : bottles) {
+            for (BottleInfo b : bottles) {
                 int u = usual.getOrDefault(r.id(), Map.of()).getOrDefault(b.code(), 0);
                 Have h = have.getOrDefault(r.id(), Map.of()).getOrDefault(b.code(), new Have(0, 0, 0));
                 heldTotal += h.held();
@@ -141,18 +194,79 @@ public class ScheduleService {
             List<EnteredBill> bills = entered.getOrDefault(r.id(), List.of());
             boolean isEntered = !bills.isEmpty();
             boolean none = heldTotal == 0;
-            boolean inGrid = !isEntered && !none;
-            due++;
-            listed += inGrid ? 1 : 0;
-            done += isEntered ? 1 : 0;
-            noBottles += !isEntered && none ? 1 : 0;
-            overdue += late ? 1 : 0;
-            items.add(new DueCustomer(r.id(), r.code(), r.name(), r.phone(), r.areaId(), r.areaName(), r.payType().name(),
-                    r.payType().label(), r.creditLimit(), r.balance(), r.cycleWeeks(), r.next(),
+            items.add(new DueCustomer(r.id(), r.code(), r.name(), r.phone(), r.address(), r.notes(), r.areaId(), r.areaName(),
+                    r.payType().name(), r.payType().label(), r.creditLimit(), r.balance(), r.day().getValue(), r.cycleWeeks(), r.next(),
                     ScheduleRules.advance(r.next(), r.cycleWeeks(), d), isDue, late,
-                    late ? (int) ChronoUnit.DAYS.between(r.next(), d) : 0, isEntered, none, inGrid, bills, lines));
+                    late ? (int) ChronoUnit.DAYS.between(r.next(), d) : 0, isEntered, none, !isEntered && !none, bills, lines));
         }
-        return new DueList(d, d.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH), isToday,
-                new DueCounts(due, listed, done, noBottles, overdue), items);
+        return items;
+    }
+
+    /**
+     * Bottles needed per day from {@code from} for {@code days} days (FR-45, design 5.4): the usual quantities of the
+     * customers due and not yet entered on each day (for today also the missed ones). Read with three queries for the
+     * whole period, whatever the number of customers.
+     */
+    @Transactional(readOnly = true)
+    public List<DayNeed> needed(LocalDate from, int days, Long areaId) {
+        List<DayNeed> out = new ArrayList<>();
+        if (days <= 0) {
+            return out;
+        }
+        LocalDate today = today();
+        LocalDate to = from.plusDays(days - 1L);
+        record Sched(long id, DayOfWeek day, int cycle, LocalDate next, LocalDate registeredOn) {
+        }
+        MapSqlParameterSource p = new MapSqlParameterSource("from", from).addValue("to", to).addValue("kinds", DELIVERY_KINDS);
+        String area = "";
+        if (areaId != null) {
+            area = " and c.area_id = :area";
+            p.addValue("area", areaId);
+        }
+        List<Sched> custs = jdbc.query("select c.id, c.delivery_day, c.cycle_weeks, c.next_delivery_date, c.registered_on from customer c "
+                + "where c.status = 'ACTIVE' and c.registered_on <= :to" + area, p, (rs, i) -> new Sched(rs.getLong(1),
+                DayOfWeek.of(rs.getInt(2)), rs.getInt(3), rs.getObject(4, LocalDate.class), rs.getObject(5, LocalDate.class)));
+        Map<Long, Map<String, Integer>> usual = new HashMap<>();
+        jdbc.query("select u.customer_id, u.bottle_type_code, u.qty from customer_usual_qty u join customer c on c.id = u.customer_id "
+                + "where c.status = 'ACTIVE' and c.registered_on <= :to and u.qty > 0" + area, p, rs -> {
+                    usual.computeIfAbsent(rs.getLong(1), k -> new HashMap<>()).put(rs.getString(2), rs.getInt(3));
+                });
+        Set<String> entered = new HashSet<>();
+        jdbc.query("select distinct t.customer_id, t.txn_date from sales_txn t join customer c on c.id = t.customer_id "
+                + "where t.txn_date between :from and :to and t.reversed_by_id is null and t.kind in (:kinds)" + area, p, rs -> {
+                    entered.add(rs.getLong(1) + "@" + rs.getObject(2, LocalDate.class));
+                });
+        for (int i = 0; i < days; i++) {
+            LocalDate d = from.plusDays(i);
+            Map<String, Integer> qty = new HashMap<>();
+            Map<String, Integer> count = new HashMap<>();
+            for (Sched c : custs) {
+                boolean due = ScheduleRules.isDue(true, c.registeredOn(), c.day(), c.cycle(), c.next(), d)
+                        || (d.equals(today) && c.next().isBefore(d));
+                if (!due || entered.contains(c.id() + "@" + d)) {
+                    continue;
+                }
+                usual.getOrDefault(c.id(), Map.of()).forEach((bt, n) -> {
+                    qty.merge(bt, n, Integer::sum);
+                    count.merge(bt, 1, Integer::sum);
+                });
+            }
+            out.add(new DayNeed(d, qty, count));
+        }
+        return out;
+    }
+
+    /** Store counts of a bottle type: FILLED, FACTORY, EMPTY. */
+    @Transactional(readOnly = true)
+    public Map<String, Map<String, Integer>> stock() {
+        Map<String, Map<String, Integer>> out = new HashMap<>();
+        jdbc.query("select bottle_type_code, bucket, qty from stock_balance", rs -> {
+            out.computeIfAbsent(rs.getString(1), k -> new HashMap<>()).put(rs.getString(2), rs.getInt(3));
+        });
+        return out;
+    }
+
+    public static String dayName(LocalDate d) {
+        return d.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
     }
 }

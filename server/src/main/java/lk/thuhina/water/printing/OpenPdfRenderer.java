@@ -18,12 +18,16 @@ import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import org.springframework.stereotype.Component;
 
-/** {@link PdfRenderer} with OpenPDF: A5 portrait, Helvetica, the layout of the prototype's printed bill. */
+/**
+ * {@link PdfRenderer} with OpenPDF: Helvetica, the layout of the prototype's printed documents – A5 portrait for bills, A4
+ * landscape for the delivery and load sheets.
+ */
 @Component
 public class OpenPdfRenderer implements PdfRenderer {
 
     private static final Color GREY = new Color(110, 110, 110);
     private static final Color LINE = new Color(200, 200, 200);
+    private static final Color GROUP = new Color(238, 244, 247);
     private static final Font NAME = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 12);
     private static final Font TITLE = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
     private static final Font BOLD = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
@@ -33,7 +37,8 @@ public class OpenPdfRenderer implements PdfRenderer {
     @Override
     public byte[] render(CompanyHeader company, PrintDocument d) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        Document doc = new Document(PageSize.A5, 30, 30, 30, 30);
+        Document doc = d.page() == PrintDocument.Page.A4_LANDSCAPE ? new Document(PageSize.A4.rotate(), 28, 28, 28, 28)
+                : new Document(PageSize.A5, 30, 30, 30, 30);
         PdfWriter.getInstance(doc, out);
         doc.addTitle(d.title() + (d.meta().isEmpty() ? "" : " " + d.meta().getFirst()));
         doc.addCreator("Thuhina Water");
@@ -52,8 +57,8 @@ public class OpenPdfRenderer implements PdfRenderer {
             p.setSpacingBefore(4);
             doc.add(p);
         }
-        if (d.table() != null) {
-            doc.add(table(d.table()));
+        for (PrintDocument.Table table : d.tables()) {
+            doc.add(table(table));
         }
         if (!d.summary().isEmpty()) {
             doc.add(summary(d.summary()));
@@ -105,9 +110,12 @@ public class OpenPdfRenderer implements PdfRenderer {
         PdfPTable t = new PdfPTable(table.headers().size());
         t.setWidthPercentage(100);
         t.setSpacingBefore(10);
-        float[] widths = new float[table.headers().size()];
-        for (int i = 0; i < widths.length; i++) {
-            widths[i] = i == 0 ? 4.4f : i == widths.length - 1 ? 2.2f : 1.7f;
+        float[] widths = table.widths();
+        if (widths == null) {
+            widths = new float[table.headers().size()];
+            for (int i = 0; i < widths.length; i++) {
+                widths[i] = i == 0 ? 4.4f : i == widths.length - 1 ? 2.2f : 1.7f;
+            }
         }
         t.setWidths(widths);
         for (int i = 0; i < table.headers().size(); i++) {
@@ -118,10 +126,20 @@ public class OpenPdfRenderer implements PdfRenderer {
         }
         t.setHeaderRows(1);
         for (List<String> row : table.rows()) {
+            if (row.size() == 1 && table.headers().size() > 1) {
+                PdfPCell c = cell(new Phrase(row.getFirst(), BOLD), Element.ALIGN_LEFT);
+                c.setColspan(table.headers().size());
+                c.setBackgroundColor(GROUP);
+                t.addCell(c);
+                continue;
+            }
             for (int i = 0; i < row.size(); i++) {
                 PdfPCell c = cell(new Phrase(row.get(i), NORMAL), table.numeric()[i] ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT);
-                c.setBorder(Rectangle.BOTTOM);
+                c.setBorder(table.rowHeight() > 0 ? Rectangle.BOX : Rectangle.BOTTOM);
                 c.setBorderColor(LINE);
+                if (table.rowHeight() > 0) {
+                    c.setMinimumHeight(table.rowHeight());
+                }
                 t.addCell(c);
             }
         }

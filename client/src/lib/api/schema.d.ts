@@ -1020,6 +1020,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/print/load-sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Load sheet PDF (A4 landscape) – route totals and the customers due on a date (default tomorrow) */
+        get: operations["loadSheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/print/delivery-sheet": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Delivery sheet PDF (A4 landscape) – the Daily Delivery List of a date (default today) by area */
+        get: operations["deliverySheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/print/bill/{txnId}": {
         parameters: {
             query?: never;
@@ -1097,6 +1131,40 @@ export interface paths {
         };
         /** A factory's charge history, newest first */
         get: operations["charges"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/delivery/requirement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Upcoming bottle requirement (FR-45): filled bottles of one type (default the largest) needed per day for the next days (default 14), against the filled stock in store and at the factory */
+        get: operations["requirement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/delivery/planning": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Delivery Planning (FR-58): customers due on a date (default tomorrow) or all active customers, grouped by route, with last / next / week-after deliveries, KPIs and the ready check per bottle type */
+        get: operations["planning"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1310,14 +1378,14 @@ export interface components {
             minFilled: number;
         };
         JsonNode: {
-            missingNode: boolean;
-            valueNode: boolean;
-            container: boolean;
-            object: boolean;
             /** @enum {string} */
             nodeType: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
             string: boolean;
             integralNumber: boolean;
+            missingNode: boolean;
+            valueNode: boolean;
+            container: boolean;
+            object: boolean;
             pojo: boolean;
             floatingPointNumber: boolean;
             short: boolean;
@@ -2271,6 +2339,149 @@ export interface components {
             createdAt: string;
             current: boolean;
         };
+        Requirement: {
+            bottleTypeCode: string;
+            label: string;
+            name: string;
+            /** Format: int32 */
+            filledInStore: number;
+            /** Format: int32 */
+            atFactory: number;
+            /** Format: int32 */
+            emptyInStore: number;
+            /** Format: int32 */
+            days: number;
+            rows: components["schemas"]["RequirementDay"][];
+            /** Format: date */
+            runsOutOn: string | null;
+        };
+        RequirementDay: {
+            /** Format: date */
+            date: string;
+            dayName: string;
+            /** Format: int32 */
+            customers: number;
+            /** Format: int32 */
+            needed: number;
+            /** Format: int32 */
+            runningTotal: number;
+            /** Format: int32 */
+            filledLeft: number;
+            /** Format: int32 */
+            withFactory: number;
+        };
+        BottleQty: {
+            bottleTypeCode: string;
+            label: string;
+            /** Format: int32 */
+            qty: number;
+        };
+        EnteredBill: {
+            /** Format: int64 */
+            id: number;
+            billNo: string;
+            paperBillNo: string | null;
+            kind: string;
+            kindLabel: string;
+        };
+        LastDelivery: {
+            /** Format: date */
+            date: string;
+            filled: components["schemas"]["BottleQty"][];
+            leftAtDoor: boolean;
+        };
+        PlanKpis: {
+            /** Format: int32 */
+            due: number;
+            /** Format: int32 */
+            entered: number;
+            /** Format: int32 */
+            missed: number;
+            needed: components["schemas"]["BottleQty"][];
+            /** Format: int32 */
+            toCollect: number;
+            /** Format: int32 */
+            owed: number;
+            moneyToCollect: number;
+        };
+        PlanRoute: {
+            /** Format: int64 */
+            areaId: number;
+            areaName: string;
+            /** Format: int32 */
+            due: number;
+            /** Format: int32 */
+            toLoad: number;
+            load: components["schemas"]["BottleQty"][];
+            /** Format: int32 */
+            toCollect: number;
+            rows: components["schemas"]["PlanRow"][];
+        };
+        PlanRow: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            address: string;
+            phone: string;
+            payType: string;
+            payTypeLabel: string;
+            /** Format: int32 */
+            deliveryDay: number;
+            dayName: string;
+            /** Format: int32 */
+            cycleWeeks: number;
+            /** Format: date */
+            nextDeliveryDate: string;
+            last: components["schemas"]["LastDelivery"];
+            due: boolean;
+            overdue: boolean;
+            entered: boolean;
+            enteredBills: components["schemas"]["EnteredBill"][];
+            thisDate: components["schemas"]["BottleQty"][];
+            held: components["schemas"]["BottleQty"][];
+            /** Format: date */
+            next: string;
+            /** Format: date */
+            weekAfter: string;
+            /** Format: int32 */
+            toCollect: number;
+            /** Format: int32 */
+            owed: number;
+            balance: number;
+            status: string;
+            statusLabel: string;
+            overLimit: boolean;
+        };
+        Planning: {
+            /** Format: date */
+            date: string;
+            dayName: string;
+            today: boolean;
+            show: string;
+            /** Format: int32 */
+            customers: number;
+            kpis: components["schemas"]["PlanKpis"];
+            ready: components["schemas"]["ReadyCheck"][];
+            routes: components["schemas"]["PlanRoute"][];
+        };
+        ReadyCheck: {
+            bottleTypeCode: string;
+            label: string;
+            name: string;
+            /** Format: int32 */
+            needed: number;
+            /** Format: int32 */
+            neededBefore: number;
+            /** Format: int32 */
+            filledInStore: number;
+            /** Format: int32 */
+            atFactory: number;
+            /** Format: int32 */
+            shortBy: number;
+            ready: boolean;
+            factoryCovers: boolean;
+        };
         DueBottle: {
             bottleTypeCode: string;
             label: string;
@@ -2308,6 +2519,8 @@ export interface components {
             code: string;
             name: string;
             phone: string;
+            address: string;
+            notes: string | null;
             /** Format: int64 */
             areaId: number;
             areaName: string;
@@ -2315,6 +2528,11 @@ export interface components {
             payTypeLabel: string;
             creditLimit: number;
             balance: number;
+            /**
+             * Format: int32
+             * @description 1 = Monday … 7 = Sunday
+             */
+            deliveryDay: number;
             /** Format: int32 */
             cycleWeeks: number;
             /** Format: date */
@@ -2340,15 +2558,16 @@ export interface components {
             dayName: string;
             today: boolean;
             counts: components["schemas"]["DueCounts"];
+            totals: components["schemas"]["DueTotals"];
             items: components["schemas"]["DueCustomer"][];
         };
-        EnteredBill: {
-            /** Format: int64 */
-            id: number;
-            billNo: string;
-            paperBillNo: string | null;
-            kind: string;
-            kindLabel: string;
+        DueTotals: {
+            load: components["schemas"]["BottleQty"][];
+            /** Format: int32 */
+            toCollect: number;
+            /** Format: int32 */
+            owed: number;
+            moneyToCollect: number;
         };
         CustomerListResponse: {
             items: components["schemas"]["CustomerListRow"][];
@@ -4145,6 +4364,52 @@ export interface operations {
             };
         };
     };
+    loadSheet: {
+        parameters: {
+            query?: {
+                date?: string;
+                area?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+        };
+    };
+    deliverySheet: {
+        parameters: {
+            query?: {
+                date?: string;
+                area?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+        };
+    };
     bill_1: {
         parameters: {
             query?: never;
@@ -4251,6 +4516,53 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["FactoryChargeHistoryRow"][];
+                };
+            };
+        };
+    };
+    requirement: {
+        parameters: {
+            query?: {
+                days?: number;
+                bottle?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Requirement"];
+                };
+            };
+        };
+    };
+    planning: {
+        parameters: {
+            query?: {
+                date?: string;
+                area?: number;
+                show?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["Planning"];
                 };
             };
         };
