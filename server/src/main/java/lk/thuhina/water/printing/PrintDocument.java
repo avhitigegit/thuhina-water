@@ -6,20 +6,28 @@ import java.util.List;
  * A printed document in plain parts, so every print (bill, delivery and load sheets; receipts, invoices, statements later)
  * has the same look: the company header with the document {@code title} and {@code meta} lines on the right (the first in
  * bold), the {@code party} block (customer / supplier), a small {@code subtitle}, one or more tables, a summary box, footer
- * lines and signature boxes, on the given {@code page}. The renderer adds nothing of its own.
+ * lines and signature boxes, on the given {@code page}. {@code watermark} (e.g. DRAFT, CANCELLED; null = none) is printed
+ * large and light across every page. The renderer adds nothing of its own.
  */
 public record PrintDocument(String title, List<String> meta, List<String> party, String subtitle, List<Table> tables,
-                            List<SummaryRow> summary, List<String> footer, List<String> signatures, Page page) {
+                            List<SummaryRow> summary, List<String> footer, List<String> signatures, Page page, String watermark) {
+
+    /** Without a watermark. */
+    public PrintDocument(String title, List<String> meta, List<String> party, String subtitle, List<Table> tables,
+                         List<SummaryRow> summary, List<String> footer, List<String> signatures, Page page) {
+        this(title, meta, party, subtitle, tables, summary, footer, signatures, page, null);
+    }
 
     /** One table on an A5 page (bills). */
     public PrintDocument(String title, List<String> meta, List<String> party, String subtitle, Table table, List<SummaryRow> summary,
                          List<String> footer, List<String> signatures) {
-        this(title, meta, party, subtitle, table == null ? List.of() : List.of(table), summary, footer, signatures, Page.A5_PORTRAIT);
+        this(title, meta, party, subtitle, table == null ? List.of() : List.of(table), summary, footer, signatures, Page.A5_PORTRAIT,
+                null);
     }
 
-    /** Page size: A5 portrait for bills; A4 landscape for the wide delivery and load sheets. */
+    /** Page size: A5 portrait for bills; A4 portrait for purchase orders; A4 landscape for the wide delivery and load sheets. */
     public enum Page {
-        A5_PORTRAIT, A4_LANDSCAPE
+        A5_PORTRAIT, A4_PORTRAIT, A4_LANDSCAPE
     }
 
     /**

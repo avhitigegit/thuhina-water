@@ -1,5 +1,6 @@
 package lk.thuhina.water.partners.service;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
@@ -12,6 +13,7 @@ import java.util.Set;
 
 import lk.thuhina.water.audit.model.AuditAction;
 import lk.thuhina.water.audit.service.AuditService;
+import lk.thuhina.water.common.Money;
 import lk.thuhina.water.common.NotFoundException;
 import lk.thuhina.water.common.PaymentTerms;
 import lk.thuhina.water.common.Texts;
@@ -30,6 +32,7 @@ import lk.thuhina.water.partners.model.Supplier;
 import lk.thuhina.water.partners.model.SupplierItem;
 import lk.thuhina.water.partners.model.SupplierItem.ItemType;
 import lk.thuhina.water.partners.repository.SupplierRepository;
+import lk.thuhina.water.purchasing.service.SupplierPaymentService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,26 +51,29 @@ public class SupplierService {
     private final ProductRepository products;
     private final NumberingService numbering;
     private final AuditService audit;
+    private final SupplierPaymentService balances;
 
     public SupplierService(SupplierRepository repository, BottleTypeRepository bottleTypes, ProductRepository products,
-                           NumberingService numbering, AuditService audit) {
+                           NumberingService numbering, AuditService audit, SupplierPaymentService balances) {
         this.repository = repository;
         this.bottleTypes = bottleTypes;
         this.products = products;
         this.numbering = numbering;
         this.audit = audit;
+        this.balances = balances;
     }
 
     /** All suppliers by code, or – with {@code item} (B20, P04) – the active suppliers of that item. */
     @Transactional(readOnly = true)
     public List<SupplierResponse> list(String item) {
         ItemNames names = names();
+        Map<Long, BigDecimal> owed = balances.owedBySupplier();
         if (item == null || item.isBlank()) {
-            return repository.findAllByOrderByCodeAsc().stream().map(s -> toResponse(s, names)).toList();
+            return repository.findAllByOrderByCodeAsc().stream().map(s -> toResponse(s, names, owed)).toList();
         }
         String code = item.trim();
         ItemType type = names.bottles.containsKey(code) ? ItemType.BOTTLE : ItemType.PRODUCT;
-        return repository.findActiveSupplying(type, code).stream().map(s -> toResponse(s, names)).toList();
+        return repository.findActiveSupplying(type, code).stream().map(s -> toResponse(s, names, owed)).toList();
     }
 
     @Transactional
@@ -84,7 +90,7 @@ public class SupplierService {
         s = repository.saveAndFlush(s);
         audit.log(AuditAction.CREATE, ENTITY, s.getCode(), s.getName() + " – " + itemText(items, names) + ", "
                 + PaymentTerms.label(terms));
-        return toResponse(s, names);
+        return toResponse(s, names, balances.owedBySupplier());
     }
 
     @Transactional
@@ -120,14 +126,14 @@ public class SupplierService {
             changes.add("contact details updated");
         }
         if (changes.isEmpty()) {
-            return toResponse(s, names);
+            return toResponse(s, names, balances.owedBySupplier());
         }
         s.update(name, Texts.blankToNull(request.contact()), request.phone().trim(), Texts.blankToNull(request.email()),
                 Texts.blankToNull(request.address()), terms, active);
         s.replaceItems(items);
         repository.saveAndFlush(s);
         audit.log(AuditAction.UPDATE, ENTITY, s.getCode(), s.getName() + ": " + String.join("; ", changes));
-        return toResponse(s, names);
+        return toResponse(s, names, balances.owedBySupplier());
     }
 
     // ------------------------------------------------------------------ rules
@@ -207,8 +213,8 @@ public class SupplierService {
         return String.join(", ", items.stream().map(names::name).toList());
     }
 
-    /** Items in the order of the pick list: bottles largest first, then products by code. */
-    private static SupplierResponse toResponse(Supplier s, ItemNames names) {
+    /** Items in the order of the pick list: bottles largest first, then products by code. Owed = received − paid (M09). */
+    private static SupplierResponse toResponse(Supplier s, ItemNames names, Map<Long, BigDecimal> owed) {
         List<String> order = new ArrayList<>(names.bottles.keySet());
         order.addAll(names.products.keySet());
         List<SuppliedItem> items = s.getItems().stream()
@@ -216,6 +222,7 @@ public class SupplierService {
                 .map(i -> new SuppliedItem(i.getItemCode(), i.getItemType().name(), names.name(i.ref())))
                 .toList();
         return new SupplierResponse(s.getId(), s.getCode(), s.getName(), s.getContact(), s.getPhone(), s.getEmail(),
-                s.getAddress(), s.getTermsDays(), PaymentTerms.label(s.getTermsDays()), items, null, s.isActive(), s.getVersion());
+                s.getAddress(), s.getTermsDays(), PaymentTerms.label(s.getTermsDays()), items, owed.getOrDefault(s.getId(), Money.ZERO),
+                s.isActive(), s.getVersion());
     }
 }
