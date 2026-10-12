@@ -85,6 +85,7 @@ export function invalidateAfterSale(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ["masterdata", "products"] });
   qc.invalidateQueries({ queryKey: ["masterdata", "brands"] });
   qc.invalidateQueries({ queryKey: ["admin", "audit"] });
+  qc.invalidateQueries({ queryKey: ["delivery"] });
 }
 
 export function useSaveSale(kind: SaleKind) {

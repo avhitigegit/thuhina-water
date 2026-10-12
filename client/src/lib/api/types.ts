@@ -140,3 +140,14 @@ export type DueCustomer = Schemas["DueCustomer"];
 export type DueCounts = Schemas["DueCounts"];
 export type DueList = Schemas["DueList"];
 export type NextPaperBill = Schemas["NextPaperBill"];
+export type BottleQty = Schemas["BottleQty"];
+export type DueTotals = Schemas["DueTotals"];
+export type PlanKpis = Schemas["PlanKpis"];
+export type LastDelivery = Schemas["LastDelivery"];
+/** `last` is null before a customer's first delivery (the generator drops null on object fields). */
+export type PlanRow = Omit<Schemas["PlanRow"], "last"> & { last: LastDelivery | null };
+export type PlanRoute = Omit<Schemas["PlanRoute"], "rows"> & { rows: PlanRow[] };
+export type Planning = Omit<Schemas["Planning"], "routes"> & { routes: PlanRoute[] };
+export type ReadyCheck = Schemas["ReadyCheck"];
+export type Requirement = Schemas["Requirement"];
+export type RequirementDay = Schemas["RequirementDay"];
