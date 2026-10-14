@@ -234,12 +234,7 @@ export function FactoriesTab() {
       key: "atFactory",
       header: "At factory now",
       align: "num",
-      cell: (f) =>
-        f.atFactory ?? (
-          <span className="muted" title="Comes with Filling Factory (M10)">
-            –
-          </span>
-        ),
+      cell: (f) => (f.atFactory > 0 ? <b style={{ color: "var(--warn)" }}>{f.atFactory}</b> : "0"),
     },
     {
       key: "owed",

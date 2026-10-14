@@ -185,9 +185,7 @@ function ReadyBanner({ r, date }: { r: ReadyCheck; date: string }) {
     <div className="banner bad">
       ✖ {text} <b>Short by {r.shortBy}.</b>{" "}
       {r.factoryCovers && "Bottles at the factory will cover it if they come back in time. "}
-      <span className="muted" title="Comes with Filling Factory (M10)">
-        Send empties to the factory
-      </span>
+      <Link href="/production?send=1">Send empties to the factory</Link>
     </div>
   );
 }

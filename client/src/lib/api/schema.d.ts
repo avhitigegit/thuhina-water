@@ -832,6 +832,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/factory-payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Factory payments, newest first */
+        get: operations["payments"];
+        put?: never;
+        /** Record a factory payment (FP-0001) for a factory and month – reference required unless cash */
+        post: operations["pay"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/factory-dispatches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send empties – one dispatch (FD-0001) for every bottle type, one batch (FB-0001) each, all-or-nothing */
+        post: operations["dispatch"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/factory-batches/{id}/returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive filled bottles (FR-0001) – partial returns allowed; rejects need a reason and are written off */
+        post: operations["receive_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/factories": {
         parameters: {
             query?: never;
@@ -1279,6 +1331,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/production/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Page KPIs: empty and at factory per bottle type, bottles at and money owed to each factory */
+        get: operations["summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/print/purchase-order/{id}": {
         parameters: {
             query?: never;
@@ -1305,6 +1374,23 @@ export interface paths {
         };
         /** Load sheet PDF (A4 landscape) – route totals and the customers due on a date (default tomorrow) */
         get: operations["loadSheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/print/dispatch-note/{dispatchNo}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dispatch note PDF (A4) – every bottle type sent to the factory in one dispatch */
+        get: operations["dispatchNote"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1390,6 +1476,74 @@ export interface paths {
         };
         /** Water price grid and deposits on a date (default today), with the next scheduled change */
         get: operations["current"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/factory-dispatches/{no}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A dispatch with its batches */
+        get: operations["dispatchByNo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/factory-batches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Batches newest first with what came back; factory and open (still at the factory) optional */
+        get: operations["batches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/factory-batches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One batch with its returns */
+        get: operations["batch"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/factory-balances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Filling cost by factory and month, with paid, due and status */
+        get: operations["balances_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1654,14 +1808,13 @@ export interface components {
             minFilled: number;
         };
         JsonNode: {
+            valueNode: boolean;
+            container: boolean;
+            object: boolean;
             /** @enum {string} */
             nodeType: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
             string: boolean;
             integralNumber: boolean;
-            missingNode: boolean;
-            valueNode: boolean;
-            container: boolean;
-            object: boolean;
             pojo: boolean;
             floatingPointNumber: boolean;
             short: boolean;
@@ -1674,6 +1827,7 @@ export interface components {
             textual: boolean;
             boolean: boolean;
             binary: boolean;
+            missingNode: boolean;
             array: boolean;
             empty: boolean;
             null: boolean;
@@ -1876,8 +2030,8 @@ export interface components {
             termsLabel: string;
             charges: components["schemas"]["FactoryChargeView"][];
             /** Format: int32 */
-            atFactory: number | null;
-            owed: number | null;
+            atFactory: number;
+            owed: number;
             active: boolean;
             /** Format: int64 */
             version: number;
@@ -2597,6 +2751,130 @@ export interface components {
             bottleTypeCode: string;
             note?: string;
         };
+        FactoryPaymentRequest: {
+            /** Format: int64 */
+            factoryId?: number;
+            period?: string;
+            /** Format: date */
+            date: string;
+            amount?: number;
+            /** @enum {string} */
+            method?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            reference?: string;
+            note?: string;
+        };
+        FactoryLink: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+        };
+        FactoryPaymentRow: {
+            /** Format: int64 */
+            id: number;
+            fpNo: string;
+            /** Format: date */
+            date: string;
+            factory: components["schemas"]["FactoryLink"];
+            period: string;
+            periodLabel: string;
+            method: string;
+            methodLabel: string;
+            reference: string | null;
+            amount: number;
+            note: string | null;
+            createdByName: string;
+        };
+        DispatchLine: {
+            bottleTypeCode: string;
+            /** Format: int32 */
+            qty: number;
+        };
+        DispatchRequest: {
+            /** Format: int64 */
+            factoryId?: number;
+            /** Format: date */
+            date: string;
+            vehicleNo?: string;
+            note?: string;
+            lines?: components["schemas"]["DispatchLine"][];
+        };
+        BatchView: {
+            /** Format: int64 */
+            id: number;
+            batchNo: string;
+            /** Format: int64 */
+            dispatchId: number;
+            dispatchNo: string;
+            /** Format: date */
+            date: string;
+            factory: components["schemas"]["FactoryLink"];
+            bottleTypeCode: string;
+            bottleLabel: string;
+            bottleName: string;
+            /** Format: int32 */
+            qtySent: number;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            rejected: number;
+            /** Format: int32 */
+            atFactory: number;
+            charge: number;
+            cost: number;
+            status: string;
+            statusLabel: string;
+            vehicleNo: string | null;
+            note: string | null;
+            returns: components["schemas"]["ReturnView"][];
+        };
+        DispatchView: {
+            /** Format: int64 */
+            id: number;
+            dispatchNo: string;
+            /** Format: date */
+            date: string;
+            factory: components["schemas"]["FactoryLink"];
+            factoryAddress: string | null;
+            factoryContact: string | null;
+            factoryPhone: string | null;
+            vehicleNo: string | null;
+            note: string | null;
+            createdByName: string;
+            /** Format: int32 */
+            totalBottles: number;
+            batches: components["schemas"]["BatchView"][];
+        };
+        ReturnView: {
+            /** Format: int64 */
+            id: number;
+            returnNo: string;
+            /** Format: date */
+            date: string;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            rejected: number;
+            rejectReason: string | null;
+            cost: number;
+            note: string | null;
+            createdByName: string;
+        };
+        ReturnRequest: {
+            /** Format: date */
+            date: string;
+            /** Format: int32 */
+            filled?: number;
+            /** Format: int32 */
+            rejected?: number;
+            rejectReason?: string;
+            note?: string;
+        };
+        ReturnResult: {
+            saved: components["schemas"]["ReturnView"];
+            batch: components["schemas"]["BatchView"];
+            damageNo: string | null;
+        };
         SetCustomerPriceRequest: {
             bottleTypeCode: string;
             price: number;
@@ -2902,6 +3180,29 @@ export interface components {
             statusLabel: string;
             nextStep: string | null;
         };
+        FactoryBottleStock: {
+            bottleTypeCode: string;
+            label: string;
+            name: string;
+            /** Format: int32 */
+            empty: number;
+            /** Format: int32 */
+            atFactory: number;
+        };
+        FactoryOwed: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            /** Format: int32 */
+            atFactory: number;
+            owed: number;
+            active: boolean;
+        };
+        ProductionSummary: {
+            bottles: components["schemas"]["FactoryBottleStock"][];
+            factories: components["schemas"]["FactoryOwed"][];
+        };
         WaterPriceResponse: {
             price: number;
             agreed: boolean;
@@ -2940,6 +3241,22 @@ export interface components {
             price: number;
             /** Format: date */
             effectiveFrom: string;
+        };
+        FactoryMonth: {
+            /** Format: int64 */
+            factoryId: number;
+            factoryName: string;
+            period: string;
+            periodLabel: string;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            rejected: number;
+            cost: number;
+            paid: number;
+            due: number;
+            status: string;
+            statusLabel: string;
         };
         FactoryChargeHistoryRow: {
             /** Format: int64 */
@@ -4734,6 +5051,100 @@ export interface operations {
             };
         };
     };
+    payments: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FactoryPaymentRow"][];
+                };
+            };
+        };
+    };
+    pay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactoryPaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FactoryPaymentRow"];
+                };
+            };
+        };
+    };
+    dispatch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DispatchRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DispatchView"];
+                };
+            };
+        };
+    };
+    receive_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReturnRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReturnResult"];
+                };
+            };
+        };
+    };
     list_6: {
         parameters: {
             query?: never;
@@ -5425,6 +5836,26 @@ export interface operations {
             };
         };
     };
+    summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ProductionSummary"];
+                };
+            };
+        };
+    };
     purchaseOrder: {
         parameters: {
             query?: never;
@@ -5455,6 +5886,28 @@ export interface operations {
             };
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+        };
+    };
+    dispatchNote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                dispatchNo: string;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -5577,6 +6030,93 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PriceMatrixResponse"];
+                };
+            };
+        };
+    };
+    dispatchByNo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                no: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DispatchView"];
+                };
+            };
+        };
+    };
+    batches: {
+        parameters: {
+            query?: {
+                factory?: number;
+                open?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["BatchView"][];
+                };
+            };
+        };
+    };
+    batch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["BatchView"];
+                };
+            };
+        };
+    };
+    balances_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FactoryMonth"][];
                 };
             };
         };

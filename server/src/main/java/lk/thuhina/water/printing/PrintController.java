@@ -26,11 +26,14 @@ public class PrintController {
     private final BillPrintService bills;
     private final DeliveryPrintService delivery;
     private final PurchaseOrderPrintService purchaseOrders;
+    private final DispatchNotePrintService dispatchNotes;
 
-    public PrintController(BillPrintService bills, DeliveryPrintService delivery, PurchaseOrderPrintService purchaseOrders) {
+    public PrintController(BillPrintService bills, DeliveryPrintService delivery, PurchaseOrderPrintService purchaseOrders,
+                           DispatchNotePrintService dispatchNotes) {
         this.bills = bills;
         this.delivery = delivery;
         this.purchaseOrders = purchaseOrders;
+        this.dispatchNotes = dispatchNotes;
     }
 
     @Operation(summary = "Bill PDF (A5) – opens in the browser to print")
@@ -64,6 +67,13 @@ public class PrintController {
     @PreAuthorize("hasAuthority('" + Permissions.PURCHASING_VIEW + "')")
     public ResponseEntity<byte[]> purchaseOrder(@PathVariable long id) {
         return pdf(purchaseOrders.purchaseOrder(id), purchaseOrders.poNo(id) + ".pdf");
+    }
+
+    @Operation(summary = "Dispatch note PDF (A4) – every bottle type sent to the factory in one dispatch")
+    @GetMapping(value = "/dispatch-note/{dispatchNo}", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAuthority('" + Permissions.PRODUCTION_VIEW + "')")
+    public ResponseEntity<byte[]> dispatchNote(@PathVariable String dispatchNo) {
+        return pdf(dispatchNotes.dispatchNote(dispatchNo), dispatchNo + ".pdf");
     }
 
     private static ResponseEntity<byte[]> pdf(byte[] pdf, String filename) {

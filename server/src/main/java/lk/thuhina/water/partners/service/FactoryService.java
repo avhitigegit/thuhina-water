@@ -36,6 +36,7 @@ import lk.thuhina.water.partners.model.Factory;
 import lk.thuhina.water.partners.model.FactoryCharge;
 import lk.thuhina.water.partners.repository.FactoryChargeRepository;
 import lk.thuhina.water.partners.repository.FactoryRepository;
+import lk.thuhina.water.production.service.ProductionQueryService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,15 +56,18 @@ public class FactoryService {
     private final NumberingService numbering;
     private final AuditService audit;
     private final Clock clock;
+    private final ProductionQueryService production;
 
     public FactoryService(FactoryRepository repository, FactoryChargeRepository charges, BottleTypeRepository bottleTypes,
-                          NumberingService numbering, AuditService audit, Clock clock) {
+                          NumberingService numbering, AuditService audit, Clock clock,
+                          ProductionQueryService production) {
         this.repository = repository;
         this.charges = charges;
         this.bottleTypes = bottleTypes;
         this.numbering = numbering;
         this.audit = audit;
         this.clock = clock;
+        this.production = production;
     }
 
     /** The factory's charge per bottle of this type on {@code date} – the newest row on or before the date. */
@@ -79,8 +83,10 @@ public class FactoryService {
         Map<Long, List<FactoryCharge>> all = charges.findAllByOrderByEffectiveFromDescIdDesc().stream()
                 .collect(Collectors.groupingBy(FactoryCharge::getFactoryId));
         LocalDate today = today();
+        Map<Long, Integer> at = production.atFactoryByFactory();
+        Map<Long, BigDecimal> owed = production.owedByFactory();
         return repository.findAllByOrderByCodeAsc().stream()
-                .map(f -> toResponse(f, all.getOrDefault(f.getId(), List.of()), active, today))
+                .map(f -> toResponse(f, all.getOrDefault(f.getId(), List.of()), active, today, at, owed))
                 .toList();
     }
 
@@ -116,7 +122,8 @@ public class FactoryService {
         }
         audit.log(AuditAction.CREATE, ENTITY, f.getCode(), f.getName() + " – charges per bottle " + String.join(" · ", text)
                 + ", " + PaymentTerms.label(terms));
-        return toResponse(f, charges.findByFactoryIdOrderByEffectiveFromDescIdDesc(f.getId()), active, today);
+        return toResponse(f, charges.findByFactoryIdOrderByEffectiveFromDescIdDesc(f.getId()), active, today,
+                production.atFactoryByFactory(), production.owedByFactory());
     }
 
     @Transactional
@@ -163,7 +170,8 @@ public class FactoryService {
             repository.saveAndFlush(f);
             audit.log(AuditAction.UPDATE, ENTITY, f.getCode(), f.getName() + ": " + String.join("; ", changes));
         }
-        return toResponse(f, charges.findByFactoryIdOrderByEffectiveFromDescIdDesc(id), active, today);
+        return toResponse(f, charges.findByFactoryIdOrderByEffectiveFromDescIdDesc(id), active, today,
+                production.atFactoryByFactory(), production.owedByFactory());
     }
 
     // ------------------------------------------------------------------ helpers
@@ -212,14 +220,17 @@ public class FactoryService {
         return MasterDataRules.litresText(b.getLitres()) + "L";
     }
 
-    private static FactoryResponse toResponse(Factory f, List<FactoryCharge> history, List<BottleType> active, LocalDate today) {
+    /** {@code at} / {@code owed} = bottles still at each factory and filling cost − payments (Production, M10). */
+    private static FactoryResponse toResponse(Factory f, List<FactoryCharge> history, List<BottleType> active, LocalDate today,
+                                              Map<Long, Integer> at, Map<Long, BigDecimal> owed) {
         List<FactoryChargeView> views = new ArrayList<>();
         for (BottleType b : active) {
             inForce(history, b.getCode(), today).ifPresent(c ->
                     views.add(new FactoryChargeView(b.getCode(), label(b), c.getCharge(), c.getEffectiveFrom())));
         }
         return new FactoryResponse(f.getId(), f.getCode(), f.getName(), f.getAddress(), f.getContact(), f.getPhone(),
-                f.getEmail(), f.getLicence(), f.getTermsDays(), PaymentTerms.label(f.getTermsDays()), views, null, null,
+                f.getEmail(), f.getLicence(), f.getTermsDays(), PaymentTerms.label(f.getTermsDays()), views, at.getOrDefault(f.getId(), 0),
+                owed.getOrDefault(f.getId(), Money.ZERO),
                 f.isActive(), f.getVersion());
     }
 }
