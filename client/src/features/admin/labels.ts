@@ -21,6 +21,7 @@ export function actionLabel(action: string): string {
 const ACTION_KIND: Record<string, BadgeKind> = {
   CREATE: "ok",
   UPDATE: "info",
+  DELETE: "bad",
   REVERSE: "bad",
   APPROVE: "warn",
   IMPORT: "dark",

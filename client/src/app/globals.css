@@ -1206,6 +1206,26 @@
     display: none;
   }
 
+  /* Horizontal bars (prototype UI.hbars) – e.g. expenses by type */
+  .hbar {
+    display: grid;
+    grid-template-columns: 150px 1fr 110px;
+    gap: 8px;
+    align-items: center;
+    font-size: 12.5px;
+    margin-bottom: 6px;
+  }
+  .hbar .track {
+    background: var(--border);
+    border-radius: 3px;
+    height: 12px;
+    overflow: hidden;
+  }
+  .hbar .fill {
+    background: var(--brand);
+    height: 100%;
+  }
+
   /* Bar chart (prototype UI.bars) – e.g. the upcoming bottle requirement */
   .bars {
     display: flex;
