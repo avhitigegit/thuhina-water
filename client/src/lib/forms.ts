@@ -48,3 +48,12 @@ export function optionalMoneyText(negativeMessage: string) {
     .refine((v) => v === "" || Number(v) >= 0, negativeMessage)
     .refine((v) => v === "" || /^\d+(\.\d{1,2})?$/.test(v), "Use rupees and cents, e.g. 1350 or 1350.50.");
 }
+
+/** The message to show for a failed save in a pop-up's banner: the field messages of a 400, else the error message. */
+export function errorText(err: unknown): string {
+  if (err instanceof ApiError) {
+    const fields = Object.values(err.fieldErrors);
+    return fields.length ? fields.join(" ") : err.message;
+  }
+  return "Something went wrong. Please try again.";
+}

@@ -15,8 +15,8 @@ import lk.thuhina.water.billing.dto.BillingDtos.InvoicePreview;
 import lk.thuhina.water.billing.dto.BillingDtos.InvoiceRow;
 import lk.thuhina.water.billing.dto.BillingDtos.InvoiceView;
 import lk.thuhina.water.billing.dto.BillingDtos.PaymentListResponse;
-import lk.thuhina.water.billing.dto.BillingDtos.PaymentRequest;
-import lk.thuhina.water.billing.dto.BillingDtos.PaymentRow;
+import lk.thuhina.water.billing.dto.BillingDtos.CustomerPaymentRequest;
+import lk.thuhina.water.billing.dto.BillingDtos.CustomerPaymentRow;
 import lk.thuhina.water.billing.dto.BillingDtos.PaymentSaved;
 import lk.thuhina.water.billing.dto.BillingDtos.RecentMoney;
 import lk.thuhina.water.billing.dto.BillingDtos.StatementView;
@@ -92,7 +92,7 @@ public class BillingController {
     @PostMapping("/payments")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize(EDIT)
-    public PaymentSaved receive(@Valid @RequestBody PaymentRequest request) {
+    public PaymentSaved receive(@Valid @RequestBody CustomerPaymentRequest request) {
         return payments.receive(request);
     }
 
@@ -117,7 +117,7 @@ public class BillingController {
     @Operation(summary = "One payment")
     @GetMapping("/payments/{id}")
     @PreAuthorize(VIEW)
-    public PaymentRow payment(@PathVariable long id) {
+    public CustomerPaymentRow payment(@PathVariable long id) {
         return query.payment(id);
     }
 

@@ -5,7 +5,8 @@
  * Sales. Header, banners (inactive, over the credit limit, delivery overdue), actions by permission, balance cards,
  * delivery and price summary, tabs History · Payments · Invoices · Prices. First purchase / Extra order / Collect
  * empties / Settle owed open their sale pop-ups here (M06); Enter bill opens the daily grid (M07). The History tab
- * lists the bills with charge, paid and the running balance; payments and invoices fill in with Billing (M11).
+ * lists the bills and payments with charge, paid and the running balance; Payments and Invoices (M11) are shown to roles
+ * that see Billing, with the receipt and invoice prints.
  */
 import Link from "next/link";
 import { useState } from "react";
@@ -15,9 +16,22 @@ import { SidePanel } from "@/components/shared/SidePanel";
 import { Badge, StatusBadge } from "@/components/shared/StatusBadge";
 import { Tabs } from "@/components/shared/Tabs";
 import { useCan } from "@/features/auth/access";
+import {
+  invoiceUrl,
+  openPdf,
+  receiptUrl,
+  useCustomerInvoices,
+  useCustomerPayments,
+} from "@/features/billing/api";
 import { NewSaleDialog } from "@/features/sales/SaleDialogs";
 import type { SaleKind } from "@/features/sales/labels";
-import type { CustomerDetail, CustomerHistoryRow, CustomerPriceRow } from "@/lib/api/types";
+import type {
+  CustomerDetail,
+  CustomerHistoryRow,
+  CustomerPaymentRow,
+  CustomerPriceRow,
+  InvoiceRow,
+} from "@/lib/api/types";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { P } from "@/lib/permissions";
 import { useCustomer, useCustomerHistory, useCustomerPrices } from "./api";
@@ -33,7 +47,11 @@ const ENTRY: Record<string, { label: string; kind: "ok" | "info" | "" | "dark" }
   PRICE: { label: "Price", kind: "info" },
   CHANGED: { label: "Changed", kind: "" },
   SALE: { label: "Bill", kind: "dark" },
+  PAYMENT: { label: "Payment", kind: "ok" },
 };
+
+/** Bills and payments show their business date; the other entries when they were made. */
+const DATED = new Set(["SALE", "PAYMENT"]);
 
 /** History: registration, changes, prices and bills (bill date; bill number links to Sales & Bills). */
 function historyColumns(canSeeBills: boolean): Column<CustomerHistoryRow>[] {
@@ -42,7 +60,7 @@ function historyColumns(canSeeBills: boolean): Column<CustomerHistoryRow>[] {
       key: "date",
       header: "Date",
       cell: (h) => (
-        <span className="nowrap">{h.kind === "SALE" ? formatDate(h.date) : formatDateTime(h.at)}</span>
+        <span className="nowrap">{DATED.has(h.kind) ? formatDate(h.date) : formatDateTime(h.at)}</span>
       ),
     },
     {
@@ -55,7 +73,11 @@ function historyColumns(canSeeBills: boolean): Column<CustomerHistoryRow>[] {
             <Badge kind={e.kind}>{e.label}</Badge>
             {h.billNo && (
               <div className="small mono">
-                {canSeeBills ? <Link href={`/sales/bills?bill=${h.billNo}`}>{h.billNo}</Link> : h.billNo}
+                {canSeeBills && h.kind === "SALE" ? (
+                  <Link href={`/sales/bills?bill=${h.billNo}`}>{h.billNo}</Link>
+                ) : (
+                  h.billNo
+                )}
               </div>
             )}
           </>
@@ -84,6 +106,57 @@ function historyColumns(canSeeBills: boolean): Column<CustomerHistoryRow>[] {
     { key: "by", header: "By", cell: (h) => <span className="small">{h.byName ?? h.by}</span> },
   ];
 }
+
+const paymentColumns: Column<CustomerPaymentRow>[] = [
+  {
+    key: "receipt",
+    header: "Receipt",
+    cell: (p) => (
+      <button
+        className="btn link mono"
+        type="button"
+        title="Print the receipt"
+        onClick={() => openPdf(receiptUrl(p.id))}
+      >
+        {p.receiptNo}
+      </button>
+    ),
+  },
+  { key: "date", header: "Date", cell: (p) => formatDate(p.date) },
+  { key: "method", header: "Method", cell: (p) => p.methodLabel },
+  {
+    key: "ref",
+    header: "Reference",
+    cell: (p) => (
+      <>
+        {p.reference}
+        {p.invoiceNo && <div className="small muted">for {p.invoiceNo}</div>}
+      </>
+    ),
+  },
+  { key: "amount", header: "Amount", align: "num", cell: (p) => <MoneyText value={p.amount} /> },
+];
+
+const invoiceColumns: Column<InvoiceRow>[] = [
+  {
+    key: "invoice",
+    header: "Invoice",
+    cell: (i) => <Link href={`/billing?invoice=${i.id}`}>{i.invoiceNo}</Link>,
+  },
+  { key: "month", header: "Month", cell: (i) => i.periodLabel },
+  { key: "amount", header: "This month", align: "num", cell: (i) => <MoneyText value={i.amount} /> },
+  { key: "total", header: "Total due", align: "num", cell: (i) => <MoneyText value={i.totalDue} /> },
+  {
+    key: "print",
+    header: "",
+    className: "actions",
+    cell: (i) => (
+      <button className="btn sm" type="button" onClick={() => openPdf(invoiceUrl(i.id))}>
+        Print
+      </button>
+    ),
+  },
+];
 
 const priceColumns: Column<CustomerPriceRow>[] = [
   { key: "bottle", header: "Bottle", cell: (e) => e.label },
@@ -138,6 +211,8 @@ function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDeta
   const [sale, setSale] = useState<SaleKind | null>(null);
   const history = useCustomerHistory(c.id);
   const prices = useCustomerPrices(c.id, canSeePrices && tab === "price");
+  const payments = useCustomerPayments(c.id, canBill && tab === "pay");
+  const invoices = useCustomerInvoices(c.id, canBill && tab === "inv");
   const active = c.status === "ACTIVE";
   const held = c.bottles.reduce((s, b) => s + b.held, 0);
   const toCollect = c.bottles.reduce((s, b) => s + b.toCollect, 0);
@@ -299,8 +374,12 @@ function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDeta
         <Tabs
           tabs={[
             { id: "hist", label: "History" },
-            { id: "pay", label: "Payments" },
-            { id: "inv", label: "Invoices" },
+            ...(canBill
+              ? [
+                  { id: "pay" as const, label: "Payments" },
+                  { id: "inv" as const, label: "Invoices" },
+                ]
+              : []),
             ...(canSeePrices ? [{ id: "price" as const, label: "Prices" }] : []),
           ]}
           value={tab}
@@ -316,12 +395,24 @@ function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDeta
           />
         )}
         {tab === "pay" && (
-          <p className="muted">No payments yet. Payments are recorded in Billing &amp; Payments.</p>
+          <DataTable
+            columns={paymentColumns}
+            rows={payments.data?.items}
+            loading={payments.isPending}
+            rowKey={(p) => p.id}
+            empty="No payments."
+          />
         )}
         {tab === "inv" && (
-          <p className="muted">
-            {c.payType === "MONTHLY_BILL" ? "No invoices yet." : "Only Monthly bill customers get invoices."}
-          </p>
+          <DataTable
+            columns={invoiceColumns}
+            rows={invoices.data}
+            loading={invoices.isPending}
+            rowKey={(i) => i.id}
+            empty={
+              c.payType === "MONTHLY_BILL" ? "No invoices yet." : "Only Monthly bill customers get invoices."
+            }
+          />
         )}
         {tab === "price" && (
           <DataTable

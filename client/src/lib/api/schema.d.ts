@@ -814,6 +814,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Payments newest first; customer and dates optional */
+        get: operations["payments"];
+        put?: never;
+        /** Receive a payment (RC-00001). Reference required for Bank transfer and Cheque; part payments and advances allowed */
+        post: operations["receive_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/old-bottle-brands": {
         parameters: {
             query?: never;
@@ -832,6 +850,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/invoices/generate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Generate invoices (INV-YYMM-0001) for Monthly bill customers without one for the month; skipped customers come back with the reason */
+        post: operations["generate"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/factory-payments": {
         parameters: {
             query?: never;
@@ -840,7 +875,7 @@ export interface paths {
             cookie?: never;
         };
         /** Factory payments, newest first */
-        get: operations["payments"];
+        get: operations["payments_1"];
         put?: never;
         /** Record a factory payment (FP-0001) for a factory and month – reference required unless cash */
         post: operations["pay"];
@@ -877,7 +912,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Receive filled bottles (FR-0001) – partial returns allowed; rejects need a reason and are written off */
-        post: operations["receive_1"];
+        post: operations["receive_2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1195,6 +1230,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/statements/{customerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Statement of account: brought forward, charges and payments with the running balance, aging on the to date. from default the start of last month, to default today */
+        get: operations["statement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sales/txns": {
         parameters: {
             query?: never;
@@ -1348,6 +1400,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/print/statement/{customerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Statement of account PDF (A4) – from default the start of last month, to default today */
+        get: operations["statement_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/print/receipt/{paymentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Payment receipt PDF (A5) – amount, how paid, balance before and now */
+        get: operations["receipt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/print/purchase-order/{id}": {
         parameters: {
             query?: never;
@@ -1374,6 +1460,23 @@ export interface paths {
         };
         /** Load sheet PDF (A4 landscape) – route totals and the customers due on a date (default tomorrow) */
         get: operations["loadSheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/print/invoice/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Monthly invoice PDF (A4) – a line per delivery, previous balance, payments, this month, total due */
+        get: operations["invoice"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1476,6 +1579,91 @@ export interface paths {
         };
         /** Water price grid and deposits on a date (default today), with the next scheduled change */
         get: operations["current"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payments/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One payment */
+        get: operations["payment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/payments/recent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Recent payments and cash collected on bills, newest first (default 15) */
+        get: operations["recent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Invoices newest first; month (YYYY-MM) and customer optional */
+        get: operations["invoices"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An invoice with its lines */
+        get: operations["invoice_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/invoices/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Monthly invoices tab: every Monthly bill customer for the month (default last month) with deliveries, this month, previous balance, payments, total due and the invoice when generated; months offered = this and 3 before */
+        get: operations["preview"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1644,7 +1832,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Customer history – registration, changes, status and prices (sales and payments come later) */
+        /** Customer history – registration, changes, status, prices, bills and payments (with the running balance) */
         get: operations["history_2"];
         put?: never;
         post?: never;
@@ -1739,6 +1927,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/accounts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer accounts with a balance and their aging (0–30 / 31–60 / 61–90 / 90+), largest first, with the totals of every matching row. show = over (over the credit limit) / old (older than 30 days); asOf default today */
+        get: operations["accounts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/{customerId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One customer's account (also with a zero balance) and invoices – for the Receive payment pop-up */
+        get: operations["account"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/accounts/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Page KPIs: total outstanding and each aging bucket over every customer with a balance */
+        get: operations["summary_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1808,13 +2047,14 @@ export interface components {
             minFilled: number;
         };
         JsonNode: {
-            valueNode: boolean;
-            container: boolean;
-            object: boolean;
             /** @enum {string} */
             nodeType: "ARRAY" | "BINARY" | "BOOLEAN" | "MISSING" | "NULL" | "NUMBER" | "OBJECT" | "POJO" | "STRING";
             string: boolean;
             integralNumber: boolean;
+            missingNode: boolean;
+            valueNode: boolean;
+            container: boolean;
+            object: boolean;
             pojo: boolean;
             floatingPointNumber: boolean;
             short: boolean;
@@ -1827,7 +2067,6 @@ export interface components {
             textual: boolean;
             boolean: boolean;
             binary: boolean;
-            missingNode: boolean;
             array: boolean;
             empty: boolean;
             null: boolean;
@@ -2746,10 +2985,100 @@ export interface components {
             createdAt: string;
             status: string;
         };
+        CustomerPaymentRequest: {
+            /** Format: int64 */
+            customerId?: number;
+            /** Format: date */
+            date: string;
+            amount?: number;
+            /** @enum {string} */
+            method?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            reference?: string;
+            bank?: string;
+            /** Format: date */
+            chequeDate?: string;
+            /** Format: int64 */
+            invoiceId?: number;
+            note?: string;
+        };
+        CustomerLink: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+        };
+        CustomerPaymentRow: {
+            /** Format: int64 */
+            id: number;
+            receiptNo: string;
+            /** Format: date */
+            date: string;
+            customer: components["schemas"]["CustomerLink"];
+            amount: number;
+            method: string;
+            methodLabel: string;
+            reference: string | null;
+            bank: string | null;
+            /** Format: date */
+            chequeDate: string | null;
+            /** Format: int64 */
+            invoiceId: number | null;
+            invoiceNo: string | null;
+            note: string | null;
+            balanceBefore: number;
+            balanceAfter: number;
+            partPayment: boolean;
+            createdByName: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        PaymentSaved: {
+            payment: components["schemas"]["CustomerPaymentRow"];
+            balanceNow: number;
+            partPayment: boolean;
+            advance: boolean;
+            message: string;
+        };
         CreateOldBottleBrandRequest: {
             name: string;
             bottleTypeCode: string;
             note?: string;
+        };
+        GenerateRequest: {
+            period: string;
+        };
+        GenerateResult: {
+            period: string;
+            periodLabel: string;
+            created: components["schemas"]["InvoiceRow"][];
+            skipped: components["schemas"]["SkippedCustomer"][];
+        };
+        InvoiceRow: {
+            /** Format: int64 */
+            id: number;
+            invoiceNo: string;
+            customer: components["schemas"]["CustomerLink"];
+            period: string;
+            periodLabel: string;
+            /** Format: date */
+            invoiceDate: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: int32 */
+            deliveries: number;
+            opening: number;
+            payments: number;
+            amount: number;
+            totalDue: number;
+            paid: number;
+            createdByName: string;
+        };
+        SkippedCustomer: {
+            /** Format: int64 */
+            customerId: number;
+            code: string;
+            name: string;
+            reason: string;
         };
         FactoryPaymentRequest: {
             /** Format: int64 */
@@ -3083,6 +3412,42 @@ export interface components {
             /** Format: int64 */
             total: number;
         };
+        CustomerInfo: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+            address: string;
+            area: string;
+            phone: string;
+            payType: string;
+            payTypeLabel: string;
+            /** Format: int32 */
+            termsDays: number;
+        };
+        StatementRow: {
+            /** Format: date */
+            date: string;
+            ref: string;
+            description: string;
+            charges: number;
+            payments: number;
+            balance: number;
+        };
+        StatementView: {
+            customer: components["schemas"]["CustomerInfo"];
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            broughtForward: number;
+            rows: components["schemas"]["StatementRow"][];
+            closing: number;
+            days0to30: number;
+            days31to60: number;
+            days61to90: number;
+            over90: number;
+        };
         TxnListResponse: {
             items: components["schemas"]["TxnRow"][];
             /** Format: int32 */
@@ -3241,6 +3606,103 @@ export interface components {
             price: number;
             /** Format: date */
             effectiveFrom: string;
+        };
+        PaymentListResponse: {
+            items: components["schemas"]["CustomerPaymentRow"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            total: number;
+        };
+        RecentMoney: {
+            kind: string;
+            /** Format: int64 */
+            id: number;
+            ref: string;
+            /** Format: date */
+            date: string;
+            /** Format: date-time */
+            at: string;
+            /** Format: int64 */
+            customerId: number | null;
+            customerName: string;
+            how: string;
+            amount: number;
+        };
+        InvoiceLine: {
+            /** Format: date */
+            date: string;
+            billNo: string;
+            description: string;
+            /** Format: int32 */
+            qty: number | null;
+            unitPrice: number | null;
+            amount: number;
+        };
+        InvoiceView: {
+            /** Format: int64 */
+            id: number;
+            invoiceNo: string;
+            customer: components["schemas"]["CustomerInfo"];
+            period: string;
+            periodLabel: string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** Format: date */
+            invoiceDate: string;
+            /** Format: date */
+            dueDate: string;
+            /** Format: int32 */
+            deliveries: number;
+            opening: number;
+            charges: number;
+            paidOnBills: number;
+            payments: number;
+            amount: number;
+            totalDue: number;
+            paid: number;
+            lines: components["schemas"]["InvoiceLine"][];
+            createdByName: string;
+        };
+        InvoiceLink: {
+            /** Format: int64 */
+            id: number;
+            invoiceNo: string;
+            period: string;
+            periodLabel: string;
+            totalDue: number;
+        };
+        InvoiceMonthRow: {
+            /** Format: int64 */
+            customerId: number;
+            code: string;
+            name: string;
+            status: string;
+            /** Format: int32 */
+            deliveries: number;
+            charges: number;
+            paidOnBills: number;
+            thisMonth: number;
+            opening: number;
+            payments: number;
+            totalDue: number;
+            invoice: components["schemas"]["InvoiceLink"];
+        };
+        InvoicePreview: {
+            period: string;
+            periodLabel: string;
+            periods: components["schemas"]["PeriodOption"][];
+            rows: components["schemas"]["InvoiceMonthRow"][];
+            /** Format: int32 */
+            toGenerate: number;
+        };
+        PeriodOption: {
+            period: string;
+            label: string;
         };
         FactoryMonth: {
             /** Format: int64 */
@@ -3603,6 +4065,59 @@ export interface components {
         UserOption: {
             username: string;
             fullName: string | null;
+        };
+        AccountListResponse: {
+            items: components["schemas"]["AccountRow"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            total: number;
+            totals: components["schemas"]["AgingTotals"];
+        };
+        AccountRow: {
+            /** Format: int64 */
+            customerId: number;
+            code: string;
+            name: string;
+            phone: string;
+            payType: string;
+            payTypeLabel: string;
+            creditLimit: number;
+            status: string;
+            days0to30: number;
+            days31to60: number;
+            days61to90: number;
+            over90: number;
+            balance: number;
+            overLimit: boolean;
+            /** Format: date */
+            oldest: string | null;
+        };
+        AgingTotals: {
+            days0to30: number;
+            days31to60: number;
+            days61to90: number;
+            over90: number;
+            balance: number;
+        };
+        AccountView: {
+            account: components["schemas"]["AccountRow"];
+            invoices: components["schemas"]["InvoiceLink"][];
+        };
+        AccountSummary: {
+            totalOutstanding: number;
+            days0to30: number;
+            days31to60: number;
+            days61to90: number;
+            over90: number;
+            /** Format: int64 */
+            customers: number;
+            /** Format: int64 */
+            overLimit: number;
+            /** Format: date */
+            asOf: string;
         };
     };
     responses: never;
@@ -5007,6 +5522,56 @@ export interface operations {
             };
         };
     };
+    payments: {
+        parameters: {
+            query?: {
+                customer?: number;
+                from?: string;
+                to?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PaymentListResponse"];
+                };
+            };
+        };
+    };
+    receive_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerPaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PaymentSaved"];
+                };
+            };
+        };
+    };
     list_5: {
         parameters: {
             query?: never;
@@ -5051,7 +5616,31 @@ export interface operations {
             };
         };
     };
-    payments: {
+    generate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GenerateRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["GenerateResult"];
+                };
+            };
+        };
+    };
+    payments_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -5119,7 +5708,7 @@ export interface operations {
             };
         };
     };
-    receive_1: {
+    receive_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -5658,6 +6247,31 @@ export interface operations {
             };
         };
     };
+    statement: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                customerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["StatementView"];
+                };
+            };
+        };
+    };
     list_8: {
         parameters: {
             query?: {
@@ -5856,6 +6470,53 @@ export interface operations {
             };
         };
     };
+    statement_1: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                customerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+        };
+    };
+    receipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                paymentId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+        };
+    };
     purchaseOrder: {
         parameters: {
             query?: never;
@@ -5886,6 +6547,28 @@ export interface operations {
             };
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+        };
+    };
+    invoice: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -6030,6 +6713,117 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["PriceMatrixResponse"];
+                };
+            };
+        };
+    };
+    payment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CustomerPaymentRow"];
+                };
+            };
+        };
+    };
+    recent: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["RecentMoney"][];
+                };
+            };
+        };
+    };
+    invoices: {
+        parameters: {
+            query?: {
+                period?: string;
+                customer?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["InvoiceRow"][];
+                };
+            };
+        };
+    };
+    invoice_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["InvoiceView"];
+                };
+            };
+        };
+    };
+    preview: {
+        parameters: {
+            query?: {
+                period?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["InvoicePreview"];
                 };
             };
         };
@@ -6375,6 +7169,77 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AuditFilterOptions"];
+                };
+            };
+        };
+    };
+    accounts: {
+        parameters: {
+            query?: {
+                q?: string;
+                pay?: "CASH" | "CREDIT" | "MONTHLY_BILL";
+                show?: string;
+                asOf?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountListResponse"];
+                };
+            };
+        };
+    };
+    account: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                customerId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountView"];
+                };
+            };
+        };
+    };
+    summary_1: {
+        parameters: {
+            query?: {
+                asOf?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AccountSummary"];
                 };
             };
         };

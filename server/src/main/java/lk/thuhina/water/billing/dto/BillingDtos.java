@@ -66,7 +66,7 @@ public final class BillingDtos {
 
     // ------------------------------------------------------------------ payments (FR-50)
 
-    public record PaymentRequest(
+    public record CustomerPaymentRequest(
             Long customerId,
             @NotNull(message = "Enter the date.") LocalDate date,
             BigDecimal amount,
@@ -79,7 +79,7 @@ public final class BillingDtos {
     }
 
     /** A payment with its receipt number; {@code balanceAfter} = balance before − amount. */
-    public record PaymentRow(
+    public record CustomerPaymentRow(
             long id,
             String receiptNo,
             LocalDate date,
@@ -101,10 +101,10 @@ public final class BillingDtos {
     }
 
     /** After saving: the payment and "Payment saved – Rs. 2,000.00 received from …. Balance now …". */
-    public record PaymentSaved(PaymentRow payment, BigDecimal balanceNow, boolean partPayment, boolean advance, String message) {
+    public record PaymentSaved(CustomerPaymentRow payment, BigDecimal balanceNow, boolean partPayment, boolean advance, String message) {
     }
 
-    public record PaymentListResponse(List<PaymentRow> items, int page, int size, long total) {
+    public record PaymentListResponse(List<CustomerPaymentRow> items, int page, int size, long total) {
     }
 
     /** Recent money in (FR-47): a payment (kind PAYMENT, ref RC-…) or cash paid on a bill (kind BILL, ref B…). */
