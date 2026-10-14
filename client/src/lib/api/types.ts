@@ -233,3 +233,16 @@ export type ExpenseSaved = Schemas["ExpenseSaved"];
 export type ExpenseMonthView = Schemas["ExpenseMonthView"];
 export type ExpenseSummary = Schemas["ExpenseSummary"];
 export type ExpenseSummaryRow = Schemas["ExpenseSummaryRow"];
+
+// Customer quotations (M16)
+export type CqItemOption = Schemas["CqItemOption"];
+export type CqLineRequest = Schemas["CqLineRequest"];
+export type CqRequest = Schemas["CqRequest"];
+export type CqListRow = Schemas["CqListRow"];
+export type CqKpis = Schemas["CqKpis"];
+export type CqListResponse = Schemas["CqListResponse"];
+export type CqLineView = Schemas["CqLineView"];
+export type CqHistoryRow = Schemas["CqHistoryRow"];
+export type CqWaterPrice = Schemas["CqWaterPrice"];
+export type CqView = Schemas["CqView"];
+export type CqSaved = Schemas["CqSaved"];

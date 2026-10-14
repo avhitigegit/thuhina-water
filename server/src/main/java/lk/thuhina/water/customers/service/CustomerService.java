@@ -39,6 +39,7 @@ import lk.thuhina.water.masterdata.repository.CustomerTypeRepository;
 import lk.thuhina.water.masterdata.service.PricingService;
 import lk.thuhina.water.numbering.service.NumberingService;
 import lk.thuhina.water.numbering.service.SequenceNames;
+import lk.thuhina.water.quotations.service.CustomerQuotationService;
 import lk.thuhina.water.sales.dto.SalesDtos.RegistrationPreview;
 import lk.thuhina.water.sales.dto.SalesDtos.TxnDetail;
 import lk.thuhina.water.sales.service.SalesService;
@@ -75,13 +76,14 @@ public class CustomerService {
     private final NumberingService numbering;
     private final AuditService audit;
     private final SalesService sales;
+    private final CustomerQuotationService quotations;
     private final NamedParameterJdbcTemplate jdbc;
     private final Clock clock;
 
     public CustomerService(CustomerRepository repository, AreaRepository areas, CustomerTypeRepository types,
                            BottleTypeRepository bottleTypes, CustomerPriceService prices, CustomerQueryService queries,
                            PricingService pricing, NumberingService numbering, AuditService audit, SalesService sales,
-                           NamedParameterJdbcTemplate jdbc, Clock clock) {
+                           CustomerQuotationService quotations, NamedParameterJdbcTemplate jdbc, Clock clock) {
         this.repository = repository;
         this.areas = areas;
         this.types = types;
@@ -92,6 +94,7 @@ public class CustomerService {
         this.numbering = numbering;
         this.audit = audit;
         this.sales = sales;
+        this.quotations = quotations;
         this.jdbc = jdbc;
         this.clock = clock;
     }
@@ -109,6 +112,8 @@ public class CustomerService {
         }
         Checked v = check(r, null);
         Map<String, BigDecimal> agreed = agreedPrices(r, v.type(), registeredOn);
+        // Registered from an accepted customer quotation (M16): checked before anything is saved.
+        Long quotationId = r.fromQuotationId() == null ? null : quotations.registrable(r.fromQuotationId()).getId();
         SalesService.GivenBottles given = given(r);
         if (given.any() || given.oldBottles() != 0 || given.paid().signum() != 0) {
             if (!CurrentUser.get().map(u -> u.permissions().contains(Permissions.SALES_EDIT)).orElse(false)) {
@@ -130,7 +135,10 @@ public class CustomerService {
 
         String reason = Texts.blankToNull(r.agreedReason());
         for (Map.Entry<String, BigDecimal> e : agreed.entrySet()) {
-            prices.set(c.getId(), new SetCustomerPriceRequest(e.getKey(), e.getValue(), registeredOn, null, reason, null));
+            prices.set(c.getId(), new SetCustomerPriceRequest(e.getKey(), e.getValue(), registeredOn, null, reason, quotationId));
+        }
+        if (quotationId != null) {
+            quotations.registered(quotationId, c.getId(), c.getCode(), c.getName(), registeredOn, agreed.size());
         }
         List<TxnDetail> bills = given.any() ? sales.registrationBills(c.getId(), registeredOn, given) : List.of();
         return new CustomerSaved(queries.detail(c.getId()), agreed.size(), bills);

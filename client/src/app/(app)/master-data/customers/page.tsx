@@ -3,7 +3,8 @@
 /*
  * Customers (M05, prototype master-data/customers.html): search and filters (area, delivery day, type, payment,
  * price, status), paged list with balances, row click → side panel, Edit / Deactivate per row, New customer and
- * Customer types (Admin). ?id=C0012 opens a customer's panel, ?new=1 the New customer pop-up.
+ * Customer types (Admin). ?id=C0012 opens a customer's panel, ?new=1 the New customer pop-up, ?fromQuote=<id> the New
+ * customer pop-up pre-filled from an accepted customer quotation (M16 Register as customer).
  */
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
@@ -13,13 +14,13 @@ import { MoneyText } from "@/components/shared/MoneyText";
 import { Badge, StatusBadge } from "@/components/shared/StatusBadge";
 import { Can, useCan } from "@/features/auth/access";
 import { useAreas, useCustomer, useCustomerList, useCustomerTypes } from "@/features/customers/api";
-import { CustomerDialog } from "@/features/customers/CustomerDialog";
+import { CustomerDialog, type CustomerPrefill } from "@/features/customers/CustomerDialog";
 import { CustomerPanel } from "@/features/customers/CustomerPanel";
 import { cycleShort, DAYS, dayName, payLabel, PAY_TYPES } from "@/features/customers/labels";
 import { StatusDialog } from "@/features/customers/StatusDialog";
 import { TypesAreasDialog } from "@/features/customers/TypesAreasDialog";
 import { api } from "@/lib/api/client";
-import type { CustomerListRow, CustomerLookupRow } from "@/lib/api/types";
+import type { CqView, CustomerListRow, CustomerLookupRow } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
 import { P } from "@/lib/permissions";
 
@@ -76,6 +77,33 @@ function CustomersPage() {
       cancelled = true;
     };
   }, [idParam]);
+  // ?fromQuote=12: Register as customer from an accepted quotation – the New customer pop-up pre-filled.
+  const [prefill, setPrefill] = useState<CustomerPrefill | undefined>(undefined);
+  const fromQuote = params.get("fromQuote");
+  useEffect(() => {
+    if (!fromQuote || !canEdit) return;
+    let cancelled = false;
+    api<CqView>(`/customer-quotations/${fromQuote}`)
+      .then((q) => {
+        if (cancelled || !q.canRegister) return;
+        setPrefill({
+          quotationId: q.id,
+          name: q.orgName,
+          phone: q.phone ?? "",
+          address: q.address ?? "",
+          areaId: q.areaId ?? null,
+          customerTypeId: q.customerTypeId,
+          notes: q.registerNotes,
+          agreedPrices: Object.fromEntries(q.agreedPrices.map((a) => [a.bottleTypeCode, a.price])),
+          agreedReason: `Quotation ${q.cqNo} accepted`,
+        });
+        setEditing(null);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [fromQuote, canEdit]);
   const [newHandled, setNewHandled] = useState(false);
   if (newParam && canEdit && !newHandled) {
     setNewHandled(true);
@@ -337,9 +365,13 @@ function CustomersPage() {
       />
       {editing !== undefined && (
         <CustomerDialog
-          key={editing ?? "new"}
+          key={editing ?? (prefill ? "quote" : "new")}
           customerId={editing}
-          onClose={() => setEditing(undefined)}
+          prefill={editing === null ? prefill : undefined}
+          onClose={() => {
+            setEditing(undefined);
+            setPrefill(undefined);
+          }}
           onSaved={(c) => setPanelId(c.id)}
         />
       )}

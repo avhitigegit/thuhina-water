@@ -32,6 +32,7 @@ const STATUS_KIND: Record<string, BadgeKind> = {
   Due: "info",
   Accepted: "ok",
   Rejected: "bad",
+  "Not accepted": "bad",
   Expired: "warn",
   Agreed: "info",
   Standard: "",

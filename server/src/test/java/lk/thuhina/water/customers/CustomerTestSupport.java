@@ -29,7 +29,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * Helpers for customer tests. Each test gets its own area, customer type and bottle type (sizes 600.xx) with standard
  * prices, because all tests share one database.
  */
-abstract class CustomerTestSupport extends IntegrationTest {
+public abstract class CustomerTestSupport extends IntegrationTest {
 
     private static final AtomicInteger SIZE = new AtomicInteger();
     private static final AtomicInteger PHONE = new AtomicInteger(1000);
@@ -46,7 +46,7 @@ abstract class CustomerTestSupport extends IntegrationTest {
     protected LocalDate today;
 
     @BeforeEach
-    void setUpData() throws Exception {
+    protected void setUpData() throws Exception {
         admin = login(createUser(Role.ADMIN));
         today = BusinessDates.today(clock);
         long n = System.nanoTime();
