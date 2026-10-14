@@ -56,8 +56,9 @@ public abstract class SalesTestSupport extends IntegrationTest {
         areaId = id(mvc.perform(json(post("/areas"), Map.of("name", "Area " + n))).andReturn());
         typeId = id(mvc.perform(json(post("/customer-types"), Map.of("name", "Type " + n))).andReturn());
         BigDecimal litres = new BigDecimal("700").add(BigDecimal.valueOf(SIZE.incrementAndGet(), 2));
-        bottle = (String) read(mvc.perform(json(post("/bottle-types"), Map.of("name", litres + "L S", "litres", litres))).andReturn()).get("code");
         label = litres.stripTrailingZeros().toPlainString() + "L";
+        // The name uses the same number as the label (700.3L, not 700.30L), so texts like "Water – 700.3L S" match.
+        bottle = (String) read(mvc.perform(json(post("/bottle-types"), Map.of("name", label + " S", "litres", litres))).andReturn()).get("code");
         jdbc.update("insert into price_entry (kind, bottle_type_code, customer_type_id, price, effective_from, reason) "
                 + "values ('WATER', ?, ?, 350, DATE '2026-01-01', 'test')", bottle, typeId);
         jdbc.update("insert into price_entry (kind, bottle_type_code, price, effective_from, reason) "

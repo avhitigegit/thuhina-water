@@ -168,6 +168,12 @@ public class ExpenseQueryService {
                 rows.stream().map(ExpenseSummaryRow::total).reduce(Money.ZERO, BigDecimal::add));
     }
 
+    /** Every expense for the months {@code from} – {@code to}, by month then paid date (Expenses report, M12). */
+    public List<ExpenseRow> entries(YearMonth from, YearMonth to) {
+        return rows(jdbc.query(ROW_SQL + "where not e.deleted and e.for_month between :f and :t order by e.for_month, e.paid_date, e.id",
+                Map.of("f", from.atDay(1), "t", to.atDay(1)), ExpenseQueryService::raw));
+    }
+
     /** Every expense of a month for the printed statement, by type then date. */
     public List<ExpenseRow> forPrint(YearMonth month) {
         return rows(jdbc.query(ROW_SQL + "where not e.deleted and e.for_month = :m order by t.name, e.paid_date, e.id",

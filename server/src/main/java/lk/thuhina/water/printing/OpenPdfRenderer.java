@@ -68,6 +68,11 @@ public class OpenPdfRenderer implements PdfRenderer {
             doc.add(p);
         }
         for (PrintDocument.Table table : d.tables()) {
+            if (table.title() != null) {
+                Paragraph p = new Paragraph(table.title(), BOLD);
+                p.setSpacingBefore(12);
+                doc.add(p);
+            }
             doc.add(table(table));
         }
         if (!d.summary().isEmpty()) {

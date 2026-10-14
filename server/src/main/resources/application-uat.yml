@@ -9,3 +9,8 @@ springdoc:
     enabled: true
   swagger-ui:
     enabled: true
+
+app:
+  demo-data:
+    # Demo-data generator (M12) on – never in production.
+    enabled: true
