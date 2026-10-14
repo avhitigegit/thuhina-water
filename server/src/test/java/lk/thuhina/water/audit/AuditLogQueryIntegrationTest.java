@@ -116,7 +116,7 @@ class AuditLogQueryIntegrationTest extends IntegrationTest {
         mvc.perform(get("/audit-log?from=" + today + "&to=" + today.minusDays(1)).cookie(cookie))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details.fields.to").value("'To' must be on or after 'From'."));
-        mvc.perform(get("/audit-log?action=DELETE").cookie(cookie))
+        mvc.perform(get("/audit-log?action=ERASE").cookie(cookie))
                 .andExpect(status().isBadRequest());
     }
 
@@ -126,7 +126,7 @@ class AuditLogQueryIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.users[?(@.username == '" + admin.getUsername() + "')].fullName").value(hasItem(admin.getFullName())))
                 .andExpect(jsonPath("$.actions").value(org.hamcrest.Matchers.contains(
-                        "CREATE", "UPDATE", "APPROVE", "REVERSE", "IMPORT", "LOGIN", "LOGOUT")))
+                        "CREATE", "UPDATE", "DELETE", "APPROVE", "REVERSE", "IMPORT", "LOGIN", "LOGOUT")))
                 .andExpect(jsonPath("$.entities").value(hasItem("Customer")))
                 .andExpect(jsonPath("$.entities").value(hasItem("Session")));
     }
