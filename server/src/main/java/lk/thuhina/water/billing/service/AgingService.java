@@ -146,6 +146,14 @@ public class AgingService {
                         rs.getLong("n"), rs.getLong("over_n"), on));
     }
 
+    /** Customers with an amount owed for more than 90 days on :asOf (dashboard, M12). */
+    @Transactional(readOnly = true)
+    public long over90Count(LocalDate asOf) {
+        Long n = jdbc.queryForObject("select count(*) filter (where b90 > 0) from (" + AGED + ") r",
+                new MapSqlParameterSource("asOf", date(asOf)), Long.class);
+        return n == null ? 0 : n;
+    }
+
     /** One customer's account on :asOf (also when the balance is zero), aged with {@link AgingRules}. */
     @Transactional(readOnly = true)
     public AccountRow account(long customerId, LocalDate asOf) {

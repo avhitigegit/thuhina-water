@@ -34,8 +34,9 @@ dependencies {
 	implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	runtimeOnly 'org.postgresql:postgresql'
-	// PDF bills and documents (M06); Apache POI is added for Excel exports in M12.
+	// PDF bills and documents (M06); Excel report exports (M12).
 	implementation 'com.github.librepdf:openpdf:2.0.3'
+	implementation 'org.apache.poi:poi-ooxml:5.4.1'
 
 	testImplementation 'org.springframework.boot:spring-boot-starter-actuator-test'
 	testImplementation 'org.springframework.boot:spring-boot-starter-data-jpa-test'

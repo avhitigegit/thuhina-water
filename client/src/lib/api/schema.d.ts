@@ -1321,6 +1321,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/demo-data": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Suggested range and the last delivery bill (the client shows the generator only when this answers) */
+        get: operations["status"];
+        put?: never;
+        /** Make demo history for days without delivery bills (default two months up to yesterday) */
+        post: operations["generate_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/supplier-balances": {
         parameters: {
             query?: never;
@@ -1508,6 +1526,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The reports the user may run */
+        get: operations["list_10"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A report for a date range (default the start of last month to today; at most 366 days) */
+        get: operations["report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/{key}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Export a report as PDF (format=pdf) or Excel (format=xlsx) – the same data as the screen */
+        get: operations["export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/quotation-requests/{id}": {
         parameters: {
             query?: never;
@@ -1550,7 +1619,7 @@ export interface paths {
             cookie?: never;
         };
         /** Purchase orders, newest first, with the next step (status optional) */
-        get: operations["list_10"];
+        get: operations["list_11"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2035,6 +2104,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Dashboard: KPIs for today, low stock, today's deliveries, needs attention, sales of the last 14 days */
+        get: operations["dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customers": {
         parameters: {
             query?: never;
@@ -2043,7 +2129,7 @@ export interface paths {
             cookie?: never;
         };
         /** Customers with search (name, code, address; phone digits from 3), filters and paging. status ACTIVE (default) / INACTIVE / ALL; price STANDARD / AGREED; day 1 = Monday … 7 = Sunday */
-        get: operations["list_11"];
+        get: operations["list_12"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2111,7 +2197,7 @@ export interface paths {
             cookie?: never;
         };
         /** All customers' agreed prices: status=current (in force and scheduled, default) or all */
-        get: operations["list_12"];
+        get: operations["list_13"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3760,6 +3846,40 @@ export interface components {
             currentPassword: string;
             newPassword: string;
         };
+        DemoDataRequest: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+        };
+        DemoDataResult: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            /** Format: int32 */
+            bills: number;
+            /** Format: int32 */
+            leftAtDoor: number;
+            /** Format: int32 */
+            shortages: number;
+            /** Format: int32 */
+            extraOrders: number;
+            /** Format: int32 */
+            productSales: number;
+            /** Format: int32 */
+            dispatches: number;
+            /** Format: int32 */
+            returns: number;
+            /** Format: int32 */
+            payments: number;
+            /** Format: int32 */
+            invoices: number;
+            /** Format: int32 */
+            skipped: number;
+            problems: string[];
+            message: string;
+        };
         SupplierBalance: {
             /** Format: int64 */
             supplierId: number;
@@ -3957,6 +4077,48 @@ export interface components {
         Row: {
             area: string;
             access: components["schemas"]["Cell"][];
+        };
+        ReportInfo: {
+            key: string;
+            name: string;
+        };
+        ChartPoint: {
+            label: string;
+            value: string;
+            title: string;
+        };
+        ReportChart: {
+            title: string;
+            points: components["schemas"]["ChartPoint"][];
+        };
+        ReportColumn: {
+            header: string;
+            type: string;
+        };
+        ReportKpi: {
+            label: string;
+            value: string;
+            type: string;
+            alert: boolean;
+        };
+        ReportTable: {
+            title: string;
+            columns: components["schemas"]["ReportColumn"][];
+            rows: string[][];
+            footer: string[] | null;
+            boldRows: number[];
+        };
+        ReportView: {
+            key: string;
+            name: string;
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            kpis: components["schemas"]["ReportKpi"][];
+            chart: components["schemas"]["ReportChart"];
+            tables: components["schemas"]["ReportTable"][];
+            note: string | null;
         };
         QrRow: {
             /** Format: int64 */
@@ -4460,6 +4622,46 @@ export interface components {
             owed: number;
             moneyToCollect: number;
         };
+        AttentionItem: {
+            kind: string;
+            linkText: string;
+            text: string;
+            href: string | null;
+        };
+        DashDelivery: {
+            /** Format: int64 */
+            customerId: number;
+            code: string;
+            name: string;
+            area: string;
+            usual: string;
+            status: string;
+            statusLabel: string;
+        };
+        DashKpi: {
+            key: string;
+            label: string;
+            value: string;
+            hint: string;
+            href: string | null;
+            alert: boolean;
+        };
+        DashboardView: {
+            /** Format: date */
+            today: string;
+            lowStock: components["schemas"]["LowStockAlert"][];
+            lowStockHref: string | null;
+            kpis: components["schemas"]["DashKpi"][];
+            deliveries: components["schemas"]["DashDelivery"][];
+            deliveriesHref: string | null;
+            attention: components["schemas"]["AttentionItem"][];
+            sales14: components["schemas"]["DaySales"][];
+        };
+        DaySales: {
+            /** Format: date */
+            date: string;
+            amount: number;
+        };
         CustomerListResponse: {
             items: components["schemas"]["CustomerListRow"][];
             /** Format: int32 */
@@ -4615,6 +4817,14 @@ export interface components {
         UserOption: {
             username: string;
             fullName: string | null;
+        };
+        DemoDataStatus: {
+            /** Format: date */
+            suggestedFrom: string;
+            /** Format: date */
+            suggestedTo: string;
+            /** Format: date */
+            lastDeliveryBill: string | null;
         };
         AccountListResponse: {
             items: components["schemas"]["AccountRow"][];
@@ -7086,6 +7296,50 @@ export interface operations {
             };
         };
     };
+    status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DemoDataStatus"];
+                };
+            };
+        };
+    };
+    generate_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DemoDataRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DemoDataResult"];
+                };
+            };
+        };
+    };
     balances: {
         parameters: {
             query?: never;
@@ -7328,6 +7582,77 @@ export interface operations {
             };
         };
     };
+    list_10: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReportInfo"][];
+                };
+            };
+        };
+    };
+    report: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReportView"];
+                };
+            };
+        };
+    };
+    export: {
+        parameters: {
+            query?: {
+                format?: string;
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
     detail_3: {
         parameters: {
             query?: never;
@@ -7372,7 +7697,7 @@ export interface operations {
             };
         };
     };
-    list_10: {
+    list_11: {
         parameters: {
             query?: {
                 status?: string;
@@ -8018,7 +8343,27 @@ export interface operations {
             };
         };
     };
-    list_11: {
+    dashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DashboardView"];
+                };
+            };
+        };
+    };
+    list_12: {
         parameters: {
             query?: {
                 q?: string;
@@ -8117,7 +8462,7 @@ export interface operations {
             };
         };
     };
-    list_12: {
+    list_13: {
         parameters: {
             query?: {
                 status?: string;

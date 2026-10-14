@@ -33,12 +33,17 @@ public record PrintDocument(String title, List<String> meta, List<String> party,
     /**
      * Table: headers and rows of text; {@code numeric[i]} = column i is right-aligned. A row with a single cell is a group
      * heading across all columns (e.g. the area). {@code widths} = relative column widths (null = the bill's widths);
-     * {@code rowHeight} > 0 leaves room to write by hand in blank columns.
+     * {@code rowHeight} > 0 leaves room to write by hand in blank columns. {@code title} (optional) is printed above the table
+     * (reports, M12).
      */
-    public record Table(List<String> headers, boolean[] numeric, List<List<String>> rows, float[] widths, float rowHeight) {
+    public record Table(List<String> headers, boolean[] numeric, List<List<String>> rows, float[] widths, float rowHeight, String title) {
+
+        public Table(List<String> headers, boolean[] numeric, List<List<String>> rows, float[] widths, float rowHeight) {
+            this(headers, numeric, rows, widths, rowHeight, null);
+        }
 
         public Table(List<String> headers, boolean[] numeric, List<List<String>> rows) {
-            this(headers, numeric, rows, null, 0);
+            this(headers, numeric, rows, null, 0, null);
         }
     }
 

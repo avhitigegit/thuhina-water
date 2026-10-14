@@ -1,5 +1,7 @@
 # Integration tests: PostgreSQL from Testcontainers (no seed data), fixed test secrets.
 app:
+  demo-data:
+    enabled: true
   jwt:
     secret: test-secret-for-integration-tests-0123456789
   cookie:

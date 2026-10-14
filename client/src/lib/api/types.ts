@@ -246,3 +246,20 @@ export type CqHistoryRow = Schemas["CqHistoryRow"];
 export type CqWaterPrice = Schemas["CqWaterPrice"];
 export type CqView = Schemas["CqView"];
 export type CqSaved = Schemas["CqSaved"];
+
+// Dashboard & reports (M12)
+export type DashKpi = Schemas["DashKpi"];
+export type DashDelivery = Schemas["DashDelivery"];
+export type AttentionItem = Schemas["AttentionItem"];
+export type DaySales = Schemas["DaySales"];
+export type DashboardView = Schemas["DashboardView"];
+export type ReportInfo = Schemas["ReportInfo"];
+export type ReportColumn = Schemas["ReportColumn"];
+export type ReportKpi = Schemas["ReportKpi"];
+export type ChartPoint = Schemas["ChartPoint"];
+/** `chart` is null for reports without one (springdoc drops "nullable" on object references). */
+export type ReportTable = Schemas["ReportTable"];
+export type ReportChart = Schemas["ReportChart"];
+export type ReportView = Omit<Schemas["ReportView"], "chart"> & { chart: ReportChart | null };
+export type DemoDataStatus = Schemas["DemoDataStatus"];
+export type DemoDataResult = Schemas["DemoDataResult"];

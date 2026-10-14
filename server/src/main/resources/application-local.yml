@@ -12,6 +12,9 @@ springdoc:
     enabled: true
 
 app:
+  demo-data:
+    # Demo-data generator (M12) on – never in production.
+    enabled: true
   jwt:
     # Local only – UAT and production must set JWT_SECRET.
     secret: ${JWT_SECRET:local-dev-secret-change-me-0123456789abcdef}
