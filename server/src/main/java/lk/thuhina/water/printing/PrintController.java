@@ -28,15 +28,18 @@ public class PrintController {
     private final PurchaseOrderPrintService purchaseOrders;
     private final DispatchNotePrintService dispatchNotes;
     private final BillingPrintService billing;
+    private final ExpensePrintService expenses;
     private final CustomerQuotationPrintService quotations;
 
     public PrintController(BillPrintService bills, DeliveryPrintService delivery, PurchaseOrderPrintService purchaseOrders,
-                           DispatchNotePrintService dispatchNotes, BillingPrintService billing, CustomerQuotationPrintService quotations) {
+                           DispatchNotePrintService dispatchNotes, BillingPrintService billing, ExpensePrintService expenses,
+                           CustomerQuotationPrintService quotations) {
         this.bills = bills;
         this.delivery = delivery;
         this.purchaseOrders = purchaseOrders;
         this.dispatchNotes = dispatchNotes;
         this.billing = billing;
+        this.expenses = expenses;
         this.quotations = quotations;
     }
 
@@ -101,6 +104,13 @@ public class PrintController {
                                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return pdf(billing.statement(customerId, from, to), "statement-" + customerId + ".pdf");
+    }
+
+    @Operation(summary = "Expense statement PDF (A4) – the expenses for a month (YYYY-MM, default this month) by type, total, signatures")
+    @GetMapping(value = "/expenses", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAuthority('" + Permissions.EXPENSES_VIEW + "')")
+    public ResponseEntity<byte[]> expenses(@RequestParam(required = false) String month) {
+        return pdf(expenses.month(month), "expenses-" + (month == null ? "this-month" : month) + ".pdf");
     }
 
     @Operation(summary = "Customer quotation PDF (A4) – DRAFT watermark while not sent")

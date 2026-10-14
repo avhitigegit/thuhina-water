@@ -147,7 +147,7 @@ export function AuditTab() {
             params: { page, size: PAGE_SIZE },
           }}
           rowKey={(a) => a.id}
-          rowClassName={(a) => (a.action === "REVERSE" ? "row-bad" : undefined)}
+          rowClassName={(a) => (a.action === "REVERSE" || a.action === "DELETE" ? "row-bad" : undefined)}
           empty="No entries."
         />
       )}

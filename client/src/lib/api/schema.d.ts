@@ -142,6 +142,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/expenses/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One expense */
+        get: operations["expense"];
+        /** Change any field of an expense */
+        put: operations["update_7"];
+        post?: never;
+        /** Delete an expense – the reason is required and kept in the audit log (soft delete) */
+        delete: operations["delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/expense-types/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Rename an expense type, change its description, or activate / deactivate it */
+        put: operations["updateType"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customers/{id}": {
         parameters: {
             query?: never;
@@ -152,7 +188,7 @@ export interface paths {
         /** Everything for the side panel: details, balances, outstanding, delivery, water prices */
         get: operations["detail_1"];
         /** Edit a customer */
-        put: operations["update_7"];
+        put: operations["update_8"];
         post?: never;
         delete?: never;
         options?: never;
@@ -187,7 +223,7 @@ export interface paths {
         /** One quotation with lines, history, the next steps, the email text and the register pre-fill */
         get: operations["view"];
         /** Change a draft (only a draft can change) */
-        put: operations["update_8"];
+        put: operations["update_9"];
         post?: never;
         delete?: never;
         options?: never;
@@ -204,7 +240,7 @@ export interface paths {
         };
         get?: never;
         /** Change the name or active – the size cannot change */
-        put: operations["update_9"];
+        put: operations["update_10"];
         post?: never;
         delete?: never;
         options?: never;
@@ -955,6 +991,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/expenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Monthly expenses: the entries for the month they are for (default this month), type and search optional; month total, previous month and difference, totals by type, months to choose from */
+        get: operations["month"];
+        put?: never;
+        /** Add an expense (EX-0001) for the month it is for; reference required unless Cash */
+        post: operations["create_7"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/expense-types": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Expense types (active and inactive) */
+        get: operations["types"];
+        put?: never;
+        /** Add an expense type */
+        post: operations["createType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customers/{id}/reactivate": {
         parameters: {
             query?: never;
@@ -1087,7 +1159,7 @@ export interface paths {
         get: operations["list_7"];
         put?: never;
         /** New draft (QT-2026-001); copyOf for Make a copy */
-        post: operations["create_7"];
+        post: operations["create_8"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1173,7 +1245,7 @@ export interface paths {
         get: operations["list_8"];
         put?: never;
         /** New bottle type – the code is made from the size (19 → B19) */
-        post: operations["create_8"];
+        post: operations["create_9"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1589,6 +1661,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/print/expenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Expense statement PDF (A4) – the expenses for a month (YYYY-MM, default this month) by type, total, signatures */
+        get: operations["expenses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/print/dispatch-note/{dispatchNo}": {
         parameters: {
             query?: never;
@@ -1878,6 +1967,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/expenses/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Month by month: type × month from / to (YYYY-MM, default the 6 months up to this month), with totals */
+        get: operations["summary_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/delivery/requirement": {
         parameters: {
             query?: never;
@@ -2107,7 +2213,7 @@ export interface paths {
             cookie?: never;
         };
         /** Page KPIs: total outstanding and each aging bucket over every customer with a balance */
-        get: operations["summary_1"];
+        get: operations["summary_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2409,6 +2515,65 @@ export interface components {
             /** Format: int32 */
             atFactory: number;
             owed: number;
+            active: boolean;
+            /** Format: int64 */
+            version: number;
+        };
+        ExpenseRequest: {
+            /** Format: date */
+            paidDate: string;
+            forMonth: string;
+            /** Format: int64 */
+            typeId: number;
+            description: string;
+            paidTo: string;
+            billNo: string;
+            amount: number;
+            /** @enum {string} */
+            method: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            reference: string;
+            /** Format: int64 */
+            version: number;
+        };
+        ExpenseRow: {
+            /** Format: int64 */
+            id: number;
+            expenseNo: string;
+            /** Format: date */
+            paidDate: string;
+            forMonth: string;
+            forMonthLabel: string;
+            paidInOtherMonth: boolean;
+            /** Format: int64 */
+            typeId: number;
+            typeName: string;
+            description: string | null;
+            paidTo: string | null;
+            billNo: string | null;
+            amount: number;
+            method: string;
+            methodLabel: string;
+            reference: string | null;
+            createdByName: string;
+            /** Format: int64 */
+            version: number;
+        };
+        ExpenseSaved: {
+            expense: components["schemas"]["ExpenseRow"];
+            message: string;
+        };
+        ExpenseTypeRequest: {
+            name: string;
+            description: string;
+            active: boolean;
+            /** Format: int64 */
+            version: number;
+        };
+        ExpenseTypeView: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            description: string | null;
             active: boolean;
             /** Format: int64 */
             version: number;
@@ -4019,6 +4184,52 @@ export interface components {
             createdAt: string;
             current: boolean;
         };
+        ExpenseMonthView: {
+            month: string;
+            monthLabel: string;
+            months: components["schemas"]["MonthOption"][];
+            items: components["schemas"]["ExpenseRow"][];
+            shownTotal: number;
+            total: number;
+            /** Format: int32 */
+            entries: number;
+            previousMonth: string;
+            previousLabel: string;
+            previousTotal: number;
+            difference: number;
+            byType: components["schemas"]["ExpenseTypeTotal"][];
+            payees: string[];
+        };
+        ExpenseTypeTotal: {
+            /** Format: int64 */
+            typeId: number;
+            name: string;
+            total: number;
+        };
+        MonthOption: {
+            month: string;
+            label: string;
+        };
+        ExpenseSummary: {
+            from: string;
+            to: string;
+            months: components["schemas"]["ExpenseSummaryMonth"][];
+            rows: components["schemas"]["ExpenseSummaryRow"][];
+            total: number;
+        };
+        ExpenseSummaryMonth: {
+            month: string;
+            label: string;
+            total: number;
+        };
+        ExpenseSummaryRow: {
+            /** Format: int64 */
+            typeId: number;
+            name: string;
+            active: boolean;
+            amounts: number[];
+            total: number;
+        };
         Requirement: {
             bottleTypeCode: string;
             label: string;
@@ -4458,6 +4669,11 @@ export interface components {
             /** Format: date */
             asOf: string;
         };
+        DeleteExpenseRequest: {
+            reason: string;
+            /** Format: int64 */
+            version: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -4721,6 +4937,104 @@ export interface operations {
             };
         };
     };
+    expense: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ExpenseRow"];
+                };
+            };
+        };
+    };
+    update_7: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpenseRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ExpenseSaved"];
+                };
+            };
+        };
+    };
+    delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DeleteExpenseRequest"];
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpenseTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ExpenseTypeView"];
+                };
+            };
+        };
+    };
     detail_1: {
         parameters: {
             query?: never;
@@ -4743,7 +5057,7 @@ export interface operations {
             };
         };
     };
-    update_7: {
+    update_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -4817,7 +5131,7 @@ export interface operations {
             };
         };
     };
-    update_8: {
+    update_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -4843,7 +5157,7 @@ export interface operations {
             };
         };
     };
-    update_9: {
+    update_10: {
         parameters: {
             query?: never;
             header?: never;
@@ -6165,6 +6479,98 @@ export interface operations {
             };
         };
     };
+    month: {
+        parameters: {
+            query?: {
+                month?: string;
+                type?: number;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ExpenseMonthView"];
+                };
+            };
+        };
+    };
+    create_7: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpenseRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ExpenseSaved"];
+                };
+            };
+        };
+    };
+    types: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ExpenseTypeView"][];
+                };
+            };
+        };
+    };
+    createType: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpenseTypeRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ExpenseTypeView"];
+                };
+            };
+        };
+    };
     reactivate: {
         parameters: {
             query?: never;
@@ -6396,7 +6802,7 @@ export interface operations {
             };
         };
     };
-    create_7: {
+    create_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -6546,7 +6952,7 @@ export interface operations {
             };
         };
     };
-    create_8: {
+    create_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -7122,6 +7528,28 @@ export interface operations {
             };
         };
     };
+    expenses: {
+        parameters: {
+            query?: {
+                month?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+        };
+    };
     dispatchNote: {
         parameters: {
             query?: never;
@@ -7497,6 +7925,29 @@ export interface operations {
             };
         };
     };
+    summary_1: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ExpenseSummary"];
+                };
+            };
+        };
+    };
     requirement: {
         parameters: {
             query?: {
@@ -7714,7 +8165,7 @@ export interface operations {
                 from?: string;
                 to?: string;
                 user?: string;
-                action?: "CREATE" | "UPDATE" | "APPROVE" | "REVERSE" | "IMPORT" | "LOGIN" | "LOGOUT";
+                action?: "CREATE" | "UPDATE" | "DELETE" | "APPROVE" | "REVERSE" | "IMPORT" | "LOGIN" | "LOGOUT";
                 entity?: string;
                 q?: string;
                 page?: number;
@@ -7806,7 +8257,7 @@ export interface operations {
             };
         };
     };
-    summary_1: {
+    summary_2: {
         parameters: {
             query?: {
                 asOf?: string;

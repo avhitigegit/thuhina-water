@@ -224,6 +224,16 @@ export type GenerateResult = Schemas["GenerateResult"];
 export type InvoiceLine = Schemas["InvoiceLine"];
 export type InvoiceView = Schemas["InvoiceView"];
 
+// Expenses (M15)
+export type ExpenseType = Schemas["ExpenseTypeView"];
+export type ExpenseTypeRequest = Schemas["ExpenseTypeRequest"];
+export type ExpenseRow = Schemas["ExpenseRow"];
+export type ExpenseRequest = Schemas["ExpenseRequest"];
+export type ExpenseSaved = Schemas["ExpenseSaved"];
+export type ExpenseMonthView = Schemas["ExpenseMonthView"];
+export type ExpenseSummary = Schemas["ExpenseSummary"];
+export type ExpenseSummaryRow = Schemas["ExpenseSummaryRow"];
+
 // Customer quotations (M16)
 export type CqItemOption = Schemas["CqItemOption"];
 export type CqLineRequest = Schemas["CqLineRequest"];
