@@ -185,3 +185,18 @@ export type ReceiptResult = Schemas["ReceiptResult"];
 export type SupplierBalance = Schemas["SupplierBalance"];
 export type PaymentRequest = Schemas["PaymentRequest"];
 export type PaymentRow = Schemas["PaymentRow"];
+
+// Filling Factory (M10)
+export type FactoryLink = Schemas["FactoryLink"];
+export type DispatchRequest = Schemas["DispatchRequest"];
+export type DispatchView = Schemas["DispatchView"];
+export type BatchView = Schemas["BatchView"];
+export type ReturnView = Schemas["ReturnView"];
+export type ReturnRequest = Schemas["ReturnRequest"];
+export type ReturnResult = Schemas["ReturnResult"];
+export type FactoryBottleStock = Schemas["FactoryBottleStock"];
+export type FactoryOwed = Schemas["FactoryOwed"];
+export type ProductionSummary = Schemas["ProductionSummary"];
+export type FactoryMonth = Schemas["FactoryMonth"];
+export type FactoryPaymentRequest = Schemas["FactoryPaymentRequest"];
+export type FactoryPaymentRow = Schemas["FactoryPaymentRow"];

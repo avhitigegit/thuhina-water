@@ -20,7 +20,7 @@ public final class FactoryDtos {
     public record FactoryChargeView(String bottleTypeCode, String bottleLabel, BigDecimal charge, LocalDate effectiveFrom) {
     }
 
-    /** {@code atFactory} comes with Production (M10) and {@code owed} with factory payments – null until then. */
+    /** {@code atFactory} = bottles still at the factory, {@code owed} = filling cost − payments (Production, M10). */
     public record FactoryResponse(
             long id,
             String code,
@@ -33,8 +33,8 @@ public final class FactoryDtos {
             int termsDays,
             String termsLabel,
             List<FactoryChargeView> charges,
-            @Schema(nullable = true) Integer atFactory,
-            @Schema(nullable = true) BigDecimal owed,
+            int atFactory,
+            BigDecimal owed,
             boolean active,
             long version) {
     }

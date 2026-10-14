@@ -94,6 +94,18 @@ public class DamageRecord {
         return d;
     }
 
+    /**
+     * Bottles rejected by the filling factory (FR-24, FR-29): company damage "At factory", recorded by the factory return
+     * {@code returnId} (source RETURN). The return's own posting writes them off.
+     */
+    public static DamageRecord factoryReject(String damageNo, LocalDate date, String bottleTypeCode, int qty, String reason,
+                                             String note, long returnId) {
+        DamageRecord d = company(damageNo, date, bottleTypeCode, qty, DamageLocation.AT_FACTORY, reason, note);
+        d.sourceType = "RETURN";
+        d.sourceId = returnId;
+        return d;
+    }
+
     /** A customer-damaged bottle (BR-06), recorded "At customer" by the bill {@code billId} (source SALES_TXN). */
     public static DamageRecord customer(String damageNo, LocalDate date, String bottleTypeCode, int qty, String reason, String note,
                                         long customerId, long billId) {

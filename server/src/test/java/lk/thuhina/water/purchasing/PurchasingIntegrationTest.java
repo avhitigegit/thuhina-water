@@ -87,6 +87,8 @@ class PurchasingIntegrationTest extends IntegrationTest {
         Integer productEffects = jdbc.queryForObject("select coalesce(sum(delta), 0) from ledger_effect where product_code = ?", Integer.class,
                 product);
         assertThat(stock).as("Product stock = Σ ledger effects").isEqualTo(productEffects);
+        // The test database is shared: an inactive bottle type no longer adds a column to other tests' lists.
+        jdbc.update("update bottle_type set active = false where code = ?", bottle);
     }
 
     // ------------------------------------------------------------------ helpers

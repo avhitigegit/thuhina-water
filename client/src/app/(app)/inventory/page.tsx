@@ -4,6 +4,7 @@
  * Stock (M04, prototype inventory/inventory.html): Stock · Damage & adjustments · Movements, with Record damage and
  * Stock adjustment, and the low-stock banner (FR-31). Admin only.
  */
+import Link from "next/link";
 import { useState } from "react";
 import { PageActions } from "@/components/layout/PageActions";
 import { Tabs, useHashTab } from "@/components/shared/Tabs";
@@ -39,9 +40,7 @@ export default function StockPage() {
         <div key={a.bottleTypeCode} className="banner bad">
           <b>Low stock:</b> {a.name} – {a.filled} filled in store, minimum {a.minFilled}. {a.atFactory}{" "}
           {a.atFactory === 1 ? "is" : "are"} at the factory.{" "}
-          <span className="muted" title="Comes with Filling Factory (M10)">
-            Send empties to the factory
-          </span>
+          <Link href="/production?send=1">Send empties to the factory</Link>
         </div>
       ))}
 
