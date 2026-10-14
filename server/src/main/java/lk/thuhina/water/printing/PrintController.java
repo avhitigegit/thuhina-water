@@ -27,13 +27,15 @@ public class PrintController {
     private final DeliveryPrintService delivery;
     private final PurchaseOrderPrintService purchaseOrders;
     private final DispatchNotePrintService dispatchNotes;
+    private final BillingPrintService billing;
 
     public PrintController(BillPrintService bills, DeliveryPrintService delivery, PurchaseOrderPrintService purchaseOrders,
-                           DispatchNotePrintService dispatchNotes) {
+                           DispatchNotePrintService dispatchNotes, BillingPrintService billing) {
         this.bills = bills;
         this.delivery = delivery;
         this.purchaseOrders = purchaseOrders;
         this.dispatchNotes = dispatchNotes;
+        this.billing = billing;
     }
 
     @Operation(summary = "Bill PDF (A5) – opens in the browser to print")
@@ -74,6 +76,29 @@ public class PrintController {
     @PreAuthorize("hasAuthority('" + Permissions.PRODUCTION_VIEW + "')")
     public ResponseEntity<byte[]> dispatchNote(@PathVariable String dispatchNo) {
         return pdf(dispatchNotes.dispatchNote(dispatchNo), dispatchNo + ".pdf");
+    }
+
+    @Operation(summary = "Payment receipt PDF (A5) – amount, how paid, balance before and now")
+    @GetMapping(value = "/receipt/{paymentId}", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAuthority('" + Permissions.BILLING_VIEW + "')")
+    public ResponseEntity<byte[]> receipt(@PathVariable long paymentId) {
+        return pdf(billing.receipt(paymentId), billing.receiptNo(paymentId) + ".pdf");
+    }
+
+    @Operation(summary = "Monthly invoice PDF (A4) – a line per delivery, previous balance, payments, this month, total due")
+    @GetMapping(value = "/invoice/{id}", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAuthority('" + Permissions.BILLING_VIEW + "')")
+    public ResponseEntity<byte[]> invoice(@PathVariable long id) {
+        return pdf(billing.invoice(id), billing.invoiceNo(id) + ".pdf");
+    }
+
+    @Operation(summary = "Statement of account PDF (A4) – from default the start of last month, to default today")
+    @GetMapping(value = "/statement/{customerId}", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAuthority('" + Permissions.BILLING_VIEW + "')")
+    public ResponseEntity<byte[]> statement(@PathVariable long customerId,
+                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+                                            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return pdf(billing.statement(customerId, from, to), "statement-" + customerId + ".pdf");
     }
 
     private static ResponseEntity<byte[]> pdf(byte[] pdf, String filename) {

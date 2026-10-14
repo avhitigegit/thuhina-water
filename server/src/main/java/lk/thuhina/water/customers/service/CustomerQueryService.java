@@ -39,6 +39,7 @@ import lk.thuhina.water.masterdata.repository.AreaRepository;
 import lk.thuhina.water.masterdata.repository.BottleTypeRepository;
 import lk.thuhina.water.masterdata.repository.CustomerTypeRepository;
 import lk.thuhina.water.masterdata.service.PricingService;
+import lk.thuhina.water.sales.model.PayMethod;
 import lk.thuhina.water.sales.model.SalesKind;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -234,7 +235,7 @@ public class CustomerQueryService {
                 outstanding, overLimit, overdue, prices, c.getVersion());
     }
 
-    /** Customer events from the audit log (registration, changes, status, prices). Sales and payments come in M06 / M11. */
+    /** Customer events from the audit log (registration, changes, status, prices), bills and payments – newest first. */
     @Transactional(readOnly = true)
     public List<HistoryRow> history(long id) {
         Customer c = customers.findById(id).orElseThrow(() -> new NotFoundException("Customer", id));
@@ -254,25 +255,48 @@ public class CustomerQueryService {
                 h.billNo(), h.amount(), h.paid(), h.balance())).toList();
     }
 
-    /** The customer's bills, oldest first, each with the account balance after it (running Σ amount − paid). */
+    /**
+     * The customer's bills (kind SALE) and payments (kind PAYMENT), oldest first, each with the account balance after it
+     * (running Σ amount − paid on bills − payments).
+     */
     private List<HistoryRow> bills(long customerId) {
-        List<HistoryRow> out = new ArrayList<>();
-        BigDecimal[] running = {Money.ZERO};
+        record Entry(HistoryRow row, BigDecimal change) {
+        }
+        List<Entry> raw = new ArrayList<>();
+        MapSqlParameterSource p = new MapSqlParameterSource("c", customerId);
         jdbc.query("select id, bill_no, paper_bill_no, kind, txn_date, amount, paid_on_bill, note, reversed_by_id, created_at, created_by "
-                        + "from sales_txn where customer_id = :c order by txn_date, id",
-                new MapSqlParameterSource("c", customerId), rs -> {
+                        + "from sales_txn where customer_id = :c order by txn_date, id", p, rs -> {
                     BigDecimal amount = rs.getBigDecimal("amount");
                     BigDecimal paid = rs.getBigDecimal("paid_on_bill");
-                    running[0] = running[0].add(amount).subtract(paid);
                     String paper = rs.getString("paper_bill_no");
                     String note = rs.getString("note");
                     String text = SalesKind.valueOf(rs.getString("kind")).label() + " – bill " + rs.getString("bill_no")
                             + (paper == null ? "" : " (paper " + paper + ")") + (rs.getObject("reversed_by_id") == null ? "" : " – reversed")
                             + (note == null ? "" : ": " + note);
-                    out.add(new HistoryRow(rs.getTimestamp("created_at").toInstant(), rs.getObject("txn_date", LocalDate.class), "SALE",
-                            text, rs.getString("created_by"), null, rs.getLong("id"), rs.getString("bill_no"), amount, paid,
-                            Money.of(running[0])));
+                    raw.add(new Entry(new HistoryRow(rs.getTimestamp("created_at").toInstant(), rs.getObject("txn_date", LocalDate.class),
+                            "SALE", text, rs.getString("created_by"), null, rs.getLong("id"), rs.getString("bill_no"), amount, paid, null),
+                            amount.subtract(paid)));
                 });
+        jdbc.query("select receipt_no, pay_date, amount, method, reference, note, created_at, created_by from customer_payment "
+                        + "where customer_id = :c order by pay_date, id", p, rs -> {
+                    BigDecimal amount = rs.getBigDecimal("amount");
+                    String ref = rs.getString("reference");
+                    String note = rs.getString("note");
+                    String text = "Payment " + rs.getString("receipt_no") + " – " + PayMethod.valueOf(rs.getString("method")).label()
+                            + (ref == null ? "" : " (" + ref + ")") + (note == null ? "" : ": " + note);
+                    raw.add(new Entry(new HistoryRow(rs.getTimestamp("created_at").toInstant(), rs.getObject("pay_date", LocalDate.class),
+                            "PAYMENT", text, rs.getString("created_by"), null, null, rs.getString("receipt_no"), null, amount, null),
+                            amount.negate()));
+                });
+        raw.sort(Comparator.comparing((Entry m) -> m.row().date()).thenComparing(m -> m.row().at()));
+        List<HistoryRow> out = new ArrayList<>();
+        BigDecimal running = Money.ZERO;
+        for (Entry m : raw) {
+            running = running.add(m.change());
+            HistoryRow h = m.row();
+            out.add(new HistoryRow(h.at(), h.date(), h.kind(), h.description(), h.by(), null, h.txnId(), h.billNo(), h.amount(), h.paid(),
+                    Money.of(running)));
+        }
         return out;
     }
 
