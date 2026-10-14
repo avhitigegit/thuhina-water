@@ -8,7 +8,7 @@ import java.util.List;
 import lk.thuhina.water.billing.dto.BillingDtos.CustomerInfo;
 import lk.thuhina.water.billing.dto.BillingDtos.InvoiceLine;
 import lk.thuhina.water.billing.dto.BillingDtos.InvoiceView;
-import lk.thuhina.water.billing.dto.BillingDtos.PaymentRow;
+import lk.thuhina.water.billing.dto.BillingDtos.CustomerPaymentRow;
 import lk.thuhina.water.billing.dto.BillingDtos.StatementRow;
 import lk.thuhina.water.billing.dto.BillingDtos.StatementView;
 import lk.thuhina.water.billing.service.BillingQueryService;
@@ -56,7 +56,7 @@ public class BillingPrintService {
 
     /** The receipt as plain parts (also used by tests to check the wording). */
     @Transactional(readOnly = true)
-    public PrintDocument receiptDocument(PaymentRow p) {
+    public PrintDocument receiptDocument(CustomerPaymentRow p) {
         CustomerInfo c = billing.customerInfo(p.customer().id());
         String how = p.methodLabel() + (p.reference() == null ? "" : " – " + p.reference());
         List<List<String>> rows = new ArrayList<>();

@@ -24,7 +24,7 @@ import lk.thuhina.water.billing.dto.BillingDtos.InvoicePreview;
 import lk.thuhina.water.billing.dto.BillingDtos.InvoiceRow;
 import lk.thuhina.water.billing.dto.BillingDtos.InvoiceView;
 import lk.thuhina.water.billing.dto.BillingDtos.PaymentListResponse;
-import lk.thuhina.water.billing.dto.BillingDtos.PaymentRow;
+import lk.thuhina.water.billing.dto.BillingDtos.CustomerPaymentRow;
 import lk.thuhina.water.billing.dto.BillingDtos.PeriodOption;
 import lk.thuhina.water.billing.dto.BillingDtos.RecentMoney;
 import lk.thuhina.water.billing.dto.BillingDtos.StatementRow;
@@ -99,13 +99,13 @@ public class BillingQueryService {
         }
         Long total = jdbc.queryForObject("select count(*) from customer_payment p " + where, p, Long.class);
         p.addValue("limit", safeSize).addValue("offset", (long) safePage * safeSize);
-        List<PaymentRow> items = paymentRows(PAYMENTS + where + " order by p.pay_date desc, p.id desc limit :limit offset :offset", p);
+        List<CustomerPaymentRow> items = paymentRows(PAYMENTS + where + " order by p.pay_date desc, p.id desc limit :limit offset :offset", p);
         return new PaymentListResponse(items, safePage, safeSize, total == null ? 0 : total);
     }
 
     @Transactional(readOnly = true)
-    public PaymentRow payment(long id) {
-        List<PaymentRow> rows = paymentRows(PAYMENTS + "where p.id = :id", new MapSqlParameterSource("id", id));
+    public CustomerPaymentRow payment(long id) {
+        List<CustomerPaymentRow> rows = paymentRows(PAYMENTS + "where p.id = :id", new MapSqlParameterSource("id", id));
         if (rows.isEmpty()) {
             throw new NotFoundException("Payment", id);
         }
@@ -385,22 +385,22 @@ public class BillingQueryService {
 
     // ------------------------------------------------------------------ helpers
 
-    private List<PaymentRow> paymentRows(String sql, MapSqlParameterSource p) {
+    private List<CustomerPaymentRow> paymentRows(String sql, MapSqlParameterSource p) {
         List<Object[]> raw = jdbc.query(sql, p, (rs, i) -> new Object[] {payment(rs), rs.getString("created_by")});
         Map<String, String> names = userNames(raw.stream().map(r -> (String) r[1]).toList());
         return raw.stream().map(r -> {
-            PaymentRow x = (PaymentRow) r[0];
-            return new PaymentRow(x.id(), x.receiptNo(), x.date(), x.customer(), x.amount(), x.method(), x.methodLabel(), x.reference(),
+            CustomerPaymentRow x = (CustomerPaymentRow) r[0];
+            return new CustomerPaymentRow(x.id(), x.receiptNo(), x.date(), x.customer(), x.amount(), x.method(), x.methodLabel(), x.reference(),
                     x.bank(), x.chequeDate(), x.invoiceId(), x.invoiceNo(), x.note(), x.balanceBefore(), x.balanceAfter(), x.partPayment(),
                     names.get((String) r[1]), x.createdAt());
         }).toList();
     }
 
-    private static PaymentRow payment(ResultSet rs) throws SQLException {
+    private static CustomerPaymentRow payment(ResultSet rs) throws SQLException {
         PayMethod m = PayMethod.valueOf(rs.getString("method"));
         BigDecimal amount = Money.of(rs.getBigDecimal("amount"));
         BigDecimal before = Money.of(rs.getBigDecimal("balance_before"));
-        return new PaymentRow(rs.getLong("id"), rs.getString("receipt_no"), rs.getObject("pay_date", LocalDate.class),
+        return new CustomerPaymentRow(rs.getLong("id"), rs.getString("receipt_no"), rs.getObject("pay_date", LocalDate.class),
                 new CustomerLink(rs.getLong("customer_id"), rs.getString("code"), rs.getString("name")), amount, m.name(), m.label(),
                 rs.getString("reference"), rs.getString("bank"), rs.getObject("cheque_date", LocalDate.class), (Long) rs.getObject("invoice_id"),
                 rs.getString("invoice_no"), rs.getString("note"), before, before.subtract(amount), PaymentRules.isPartPayment(amount, before),

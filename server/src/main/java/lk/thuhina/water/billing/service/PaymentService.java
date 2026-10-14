@@ -6,8 +6,8 @@ import java.time.LocalDate;
 
 import lk.thuhina.water.audit.model.AuditAction;
 import lk.thuhina.water.audit.service.AuditService;
-import lk.thuhina.water.billing.dto.BillingDtos.PaymentRequest;
-import lk.thuhina.water.billing.dto.BillingDtos.PaymentRow;
+import lk.thuhina.water.billing.dto.BillingDtos.CustomerPaymentRequest;
+import lk.thuhina.water.billing.dto.BillingDtos.CustomerPaymentRow;
 import lk.thuhina.water.billing.dto.BillingDtos.PaymentSaved;
 import lk.thuhina.water.billing.model.CustomerPayment;
 import lk.thuhina.water.billing.repository.CustomerPaymentRepository;
@@ -58,7 +58,7 @@ public class PaymentService {
     }
 
     @Transactional
-    public PaymentSaved receive(PaymentRequest r) {
+    public PaymentSaved receive(CustomerPaymentRequest r) {
         Customer c = r.customerId() == null ? null : customers.findById(r.customerId()).orElse(null);
         if (c == null) {
             throw new ValidationException("customerId", PaymentRules.MSG_CUSTOMER);
@@ -98,7 +98,7 @@ public class PaymentService {
         boolean advance = PaymentRules.isAdvance(amount, before);
         audit.log(AuditAction.CREATE, "Payment", p.getReceiptNo(), c.getName() + " (" + c.getCode() + "): " + Money.format(amount) + " by "
                 + PaymentRules.how(r.method(), reference) + (part ? " – part payment" : "") + (advance ? " – advance" : ""));
-        PaymentRow row = query.payment(p.getId());
+        CustomerPaymentRow row = query.payment(p.getId());
         String message = "Payment saved – " + Money.format(amount) + " received from " + c.getName() + ". Balance now "
                 + (after.signum() < 0 ? Money.format(after.negate()) + " in advance (credit balance)." : Money.format(after) + ".");
         return new PaymentSaved(row, after, part, advance, message);

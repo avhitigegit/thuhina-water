@@ -165,6 +165,99 @@ describe("CustomerPanel", () => {
       expect(within(panel).queryByRole("link", { name })).not.toBeInTheDocument();
     }
   });
+
+  it("lists payments in History and fills the Payments and Invoices tabs (M11)", async () => {
+    const user = userEvent.setup();
+    const { wrap } = setup([P.CUSTOMERS_VIEW, P.SALES_VIEW, P.BILLING_VIEW], (url) => {
+      if (url === "/api/customers/8") return { status: 200, body: C0008 };
+      if (url === "/api/customers/8/history")
+        return {
+          status: 200,
+          body: [
+            {
+              at: "2026-08-08T04:00:00Z",
+              date: "2026-08-08",
+              kind: "PAYMENT",
+              description: "Payment RC-00003 – Bank transfer (BOC TRF 88213)",
+              by: "shanika.acc",
+              byName: "Shanika",
+              txnId: null,
+              billNo: "RC-00003",
+              amount: null,
+              paid: 6000,
+              balance: 6760,
+            },
+          ],
+        };
+      if (url === "/api/payments")
+        return {
+          status: 200,
+          body: {
+            items: [
+              {
+                id: 3,
+                receiptNo: "RC-00003",
+                date: "2026-08-08",
+                customer: { id: 8, code: "C0008", name: "Ceyknit" },
+                amount: 6000,
+                method: "BANK_TRANSFER",
+                methodLabel: "Bank transfer",
+                reference: "BOC TRF 88213",
+                invoiceNo: "INV-2607-0001",
+              },
+            ],
+            page: 0,
+            size: 100,
+            total: 1,
+          },
+        };
+      if (url === "/api/invoices")
+        return {
+          status: 200,
+          body: [
+            {
+              id: 4,
+              invoiceNo: "INV-2608-0001",
+              period: "2026-08",
+              periodLabel: "August 2026",
+              amount: 0,
+              totalDue: 6760,
+            },
+          ],
+        };
+      return { status: 200, body: [] };
+    });
+    render(wrap(<CustomerPanel customerId={8} onClose={vi.fn()} />));
+    const panel = await screen.findByRole("dialog", { name: "Ceyknit Garments (Pvt) Ltd" });
+    const hist = (await within(panel).findByText(/Payment RC-00003/)).closest("tr") as HTMLElement;
+    expect(hist).toHaveTextContent("08/08/2026");
+    expect(hist).toHaveTextContent("Rs. 6,000.00");
+    // A receipt number is not a bill link.
+    expect(within(hist).queryByRole("link")).not.toBeInTheDocument();
+
+    await user.click(within(panel).getByRole("tab", { name: "Payments" }));
+    const pay = (await within(panel).findByRole("button", { name: "RC-00003" })).closest("tr") as HTMLElement;
+    expect(pay).toHaveTextContent("BOC TRF 88213");
+    expect(pay).toHaveTextContent("for INV-2607-0001");
+
+    await user.click(within(panel).getByRole("tab", { name: "Invoices" }));
+    expect(await within(panel).findByRole("link", { name: "INV-2608-0001" })).toHaveAttribute(
+      "href",
+      "/billing?invoice=4",
+    );
+    expect(within(panel).getByText("August 2026").closest("tr")).toHaveTextContent("Rs. 6,760.00");
+  });
+
+  it("hides Payments and Invoices from roles that do not see Billing", async () => {
+    const { wrap } = setup([P.CUSTOMERS_VIEW], (url) =>
+      url === "/api/customers/8" ? { status: 200, body: C0008 } : { status: 200, body: [] },
+    );
+    render(wrap(<CustomerPanel customerId={8} onClose={vi.fn()} />));
+    const panel = await screen.findByRole("dialog", { name: "Ceyknit Garments (Pvt) Ltd" });
+    expect(within(panel).getByRole("tab", { name: "History" })).toBeInTheDocument();
+    expect(within(panel).queryByRole("tab", { name: "Payments" })).not.toBeInTheDocument();
+    expect(within(panel).queryByRole("tab", { name: "Invoices" })).not.toBeInTheDocument();
+  });
 });
 
 describe("CustomerDialog", () => {

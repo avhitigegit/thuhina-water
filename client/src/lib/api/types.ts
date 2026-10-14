@@ -200,3 +200,26 @@ export type ProductionSummary = Schemas["ProductionSummary"];
 export type FactoryMonth = Schemas["FactoryMonth"];
 export type FactoryPaymentRequest = Schemas["FactoryPaymentRequest"];
 export type FactoryPaymentRow = Schemas["FactoryPaymentRow"];
+
+// Billing & payments (M11)
+export type BillingCustomerInfo = Schemas["CustomerInfo"];
+export type AccountRow = Schemas["AccountRow"];
+export type AgingTotals = Schemas["AgingTotals"];
+export type AccountList = Schemas["AccountListResponse"];
+export type AccountSummary = Schemas["AccountSummary"];
+export type InvoiceLink = Schemas["InvoiceLink"];
+export type AccountView = Schemas["AccountView"];
+export type CustomerPaymentRequest = Schemas["CustomerPaymentRequest"];
+export type CustomerPaymentRow = Schemas["CustomerPaymentRow"];
+export type PaymentSaved = Schemas["PaymentSaved"];
+export type PaymentList = Schemas["PaymentListResponse"];
+export type RecentMoney = Schemas["RecentMoney"];
+export type PeriodOption = Schemas["PeriodOption"];
+/** `invoice` is null until generated (springdoc drops "nullable" on object references). */
+export type InvoiceMonthRow = Omit<Schemas["InvoiceMonthRow"], "invoice"> & { invoice: InvoiceLink | null };
+export type InvoicePreview = Omit<Schemas["InvoicePreview"], "rows"> & { rows: InvoiceMonthRow[] };
+export type SkippedCustomer = Schemas["SkippedCustomer"];
+export type InvoiceRow = Schemas["InvoiceRow"];
+export type GenerateResult = Schemas["GenerateResult"];
+export type InvoiceLine = Schemas["InvoiceLine"];
+export type InvoiceView = Schemas["InvoiceView"];
