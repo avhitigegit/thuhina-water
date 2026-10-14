@@ -28,14 +28,16 @@ public class PrintController {
     private final PurchaseOrderPrintService purchaseOrders;
     private final DispatchNotePrintService dispatchNotes;
     private final BillingPrintService billing;
+    private final CustomerQuotationPrintService quotations;
 
     public PrintController(BillPrintService bills, DeliveryPrintService delivery, PurchaseOrderPrintService purchaseOrders,
-                           DispatchNotePrintService dispatchNotes, BillingPrintService billing) {
+                           DispatchNotePrintService dispatchNotes, BillingPrintService billing, CustomerQuotationPrintService quotations) {
         this.bills = bills;
         this.delivery = delivery;
         this.purchaseOrders = purchaseOrders;
         this.dispatchNotes = dispatchNotes;
         this.billing = billing;
+        this.quotations = quotations;
     }
 
     @Operation(summary = "Bill PDF (A5) – opens in the browser to print")
@@ -99,6 +101,13 @@ public class PrintController {
                                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return pdf(billing.statement(customerId, from, to), "statement-" + customerId + ".pdf");
+    }
+
+    @Operation(summary = "Customer quotation PDF (A4) – DRAFT watermark while not sent")
+    @GetMapping(value = "/customer-quotation/{id}", produces = MediaType.APPLICATION_PDF_VALUE)
+    @PreAuthorize("hasAuthority('" + Permissions.QUOTATIONS_VIEW + "')")
+    public ResponseEntity<byte[]> customerQuotation(@PathVariable long id) {
+        return pdf(quotations.quotation(id), quotations.cqNo(id) + ".pdf");
     }
 
     private static ResponseEntity<byte[]> pdf(byte[] pdf, String filename) {

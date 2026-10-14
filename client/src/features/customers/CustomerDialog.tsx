@@ -8,6 +8,8 @@
  * bottle type, old bottles, cash paid, live calculation from /customers/register/preview) · WhatsApp · Notes · Status
  * (edit). A phone already in use asks "Save anyway?"; over the credit limit asks for Admin approval. A new customer
  * and the first-purchase bills are saved together; the "Customer registered" pop-up lists the bills to print.
+ * Register as customer from an accepted customer quotation (M16) opens it pre-filled (name, phone, address, area, type,
+ * notes and the quoted water prices as agreed prices) and links the new customer to the quotation.
  */
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
@@ -67,27 +69,52 @@ const SERVER_FIELDS = [
   "notes",
 ] as const;
 
+/** A new customer's details from an accepted customer quotation (M16). */
+export interface CustomerPrefill {
+  quotationId: number;
+  name: string;
+  phone: string;
+  address: string;
+  areaId: number | null;
+  customerTypeId: number;
+  notes: string;
+  /** Quoted water prices that differ from the standard price, by bottle type. */
+  agreedPrices: Record<string, number>;
+  agreedReason: string;
+}
+
 /** Opens the pop-up for a new customer (`customerId` null) or loads the customer first. */
 export function CustomerDialog({
   customerId,
+  prefill,
   onClose,
   onSaved,
 }: {
   customerId: number | null;
+  prefill?: CustomerPrefill;
   onClose: () => void;
   onSaved?: (c: CustomerDetail) => void;
 }) {
   const existing = useCustomer(customerId);
   if (customerId !== null && !existing.data) return null;
-  return <CustomerForm customer={existing.data ?? null} onClose={onClose} onSaved={onSaved} />;
+  return (
+    <CustomerForm
+      customer={existing.data ?? null}
+      prefill={customerId === null ? prefill : undefined}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  );
 }
 
 function CustomerForm({
   customer,
+  prefill,
   onClose,
   onSaved,
 }: {
   customer: CustomerDetail | null;
+  prefill?: CustomerPrefill;
   onClose: () => void;
   onSaved?: (c: CustomerDetail) => void;
 }) {
@@ -138,13 +165,15 @@ function CustomerForm({
   } = useForm<CustomerValues>({
     resolver: zodResolver(schema) as unknown as Resolver<CustomerValues>,
     defaultValues: {
-      name: customer?.name ?? "",
-      phone: customer?.phone ?? "",
-      address: customer?.address ?? "",
-      areaId: customer ? String(customer.areaId) : "",
+      name: customer?.name ?? prefill?.name ?? "",
+      phone: customer?.phone ?? prefill?.phone ?? "",
+      address: customer?.address ?? prefill?.address ?? "",
+      areaId: customer ? String(customer.areaId) : prefill?.areaId ? String(prefill.areaId) : "",
       customerTypeId: customer
         ? String(customer.customerTypeId)
-        : String(types.data?.find((t) => t.name === "Household")?.id ?? ""),
+        : prefill
+          ? String(prefill.customerTypeId)
+          : String(types.data?.find((t) => t.name === "Household")?.id ?? ""),
       registeredOn: today,
       deliveryDay: String(defaultDay),
       cycleWeeks: String(customer?.cycleWeeks ?? 1),
@@ -153,13 +182,15 @@ function CustomerForm({
       payType: (customer?.payType as CustomerValues["payType"]) ?? "CASH",
       creditLimit: customer && customer.creditLimit > 0 ? String(customer.creditLimit) : "",
       termsDays: String(customer && customer.termsDays > 0 ? customer.termsDays : 30),
-      agreedPrices: {},
-      agreedReason: "",
+      agreedPrices: Object.fromEntries(
+        Object.entries(prefill?.agreedPrices ?? {}).map(([k, v]) => [k, String(v)]),
+      ),
+      agreedReason: prefill?.agreedReason ?? "",
       bottlesGiven: {},
       oldBottles: "0",
       whatsappOptIn: customer?.whatsappOptIn ?? false,
       whatsappNumber: customer?.whatsappNumber ?? "",
-      notes: customer?.notes ?? "",
+      notes: customer?.notes ?? prefill?.notes ?? "",
     },
   });
   const [payType, typeId, next, day, agreedPrices] = useWatch({
@@ -214,6 +245,16 @@ function CustomerForm({
     if (isNew && household && !getValues("customerTypeId")) setValue("customerTypeId", String(household));
   }, [isNew, household, getValues, setValue]);
 
+  // From a quotation: the type and area are chosen once their lists have loaded (the selects start empty).
+  const typesLoaded = !!types.data;
+  const areasLoaded = !!areas.data;
+  useEffect(() => {
+    if (prefill && typesLoaded) setValue("customerTypeId", String(prefill.customerTypeId));
+  }, [prefill, typesLoaded, setValue]);
+  useEffect(() => {
+    if (prefill?.areaId && areasLoaded) setValue("areaId", String(prefill.areaId));
+  }, [prefill, areasLoaded, setValue]);
+
   /** Standard price of a bottle type for the chosen customer type (today). */
   function standard(code: string): number | null {
     const cell = matrix.data?.water.find(
@@ -263,6 +304,7 @@ function CustomerForm({
             oldBottles: canSell ? whole(v.oldBottles) : 0,
             paid: anyGiven ? paidNumber : 0,
             approveOverLimit,
+            fromQuotationId: prefill?.quotationId,
           }
         : { version: customer.version }),
     };

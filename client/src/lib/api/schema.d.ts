@@ -177,6 +177,24 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/customer-quotations/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One quotation with lines, history, the next steps, the email text and the register pre-fill */
+        get: operations["view"];
+        /** Change a draft (only a draft can change) */
+        put: operations["update_8"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/bottle-types/{code}": {
         parameters: {
             query?: never;
@@ -186,7 +204,7 @@ export interface paths {
         };
         get?: never;
         /** Change the name or active – the size cannot change */
-        put: operations["update_8"];
+        put: operations["update_9"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1058,6 +1076,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/customer-quotations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Quotations newest first; status DRAFT / SENT / EXPIRED / ACCEPTED / REJECTED and search optional; with the KPIs */
+        get: operations["list_7"];
+        put?: never;
+        /** New draft (QT-2026-001); copyOf for Make a copy */
+        post: operations["create_7"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-quotations/{id}/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark as sent (EMAIL / BY_HAND / POST / WHATSAPP, date default today) – drafts only */
+        post: operations["send_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-quotations/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Not accepted, with the reason – sent quotations only */
+        post: operations["reject"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-quotations/{id}/apply-prices": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Apply the quoted water prices as the customer's agreed prices from a date (default today) */
+        post: operations["applyPrices"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-quotations/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Accepted (date default today) – sent quotations only, also when expired */
+        post: operations["accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/bottle-types": {
         parameters: {
             query?: never;
@@ -1066,10 +1170,10 @@ export interface paths {
             cookie?: never;
         };
         /** Bottle types, largest first; activeOnly=true for the pick lists of sales and purchasing */
-        get: operations["list_7"];
+        get: operations["list_8"];
         put?: never;
         /** New bottle type – the code is made from the size (19 → B19) */
-        post: operations["create_7"];
+        post: operations["create_8"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1255,7 +1359,7 @@ export interface paths {
             cookie?: never;
         };
         /** Bills, newest first. q = part of the system or paper bill number; kind; customerId; from / to dates */
-        get: operations["list_8"];
+        get: operations["list_9"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1374,7 +1478,7 @@ export interface paths {
             cookie?: never;
         };
         /** Purchase orders, newest first, with the next step (status optional) */
-        get: operations["list_9"];
+        get: operations["list_10"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1511,6 +1615,23 @@ export interface paths {
         };
         /** Delivery sheet PDF (A4 landscape) – the Daily Delivery List of a date (default today) by area */
         get: operations["deliverySheet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/print/customer-quotation/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Customer quotation PDF (A4) – DRAFT watermark while not sent */
+        get: operations["customerQuotation"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1816,7 +1937,7 @@ export interface paths {
             cookie?: never;
         };
         /** Customers with search (name, code, address; phone digits from 3), filters and paging. status ACTIVE (default) / INACTIVE / ALL; price STANDARD / AGREED; day 1 = Monday … 7 = Sunday */
-        get: operations["list_10"];
+        get: operations["list_11"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1859,6 +1980,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/customer-quotations/items": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What can be quoted with the price on a date: the customer's price now, or the standard price of the customer type */
+        get: operations["items"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/customer-prices": {
         parameters: {
             query?: never;
@@ -1867,7 +2005,7 @@ export interface paths {
             cookie?: never;
         };
         /** All customers' agreed prices: status=current (in force and scheduled, default) or all */
-        get: operations["list_11"];
+        get: operations["list_12"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2318,6 +2456,8 @@ export interface components {
             oldBrandId?: number;
             paid?: number;
             approveOverLimit?: boolean;
+            /** Format: int64 */
+            fromQuotationId?: number;
         };
         BillLink: {
             /** Format: int64 */
@@ -2496,6 +2636,137 @@ export interface components {
             activeCustomers: number;
             /** Format: int64 */
             version: number;
+        };
+        CqLineRequest: {
+            kind: string;
+            bottleTypeCode: string;
+            productCode: string;
+            description: string;
+            /** Format: int32 */
+            qty: number;
+            unit: string;
+            unitPrice: number;
+        };
+        CqRequest: {
+            /** Format: int64 */
+            customerId: number;
+            orgName: string;
+            contact: string;
+            designation: string;
+            address: string;
+            /** Format: int64 */
+            areaId: number;
+            phone: string;
+            email: string;
+            /** Format: int64 */
+            customerTypeId: number;
+            /** Format: date */
+            quoteDate: string;
+            /** Format: date */
+            validUntil: string;
+            subject: string;
+            deliveryText: string;
+            /** Format: int32 */
+            termsDays: number;
+            conditions: string;
+            lines: components["schemas"]["CqLineRequest"][];
+            /** Format: int64 */
+            copyOf: number;
+            /** Format: int64 */
+            version: number;
+        };
+        CqHistoryRow: {
+            /** Format: date-time */
+            at: string;
+            event: string;
+            label: string;
+            note: string | null;
+            byName: string;
+        };
+        CqLineView: {
+            /** Format: int32 */
+            lineNo: number;
+            kind: string;
+            bottleTypeCode: string | null;
+            productCode: string | null;
+            description: string;
+            /** Format: int32 */
+            qty: number;
+            unit: string | null;
+            unitPrice: number;
+            amount: number;
+            currentPrice: number | null;
+            currentAgreed: boolean;
+            belowCurrent: boolean;
+        };
+        CqSaved: {
+            quotation: components["schemas"]["CqView"];
+            message: string;
+        };
+        CqView: {
+            /** Format: int64 */
+            id: number;
+            cqNo: string;
+            /** Format: int64 */
+            customerId: number | null;
+            customerCode: string | null;
+            orgName: string;
+            contact: string | null;
+            designation: string | null;
+            address: string | null;
+            /** Format: int64 */
+            areaId: number | null;
+            areaName: string | null;
+            phone: string | null;
+            email: string | null;
+            /** Format: int64 */
+            customerTypeId: number;
+            customerTypeName: string;
+            /** Format: date */
+            quoteDate: string;
+            /** Format: date */
+            validUntil: string;
+            subject: string | null;
+            deliveryText: string | null;
+            /** Format: int32 */
+            termsDays: number;
+            termsLabel: string;
+            conditions: string | null;
+            status: string;
+            shown: string;
+            shownLabel: string;
+            sentVia: string | null;
+            sentViaText: string | null;
+            /** Format: date */
+            sentOn: string | null;
+            /** Format: date */
+            acceptedOn: string | null;
+            rejectReason: string | null;
+            /** Format: date */
+            pricesAppliedOn: string | null;
+            copyOfNo: string | null;
+            lines: components["schemas"]["CqLineView"][];
+            total: number;
+            history: components["schemas"]["CqHistoryRow"][];
+            hasWater: boolean;
+            canEdit: boolean;
+            canSend: boolean;
+            canAnswer: boolean;
+            canRegister: boolean;
+            canApplyPrices: boolean;
+            emailSubject: string;
+            emailBody: string;
+            agreedPrices: components["schemas"]["CqWaterPrice"][];
+            registerNotes: string;
+            createdByName: string;
+            /** Format: int64 */
+            version: number;
+        };
+        CqWaterPrice: {
+            bottleTypeCode: string;
+            label: string;
+            price: number;
+            standard: number | null;
         };
         UpdateBottleTypeRequest: {
             name: string;
@@ -3267,6 +3538,22 @@ export interface components {
             name: string;
             description?: string;
         };
+        CqSendRequest: {
+            via: string;
+            /** Format: date */
+            date: string;
+        };
+        CqRejectRequest: {
+            reason: string;
+        };
+        CqApplyRequest: {
+            /** Format: date */
+            from: string;
+        };
+        CqAcceptRequest: {
+            /** Format: date */
+            date: string;
+        };
         CreateBottleTypeRequest: {
             name: string;
             litres: number;
@@ -4033,6 +4320,58 @@ export interface components {
             areaName: string;
             status: string;
         };
+        CqKpis: {
+            /** Format: int32 */
+            waiting: number;
+            waitingTotal: number;
+            /** Format: int32 */
+            drafts: number;
+            /** Format: int32 */
+            accepted: number;
+            acceptedTotal: number;
+            /** Format: int32 */
+            expiredOrRejected: number;
+        };
+        CqListResponse: {
+            items: components["schemas"]["CqListRow"][];
+            kpis: components["schemas"]["CqKpis"];
+        };
+        CqListRow: {
+            /** Format: int64 */
+            id: number;
+            cqNo: string;
+            /** Format: date */
+            quoteDate: string;
+            toName: string;
+            /** Format: int64 */
+            customerId: number | null;
+            customerCode: string | null;
+            contact: string | null;
+            designation: string | null;
+            subject: string | null;
+            /** Format: int32 */
+            lineCount: number;
+            customerTypeName: string;
+            total: number;
+            /** Format: date */
+            validUntil: string;
+            status: string;
+            shown: string;
+            shownLabel: string;
+            sentViaText: string | null;
+            nextStep: string;
+        };
+        CqItemOption: {
+            key: string;
+            kind: string;
+            bottleTypeCode: string | null;
+            productCode: string | null;
+            label: string;
+            description: string;
+            unit: string;
+            currentPrice: number | null;
+            agreed: boolean;
+        };
         AuditEntryResponse: {
             /** Format: int64 */
             id: number;
@@ -4456,7 +4795,55 @@ export interface operations {
             };
         };
     };
+    view: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CqView"];
+                };
+            };
+        };
+    };
     update_8: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CqRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CqSaved"];
+                };
+            };
+        };
+    };
+    update_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -5989,6 +6376,157 @@ export interface operations {
     list_7: {
         parameters: {
             query?: {
+                status?: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CqListResponse"];
+                };
+            };
+        };
+    };
+    create_7: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CqRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CqSaved"];
+                };
+            };
+        };
+    };
+    send_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CqSendRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CqSaved"];
+                };
+            };
+        };
+    };
+    reject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CqRejectRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CqSaved"];
+                };
+            };
+        };
+    };
+    applyPrices: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CqApplyRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CqSaved"];
+                };
+            };
+        };
+    };
+    accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["CqAcceptRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CqSaved"];
+                };
+            };
+        };
+    };
+    list_8: {
+        parameters: {
+            query?: {
                 activeOnly?: boolean;
             };
             header?: never;
@@ -6008,7 +6546,7 @@ export interface operations {
             };
         };
     };
-    create_7: {
+    create_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -6272,7 +6810,7 @@ export interface operations {
             };
         };
     };
-    list_8: {
+    list_9: {
         parameters: {
             query?: {
                 q?: string;
@@ -6428,7 +6966,7 @@ export interface operations {
             };
         };
     };
-    list_9: {
+    list_10: {
         parameters: {
             query?: {
                 status?: string;
@@ -6614,6 +7152,28 @@ export interface operations {
             };
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/pdf": string;
+                };
+            };
+        };
+    };
+    customerQuotation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
             cookie?: never;
         };
         requestBody?: never;
@@ -7007,7 +7567,7 @@ export interface operations {
             };
         };
     };
-    list_10: {
+    list_11: {
         parameters: {
             query?: {
                 q?: string;
@@ -7082,7 +7642,31 @@ export interface operations {
             };
         };
     };
-    list_11: {
+    items: {
+        parameters: {
+            query?: {
+                customerTypeId?: number;
+                customerId?: number;
+                date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CqItemOption"][];
+                };
+            };
+        };
+    };
+    list_12: {
         parameters: {
             query?: {
                 status?: string;

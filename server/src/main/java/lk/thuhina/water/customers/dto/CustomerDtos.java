@@ -26,7 +26,8 @@ public final class CustomerDtos {
      * Create only: {@code registeredOn} (default today), {@code agreedPrices} per bottle type with {@code agreedReason}
      * (from the registration date), {@code bottlesGiven} per bottle type on the registration date (first purchases,
      * M06) with {@code oldBottles} of brand {@code oldBrandId} (default: the first accepted brand), {@code paid} in cash
-     * and {@code approveOverLimit} (Admin). Edit only: {@code version}. {@code allowDuplicatePhone} = "Save anyway".
+     * and {@code approveOverLimit} (Admin); {@code fromQuotationId} = registered from an accepted customer quotation (M16 –
+     * the customer is linked to it and its agreed prices keep the link). Edit only: {@code version}. {@code allowDuplicatePhone} = "Save anyway".
      */
     public record CustomerRequest(
             @NotBlank(message = MSG_REQUIRED) @Size(max = 120, message = "Name: at most 120 characters.") String name,
@@ -53,7 +54,8 @@ public final class CustomerDtos {
             Integer oldBottles,
             Long oldBrandId,
             BigDecimal paid,
-            Boolean approveOverLimit) {
+            Boolean approveOverLimit,
+            Long fromQuotationId) {
     }
 
     /** Bottles of one type with the customer: held, empties to collect, owed. */

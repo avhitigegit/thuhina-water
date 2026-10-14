@@ -368,4 +368,115 @@ describe("CustomerDialog", () => {
     });
     expect(bodies[1].allowDuplicatePhone).toBe(true);
   });
+
+  it("registers from an accepted quotation with its details and quoted price, linked to it (M16)", async () => {
+    const user = userEvent.setup();
+    const { fetch, wrap } = setup(
+      [P.CUSTOMERS_VIEW, P.CUSTOMERS_EDIT, P.CUSTOMER_PRICES_EDIT, P.MASTERDATA_VIEW],
+      (url, init) => {
+        if (url === "/api/areas")
+          return {
+            status: 200,
+            body: [{ id: 2, name: "Maharagama", active: true, activeCustomers: 3, version: 0 }],
+          };
+        if (url === "/api/customer-types")
+          return {
+            status: 200,
+            body: [
+              { id: 1, name: "Household", description: null, active: true, activeCustomers: 3, version: 0 },
+              { id: 3, name: "Office", description: null, active: true, activeCustomers: 3, version: 0 },
+            ],
+          };
+        if (url === "/api/bottle-types")
+          return {
+            status: 200,
+            body: [
+              {
+                code: "B20",
+                name: "20L Bottle",
+                litres: 20,
+                active: true,
+                deposit: 1000,
+                inCirculation: null,
+                version: 0,
+              },
+            ],
+          };
+        if (url === "/api/prices/current")
+          return {
+            status: 200,
+            body: {
+              date: todayIso(),
+              bottleTypes: [],
+              customerTypes: [],
+              deposits: [],
+              water: [
+                {
+                  key: "k",
+                  kind: "WATER",
+                  bottleTypeCode: "B20",
+                  customerTypeId: 3,
+                  current: { entryId: 1, price: 320, effectiveFrom: "2026-07-01" },
+                  next: null,
+                  confirmed: false,
+                },
+              ],
+            },
+          };
+        if (url === "/api/customers/register" && init?.method === "POST")
+          return { status: 201, body: { customer: { ...C0008, id: 42, code: "C0042" }, agreedPricesSet: 1 } };
+        return { status: 200, body: [] };
+      },
+    );
+    render(
+      wrap(
+        <CustomerDialog
+          customerId={null}
+          prefill={{
+            quotationId: 7,
+            name: "Divisional Secretariat – Maharagama",
+            phone: "011 285 0153",
+            address: "High Level Road, Maharagama",
+            areaId: 2,
+            customerTypeId: 3,
+            notes: "From quotation QT-2026-001 · contact Mrs. W.A. Dilrukshi",
+            agreedPrices: { B20: 300 },
+            agreedReason: "Quotation QT-2026-001 accepted",
+          }}
+          onClose={vi.fn()}
+        />,
+      ),
+    );
+    const dialog = await screen.findByRole("dialog", { name: "New customer" });
+    await within(dialog).findByRole("option", { name: "Maharagama" });
+    expect(within(dialog).getByLabelText("Name")).toHaveValue("Divisional Secretariat – Maharagama");
+    expect(within(dialog).getByLabelText("Customer type")).toHaveValue("3");
+    expect(within(dialog).getByLabelText("20L agreed price (Rs.)")).toHaveValue(300);
+    expect(within(dialog).getByLabelText("Reason for the agreed price")).toHaveValue(
+      "Quotation QT-2026-001 accepted",
+    );
+    expect(within(dialog).getByLabelText("Notes")).toHaveValue(
+      "From quotation QT-2026-001 · contact Mrs. W.A. Dilrukshi",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await vi.waitFor(() =>
+      expect(
+        fetch.mock.calls.some(([u, i]) => u.startsWith("/api/customers/register") && i?.method === "POST"),
+      ).toBe(true),
+    );
+    const body = JSON.parse(
+      String(
+        fetch.mock.calls.find(
+          ([u, i]) => u.startsWith("/api/customers/register") && i?.method === "POST",
+        )![1]!.body,
+      ),
+    );
+    expect(body).toMatchObject({
+      fromQuotationId: 7,
+      customerTypeId: 3,
+      areaId: 2,
+      agreedPrices: { B20: 300 },
+      agreedReason: "Quotation QT-2026-001 accepted",
+    });
+  });
 });
