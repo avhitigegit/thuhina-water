@@ -78,7 +78,7 @@ public class CustomerController {
         return queries.detail(id);
     }
 
-    @Operation(summary = "Customer history – registration, changes, status and prices (sales and payments come later)")
+    @Operation(summary = "Customer history – registration, changes, status, prices, bills and payments (with the running balance)")
     @GetMapping("/{id}/history")
     @PreAuthorize(VIEW)
     public List<HistoryRow> history(@PathVariable long id) {

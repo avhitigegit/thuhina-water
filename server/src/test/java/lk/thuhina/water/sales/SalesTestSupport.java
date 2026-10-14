@@ -29,9 +29,9 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * Helpers for sales tests. Each test gets its own area, customer type (water Rs. 350), bottle type (sizes 700.xx,
  * deposit Rs. 1,000, 100 filled + 20 empty in store) and old-bottle brand, because all tests share one database.
  * After every test the invariants are checked: With customers = Σ held + to collect + owed for the test bottle type,
- * and every test customer's account balance = Σ (amount − paid) of their bills.
+ * and every test customer's account balance = Σ (amount − paid) of their bills − Σ their payments (design 13.1).
  */
-abstract class SalesTestSupport extends IntegrationTest {
+public abstract class SalesTestSupport extends IntegrationTest {
 
     private static final AtomicInteger SIZE = new AtomicInteger();
     private static final AtomicInteger PHONE = new AtomicInteger(5000);
@@ -49,7 +49,7 @@ abstract class SalesTestSupport extends IntegrationTest {
     protected LocalDate today;
 
     @BeforeEach
-    void setUpSales() throws Exception {
+    protected void setUpSales() throws Exception {
         admin = login(createUser(Role.ADMIN));
         today = BusinessDates.today(clock);
         long n = System.nanoTime();
@@ -69,17 +69,17 @@ abstract class SalesTestSupport extends IntegrationTest {
     }
 
     @AfterEach
-    void invariants() {
+    protected void invariants() {
         Integer withCustomers = jdbc.queryForObject("select qty from stock_balance where bottle_type_code = ? and bucket = 'CUSTOMERS'",
                 Integer.class, bottle);
         Integer held = jdbc.queryForObject("select coalesce(sum(held + to_collect + owed), 0) from customer_bottle_balance "
                 + "where bottle_type_code = ?", Integer.class, bottle);
         assertThat(withCustomers).as("With customers = Σ held + to collect + owed").isEqualTo(held);
-        List<Map<String, Object>> wrong = jdbc.queryForList("select a.customer_id, a.balance, coalesce(sum(t.amount - t.paid_on_bill), 0) as bills "
-                + "from customer_account a left join sales_txn t on t.customer_id = a.customer_id "
+        List<Map<String, Object>> wrong = jdbc.queryForList("select a.customer_id, a.balance from customer_account a "
                 + "where a.customer_id in (select customer_id from customer_usual_qty where bottle_type_code = ?) "
-                + "group by a.customer_id, a.balance having a.balance <> coalesce(sum(t.amount - t.paid_on_bill), 0)", bottle);
-        assertThat(wrong).as("account balance = Σ (amount − paid)").isEmpty();
+                + "and a.balance <> (select coalesce(sum(t.amount - t.paid_on_bill), 0) from sales_txn t where t.customer_id = a.customer_id) "
+                + "- (select coalesce(sum(p.amount), 0) from customer_payment p where p.customer_id = a.customer_id)", bottle);
+        assertThat(wrong).as("account balance = Σ (amount − paid) − Σ payments").isEmpty();
     }
 
     /** Sets a store bucket of the test bottle type by a physical count. */

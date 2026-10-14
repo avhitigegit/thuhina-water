@@ -153,7 +153,8 @@ public final class CustomerDtos {
 
     /**
      * One line of the History tab: registration, changes, prices (kind REGISTERED / CHANGED / PRICE) and bills
-     * (kind SALE, with the bill, amount, paid and the running account balance after it). Payments and invoices: M11.
+     * (kind SALE, with the bill, amount, paid and the running account balance after it) and payments (kind PAYMENT, billNo =
+     * the receipt number, paid = the amount, with the running balance after it).
      */
     public record HistoryRow(Instant at, LocalDate date, String kind, String description, String by,
                              @Schema(nullable = true) String byName,
