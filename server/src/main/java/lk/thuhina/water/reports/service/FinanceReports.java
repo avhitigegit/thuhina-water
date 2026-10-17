@@ -118,29 +118,47 @@ class FinanceReports {
 
     // ------------------------------------------------------------------ Outstanding & aging
 
+    /**
+     * Money owed by age, and advances (credit balances) in their own column – so each row adds up: 0–30 + 31–60 + 61–90 +
+     * 90+ = Owed, and the total owed is the same as on Billing &amp; Payments.
+     */
     ReportView outstanding(LocalDate from, LocalDate to) {
         List<AccountRow> rows = aging.accounts(new AgingService.Filter(null, null, null), to, 0, ALL).items();
-        BigDecimal total = rows.stream().map(AccountRow::balance).reduce(Money.ZERO, BigDecimal::add);
+        BigDecimal total = sum(rows, FinanceReports::owed);
+        BigDecimal advances = sum(rows, FinanceReports::advance);
         BigDecimal over90 = rows.stream().map(AccountRow::over90).reduce(Money.ZERO, BigDecimal::add);
         ReportBuilder b = new ReportBuilder("outstanding", "Outstanding and aging", from, to);
         b.kpi(new ReportKpi("Total outstanding at " + BusinessDates.format(to), ReportBuilder.text(total, MONEY), MONEY, false));
         b.kpi(new ReportKpi("Over 90 days", ReportBuilder.text(over90, MONEY), MONEY, over90.signum() > 0));
+        if (advances.signum() != 0) {
+            b.kpi(new ReportKpi("Paid in advance", ReportBuilder.text(advances, MONEY), MONEY, false));
+        }
 
         ReportBuilder.Table byType = b.table("By payment type").col("Payment type", TEXT).col("0–30", MONEY).col("31–60", MONEY)
-                .col("61–90", MONEY).col("90+", MONEY).col("Total", MONEY);
+                .col("61–90", MONEY).col("90+", MONEY).col("Owed", MONEY).col("Paid in advance", MONEY);
         for (PayType type : PayType.values()) {
             List<AccountRow> r = rows.stream().filter(a -> type.name().equals(a.payType())).toList();
             byType.row(type.label(), sum(r, AccountRow::days0to30), sum(r, AccountRow::days31to60), sum(r, AccountRow::days61to90),
-                    sum(r, AccountRow::over90), sum(r, AccountRow::balance));
+                    sum(r, AccountRow::over90), sum(r, FinanceReports::owed), sum(r, FinanceReports::advance));
         }
         byType.footer("Total", sum(rows, AccountRow::days0to30), sum(rows, AccountRow::days31to60), sum(rows, AccountRow::days61to90),
-                over90, total).done();
+                over90, total, advances).done();
         ReportBuilder.Table byCustomer = b.table("By customer").col("Customer", TEXT).col("Pays", TEXT).col("0–30", MONEY).col("31–60", MONEY)
-                .col("61–90", MONEY).col("90+", MONEY).col("Total", MONEY);
+                .col("61–90", MONEY).col("90+", MONEY).col("Owed", MONEY).col("Paid in advance", MONEY);
         rows.forEach(a -> byCustomer.row(a.name() + " (" + a.code() + ")", a.payTypeLabel(), a.days0to30(), a.days31to60(), a.days61to90(),
-                a.over90(), a.balance()));
+                a.over90(), owed(a), advance(a)));
         byCustomer.done();
         return b.build();
+    }
+
+    /** The money the customer owes (0 when they paid in advance). */
+    private static BigDecimal owed(AccountRow a) {
+        return a.balance().signum() > 0 ? a.balance() : Money.ZERO;
+    }
+
+    /** A credit balance (paid in advance) as a positive amount, else 0. */
+    private static BigDecimal advance(AccountRow a) {
+        return a.balance().signum() < 0 ? a.balance().negate() : Money.ZERO;
     }
 
     private static BigDecimal sum(List<AccountRow> rows, java.util.function.Function<AccountRow, BigDecimal> f) {

@@ -14,11 +14,15 @@ export function fetchDueList(qc: QueryClient, date: string): Promise<DueList> {
   });
 }
 
-/** A customer typed into a row: bottles, usual quantities, prices and balance. */
-export function fetchCustomer(qc: QueryClient, id: number): Promise<CustomerDetail> {
+/**
+ * A customer typed into a row: bottles, usual quantities, prices and balance. {@code date} = the row's bill date: the
+ * water prices are the ones in force that day (BR-08), as the server will bill them.
+ */
+export function fetchCustomer(qc: QueryClient, id: number, date?: string | null): Promise<CustomerDetail> {
   return qc.fetchQuery({
-    queryKey: ["customers", "detail", id],
-    queryFn: ({ signal }) => api<CustomerDetail>(`/customers/${id}`, { signal }),
+    queryKey: ["customers", "detail", id, date ?? "today"],
+    queryFn: ({ signal }) =>
+      api<CustomerDetail>(`/customers/${id}`, { signal, query: date ? { date } : undefined }),
     staleTime: 0,
   });
 }

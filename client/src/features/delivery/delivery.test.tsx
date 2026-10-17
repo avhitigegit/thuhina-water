@@ -121,7 +121,7 @@ const REQ: Requirement = {
     customers: i % 7 === 0 ? 2 : 0,
     needed: i % 7 === 0 ? 4 : 0,
     runningTotal: i < 7 ? 4 : 8,
-    filledLeft: i < 7 ? 1 : -3,
+    filledLeft: i < 3 ? 1 : -3,
     withFactory: i < 7 ? 3 : -1,
   })),
 };
@@ -372,8 +372,10 @@ describe("Daily Delivery List", () => {
           el?.textContent === "20L stock now: 5 filled in store, 2 at the factory, 30 empties in store.",
       ),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Filled bottles run out on/)).toHaveTextContent(
-      `Filled bottles run out on Monday ${formatDate(addDaysIso(TODAY, 7))}. Send more empties to the factory before then.`,
+    // In store they run out on day 3; with the 2 at the factory on day 7 (B-06: the message said day 7 only).
+    expect(screen.getByText(/Filled bottles in store run out on/)).toHaveTextContent(
+      `Filled bottles in store run out on Monday ${formatDate(addDaysIso(TODAY, 3))}, and even with the 2 at the factory on ` +
+        `Monday ${formatDate(addDaysIso(TODAY, 7))}. Send more empties to the factory before then.`,
     );
     const rows = screen.getAllByRole("row");
     expect(rows).toHaveLength(15);

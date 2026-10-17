@@ -122,6 +122,12 @@ class ReportIntegrationTest extends SalesTestSupport {
             assertThat(r.subList(2, 6)).containsExactly("2", "600.00", "700.00", "-100.00");
         });
         assertThat(rows(table(sales, "By sale type")).stream().map(List::getFirst)).contains("First purchase", "Exchange");
+        // By bottle type (B-07): the test bottle type's bills, water and deposits (the reversal counts against them).
+        String salesBottleName = jdbc.queryForObject("select name from bottle_type where code = ?", String.class, bottle);
+        assertThat(rows(table(sales, "By bottle type"))).anySatisfy(r -> {
+            assertThat(r.subList(0, 2)).containsExactly(salesBottleName, "4");
+            assertThat(r.subList(3, 6)).containsExactly("2000.00", "4000.00", "6000.00");
+        });
 
         // Profit: the test bottle type's revenue = its water and deposits.
         Map<String, Object> profit = getJson("/reports/profit" + range(), admin);
@@ -142,11 +148,18 @@ class ReportIntegrationTest extends SalesTestSupport {
             assertThat(r.subList(1, 7)).containsOnly("0");
         });
 
-        // Outstanding at today = the account summary.
+        // Outstanding at today = the account summary (money owed; advances in their own column).
         Map<String, Object> out = getJson("/reports/outstanding" + range(), admin);
         Map<String, Object> summary = getJson("/accounts/summary", admin);
-        assertThat(new BigDecimal(((List<?>) table(out, "By payment type").get("footer")).getLast().toString()))
+        List<?> footer = (List<?>) table(out, "By payment type").get("footer");
+        assertThat(new BigDecimal(footer.get(5).toString()))
                 .isEqualByComparingTo(new BigDecimal(summary.get("totalOutstanding").toString()));
+        // B-08: every row adds up – 0–30 + 31–60 + 61–90 + 90+ = Owed (an advance does not reduce it).
+        for (List<String> r : rows(table(out, "By customer"))) {
+            BigDecimal ages = new BigDecimal(r.get(2)).add(new BigDecimal(r.get(3))).add(new BigDecimal(r.get(4))).add(new BigDecimal(r.get(5)));
+            assertThat(ages).as(r.getFirst()).isEqualByComparingTo(new BigDecimal(r.get(6)));
+            assertThat(new BigDecimal(r.get(7))).as(r.getFirst()).isNotNegative();
+        }
 
         // Exports carry the same data.
         MvcResult pdf = mvc.perform(get("/reports/sales/export" + range() + "&format=pdf").cookie(admin)).andReturn();

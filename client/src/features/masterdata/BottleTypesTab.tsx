@@ -14,6 +14,7 @@ import { MoneyText } from "@/components/shared/MoneyText";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Can } from "@/features/auth/access";
 import type { BottleType } from "@/lib/api/types";
+import { formatNumber } from "@/lib/format";
 import { showServerErrors } from "@/lib/forms";
 import { P } from "@/lib/permissions";
 import { toast } from "@/lib/toast";
@@ -146,12 +147,7 @@ export function BottleTypesTab() {
       key: "circulation",
       header: "In circulation",
       align: "num",
-      cell: (b) =>
-        b.inCirculation ?? (
-          <span className="muted" title="Comes with Stock (M04)">
-            –
-          </span>
-        ),
+      cell: (b) => formatNumber(b.inCirculation ?? 0),
     },
     {
       key: "status",

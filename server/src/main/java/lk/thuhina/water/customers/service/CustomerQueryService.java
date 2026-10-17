@@ -209,15 +209,25 @@ public class CustomerQueryService {
 
     @Transactional(readOnly = true)
     public CustomerDetail detail(long id) {
+        return detail(id, null);
+    }
+
+    /**
+     * Customer details; the water prices are the prices in force on {@code priceDate} (null = today) – Enter Bills asks
+     * for the row's bill date (BR-08), so a back-dated row shows the price the bill will be saved with.
+     */
+    @Transactional(readOnly = true)
+    public CustomerDetail detail(long id, LocalDate priceDate) {
         Customer c = customers.findById(id).orElseThrow(() -> new NotFoundException("Customer", id));
         LocalDate today = today();
+        LocalDate priceOn = priceDate == null ? today : priceDate;
         BigDecimal balance = jdbc.query("select balance from customer_account where customer_id = :c",
                 new MapSqlParameterSource("c", id), rs -> rs.next() ? rs.getBigDecimal(1) : BigDecimal.ZERO);
         BigDecimal outstanding = Money.of(balance);
         List<BottleType> active = bottleTypes.findByActiveTrueOrderByLitresDesc();
         List<WaterPriceView> prices = new ArrayList<>();
         for (BottleType b : active) {
-            Optional<PricingService.WaterPrice> wp = pricing.waterPrice(id, b.getCode(), today);
+            Optional<PricingService.WaterPrice> wp = pricing.waterPrice(id, b.getCode(), priceOn);
             prices.add(new WaterPriceView(b.getCode(), LedgerRules.bottleLabel(b.getLitres()), wp.map(PricingService.WaterPrice::price).orElse(null),
                     wp.map(PricingService.WaterPrice::agreed).orElse(false), wp.map(PricingService.WaterPrice::standard).orElse(null),
                     nextAgreed(id, b.getCode(), today),

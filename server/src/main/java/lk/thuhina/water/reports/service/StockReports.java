@@ -100,13 +100,14 @@ class StockReports {
 
     static String location(String location) {
         if (location == null) {
-            return "At the customer";
+            return "At customer";
         }
         return switch (location) {
             case "EMPTY_IN_STORE", "EMPTY" -> "Empty in store";
             case "FILLED_IN_STORE", "FILLED" -> "Filled in store";
             case "AT_FACTORY", "FACTORY" -> "At factory";
             case "DURING_DELIVERY" -> "During delivery";
+            case "AT_CUSTOMER", "CUSTOMERS" -> "At customer";
             default -> location;
         };
     }

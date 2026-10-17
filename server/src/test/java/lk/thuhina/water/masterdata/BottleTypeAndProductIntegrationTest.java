@@ -16,10 +16,15 @@ import jakarta.servlet.http.Cookie;
 import lk.thuhina.water.audit.model.AuditAction;
 import lk.thuhina.water.security.Role;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MvcResult;
 
 /** Bottle types (code from size, one per size, size fixed) and products (opening stock only on create). */
 class BottleTypeAndProductIntegrationTest extends MasterDataTestSupport {
+
+    @Autowired
+    private JdbcTemplate jdbc;
 
     @Test
     void a19LitreBottleGetsCodeB19AndASecond19LitreIsRejected() throws Exception {
@@ -28,12 +33,28 @@ class BottleTypeAndProductIntegrationTest extends MasterDataTestSupport {
                 .andExpect(jsonPath("$.code").value("B19"))
                 .andExpect(jsonPath("$.active").value(true))
                 .andExpect(jsonPath("$.deposit").value(nullValue()))
-                .andExpect(jsonPath("$.inCirculation").value(nullValue()));
+                .andExpect(jsonPath("$.inCirculation").value(0));
         assertThat(lastAudit("Bottle type", "B19").getDetails()).isEqualTo("19L Bottle");
 
         mvc.perform(json(post("/bottle-types"), admin, Map.of("name", "Another 19", "litres", "19.00")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details.fields.litres").value("A 19L bottle type already exists (19L Bottle)."));
+    }
+
+    @Test
+    void inCirculationIsEveryStockStatusExceptWrittenOff() throws Exception {
+        String code = newBottle();
+        // Stock rows of a new bottle type exist (M04); fill them directly – the ledger is not under test here.
+        jdbc.update("update stock_balance set qty = case bucket when 'EMPTY' then 5 when 'FILLED' then 3 when 'FACTORY' then 2 "
+                + "when 'CUSTOMERS' then 7 when 'WRITTEN_OFF' then 4 else qty end where bottle_type_code = ?", code);
+        try {
+            Map<String, Object> row = readList(mvc.perform(get("/bottle-types").cookie(admin)).andReturn()).stream()
+                    .filter(b -> code.equals(b.get("code"))).findFirst().orElseThrow();
+            assertThat(row.get("inCirculation")).isEqualTo(17);
+        } finally {
+            jdbc.update("update stock_balance set qty = 0 where bottle_type_code = ?", code);
+            jdbc.update("update bottle_type set active = false where code = ?", code);
+        }
     }
 
     @Test

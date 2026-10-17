@@ -5,6 +5,7 @@ import { calculate, exceedsCredit, type Bottles } from "./exchangeRules";
 import {
   billRequest,
   emptyRow,
+  freePaper,
   nextAfter,
   rowFor,
   rowView,
@@ -120,6 +121,15 @@ describe("Enter Bills grid model", () => {
     expect(suggestPaper([a, b], b.key, "900")).toBe("41276");
     expect(suggestPaper([b], b.key, "900")).toBe("900");
     expect(suggestPaper([{ ...a, paper: "A-1" }, b], b.key, null)).toBe("");
+  });
+
+  it("skips paper numbers already used in another row (re-used 5008 after 5009, 5010)", () => {
+    const r1 = { ...emptyRow("2026-10-12"), paper: "5009" };
+    const r2 = { ...emptyRow("2026-10-12"), paper: "5010" };
+    const r3 = { ...emptyRow("2026-10-12"), paper: "5008" };
+    const b = emptyRow("2026-10-12");
+    expect(suggestPaper([r1, r2, r3, b], b.key, null)).toBe("5011");
+    expect(freePaper([r1, r2, b], b.key, 5009)).toBe("5011");
   });
 
   it("live result: amount, collects, next delivery; Cash paid follows the amount", () => {

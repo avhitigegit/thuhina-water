@@ -114,6 +114,13 @@ class CustomerPriceIntegrationTest extends CustomerTestSupport {
                 .andExpect(status().isNoContent());
         assertThat(priceOn(today)).isEqualByComparingTo("285");
         assertThat(priceOn(today.plusDays(1))).isEqualByComparingTo("300");
+        // Customer details with ?date= show the water price in force on that date (Enter Bills back-dated rows, B-05).
+        String path = "$.prices[?(@.bottleTypeCode == '" + bottle + "')].price";
+        mvc.perform(get("/customers/" + customerId).cookie(admin)).andExpect(jsonPath(path).value(org.hamcrest.Matchers.contains(285.0)));
+        mvc.perform(get("/customers/" + customerId).param("date", "2026-08-01").cookie(admin))
+                .andExpect(jsonPath(path).value(org.hamcrest.Matchers.contains(250.0)));
+        mvc.perform(get("/customers/" + customerId).param("date", "2026-09-10").cookie(admin))
+                .andExpect(jsonPath(path).value(org.hamcrest.Matchers.contains(290.0)));
         mvc.perform(json(post("/customers/" + customerId + "/prices/end"),
                         Map.of("bottleTypeCode", bottle, "from", today.plusDays(5).toString(), "reason", "again")))
                 .andExpect(jsonPath("$.code").value("NO_AGREED_PRICE"));

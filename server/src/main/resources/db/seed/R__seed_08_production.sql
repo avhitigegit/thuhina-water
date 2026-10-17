@@ -1,23 +1,25 @@
 -- Seed Filling Factory history for LOCAL and UAT only (never production) – modelled on the prototype
 -- (prototype/assets/js/store.js: empties go to the factory every Saturday – 20L to AquaSeal (F01), 10L to Pure Lanka (F02) –
 -- and come back filled on Sunday; about 1 in 75 is rejected):
---   * 9 weekly loads 01/08 … 26/09/2026 (two dispatches each Saturday, one per factory), returned the next day;
+--   * 9 weekly loads 01/08 … 26/09/2026 (two dispatches each Saturday, one per factory), returned the next day; the loads fit
+--     the seeded bottle pool (about 30 × 20L and 10 × 10L a week), so stock is never negative on any date (Stock report);
 --   * the 20L batch of 26/09 was short-shipped by 6 – those 6 are still at the factory;
 --   * 01/10/2026: one dispatch with both bottle types to AquaSeal (mid-week top-up) – still at the factory;
 --   * AquaSeal's August filling cost paid on 10/09/2026 (FP-0001).
 -- The prototype takes the quantities from its daily sales simulation, which the seed does not replay, so the quantities here are
 -- fixed. Every dispatch and return is posted to the ledger (BATCH / RETURN effects, Movements shows them). Because customer
--- deliveries and empties collected in this period are not replayed, one IMPORT posting "SEED-FACTORY" moves the filled bottles
--- that came back out to customers again as empties (FILLED −filled, EMPTY +filled), so Filled in store stays as seeded and
--- Empty in store goes down only by the bottles still at the factory and the rejects.
+-- deliveries and empties collected in this period are not replayed, an IMPORT posting "SEED-FACTORY" on each return day moves
+-- that week's filled bottles out to customers again as empties (FILLED −filled, EMPTY +filled), so Filled in store stays as
+-- seeded and Empty in store goes down only by the bottles still at the factory and the rejects – week by week, not in one
+-- posting at the end (that left August with negative empties in the Stock report at a date).
 -- Runs once: skipped when FD-0001 already exists.
 
 DO $$
 DECLARE
     f01 BIGINT; f02 BIGINT;
     b20 NUMERIC := 60; b10_f02 NUMERIC := 34; b20_f01 NUMERIC := 60; b10_f01 NUMERIC := 35;
-    q20 INTEGER[] := ARRAY[280, 300, 290, 310, 300, 320, 300, 310, 300];
-    q10 INTEGER[] := ARRAY[40, 35, 45, 40, 38, 42, 40, 44, 40];
+    q20 INTEGER[] := ARRAY[28, 30, 29, 31, 30, 32, 30, 31, 30];
+    q10 INTEGER[] := ARRAY[10, 9, 11, 10, 9, 11, 10, 12, 10];
     sat DATE;
     i INTEGER;
     disp BIGINT; batch BIGINT; ret BIGINT;
@@ -59,7 +61,7 @@ BEGIN
                 ('BATCH', disp, fd, v_bt, 'FACTORY', v_qty, sat, 'Dispatched to ' || (SELECT name FROM factory WHERE id = v_fac));
 
             -- Back the next day.
-            v_rej := v_qty / 75;
+            v_rej := v_qty / 25;
             v_short := CASE WHEN sat = DATE '2026-09-26' AND v_bt = 'B20' THEN 6 ELSE 0 END;
             v_filled := v_qty - v_rej - v_short;
             UPDATE doc_sequence SET next_value = next_value + 1 WHERE name = 'FACTORY_RETURN' RETURNING next_value - 1 INTO n;
@@ -84,6 +86,12 @@ BEGIN
                 VALUES ('DMG-' || lpad(n::text, 4, '0'), sat + 1, v_bt, v_rej, 'COMPANY', 'AT_FACTORY', 'Cracked neck / failed seal test',
                         'Rejected in batch ' || fb, 'RETURN', ret, (sat + 1) + TIME '16:00' AT TIME ZONE 'Asia/Colombo', 'nimal.admin');
             END IF;
+            -- That week's deliveries: the filled bottles go out, the same number of empties come back (not replayed).
+            INSERT INTO seed_fx VALUES
+                ('IMPORT', NULL, 'SEED-FACTORY', v_bt, 'FILLED', -v_filled, sat + 1,
+                 'Seed only – filled bottles delivered and empties collected this week (not replayed)'),
+                ('IMPORT', NULL, 'SEED-FACTORY', v_bt, 'EMPTY', v_filled, sat + 1,
+                 'Seed only – filled bottles delivered and empties collected this week (not replayed)');
             IF v_fac = f01 AND sat + 1 BETWEEN DATE '2026-08-01' AND DATE '2026-08-31' THEN
                 aug := aug + v_filled * v_chg;
             END IF;
@@ -108,14 +116,6 @@ BEGIN
             ('BATCH', disp, fd, v_bt, 'EMPTY', -v_qty, DATE '2026-10-01', 'Dispatched to AquaSeal Bottling (Pvt) Ltd'),
             ('BATCH', disp, fd, v_bt, 'FACTORY', v_qty, DATE '2026-10-01', 'Dispatched to AquaSeal Bottling (Pvt) Ltd');
     END LOOP;
-
-    -- Deliveries and collections of this period are not replayed (see the top of this file).
-    INSERT INTO seed_fx
-    SELECT 'IMPORT', NULL, 'SEED-FACTORY', bottle, k.bucket, k.sign * sum(delta), DATE '2026-09-30',
-           'Seed only – v_filled bottles delivered and empties collected in this history (not replayed)'
-    FROM seed_fx CROSS JOIN (VALUES ('FILLED', -1), ('EMPTY', 1)) AS k (bucket, sign)
-    WHERE source_type = 'RETURN' AND seed_fx.bucket = 'FILLED'
-    GROUP BY bottle, k.bucket, k.sign;
 
     UPDATE stock_balance s SET qty = s.qty + t.delta
     FROM (SELECT bottle, bucket, sum(delta) AS delta FROM seed_fx GROUP BY bottle, bucket) t
