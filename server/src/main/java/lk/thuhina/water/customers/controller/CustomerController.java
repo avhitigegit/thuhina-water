@@ -1,8 +1,10 @@
 package lk.thuhina.water.customers.controller;
 
+import java.time.LocalDate;
 import java.util.List;
 
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lk.thuhina.water.customers.dto.CustomerDtos.CustomerDetail;
@@ -17,6 +19,7 @@ import lk.thuhina.water.customers.service.CustomerQueryService;
 import lk.thuhina.water.customers.service.CustomerService;
 import lk.thuhina.water.sales.dto.SalesDtos.RegistrationPreview;
 import lk.thuhina.water.security.Permissions;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -74,8 +77,10 @@ public class CustomerController {
     @Operation(summary = "Everything for the side panel: details, balances, outstanding, delivery, water prices")
     @GetMapping("/{id}")
     @PreAuthorize(VIEW)
-    public CustomerDetail detail(@PathVariable long id) {
-        return queries.detail(id);
+    public CustomerDetail detail(@PathVariable long id,
+            @Parameter(description = "Water prices in force on this date (default today)") @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        return queries.detail(id, date);
     }
 
     @Operation(summary = "Customer history – registration, changes, status, prices, bills and payments (with the running balance)")

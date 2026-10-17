@@ -28,7 +28,7 @@ import { invalidateAfterSale } from "@/features/sales/api";
 import { CustomerCard } from "@/features/sales/CustomerCard";
 import { api, ApiError } from "@/lib/api/client";
 import type { BottlesAfter, CustomerLookupRow, DueList } from "@/lib/api/types";
-import { autoSlashDate, formatDate, formatMoney, todayIso } from "@/lib/format";
+import { autoSlashDate, formatDate, formatMoney, parseDmy, todayIso } from "@/lib/format";
 import { P } from "@/lib/permissions";
 import { toast } from "@/lib/toast";
 import { fetchCustomer, fetchDueList, postBill, useNextPaperBill } from "./api";
@@ -39,6 +39,7 @@ import {
   customerText,
   emptyRow,
   fromDetail,
+  freePaper,
   fromDue,
   paidNumber,
   rowFor,
@@ -280,7 +281,8 @@ export function EnterBills() {
   /** A customer chosen in a row: load bottles, prices and usual quantities (unless already filled in for them). */
   const pick = useCallback(
     async (key: number, match: CustomerLookupRow) => {
-      const detail = await fetchCustomer(qc, match.id).catch(() => null);
+      const row = rowsRef.current.find((x) => x.key === key);
+      const detail = await fetchCustomer(qc, match.id, parseDmy(row?.date)).catch(() => null);
       if (!detail) return;
       const c = fromDetail(detail);
       update(key, (r) => {
@@ -298,6 +300,21 @@ export function EnterBills() {
     },
     [cols, qc, update],
   );
+
+  /** The row date changed: load the customer's water prices in force on the new date (BR-08). */
+  async function refreshPrices(key: number, date: string) {
+    const iso = parseDmy(date);
+    const r = rowsRef.current.find((x) => x.key === key);
+    if (!iso || !r?.customer) return;
+    const detail = await fetchCustomer(qc, r.customer.id, iso).catch(() => null);
+    if (!detail) return;
+    const prices = fromDetail(detail).prices;
+    update(key, (x) =>
+      x.status === "saved" || x.customer?.id !== detail.id || parseDmy(x.date) !== iso
+        ? x
+        : { ...x, customer: { ...x.customer, prices } },
+    );
+  }
 
   /** Enter on the customer cell before the matches arrived: look the text up now. */
   async function resolveNow(r: Row): Promise<void> {
@@ -317,9 +334,18 @@ export function EnterBills() {
     return out;
   }, [rows, cols, today, dbDuplicates]);
 
-  const setDuplicate = useCallback((key: number, message: string | null) => {
-    setDbDuplicates((d) => (d[key] === message ? d : { ...d, [key]: message }));
-  }, []);
+  const setDuplicate = useCallback(
+    (key: number, message: string | null) => {
+      const r = rowsRef.current.find((x) => x.key === key);
+      if (message && r && r.status !== "saved" && r.paperSuggested && /^\d{1,15}$/.test(r.paper.trim())) {
+        // A suggested number that is already entered: take the next free one instead of warning (the check runs again).
+        update(key, (x) => ({ ...x, paper: freePaper(rowsRef.current, key, Number(x.paper.trim()) + 1) }));
+        return;
+      }
+      setDbDuplicates((d) => (d[key] === message ? d : { ...d, [key]: message }));
+    },
+    [update],
+  );
 
   // ------------------------------------------------------------------ saving (C6)
 
@@ -446,7 +472,7 @@ export function EnterBills() {
     const s = suggestPaper(rowsRef.current, r.key, nextPaper.data?.next ?? null);
     if (s) {
       // A suggestion is not typing: an automatic row stays automatic.
-      update(r.key, (x) => ({ ...x, paper: s }));
+      update(r.key, (x) => ({ ...x, paper: s, paperSuggested: true }));
       focus(r.key);
     }
   }
@@ -604,7 +630,9 @@ export function EnterBills() {
                         value={r.paper}
                         disabled={locked}
                         onFocus={() => paperFocus(r)}
-                        onChange={(e) => edit(r.key, (x) => ({ ...x, paper: e.target.value }))}
+                        onChange={(e) =>
+                          edit(r.key, (x) => ({ ...x, paper: e.target.value, paperSuggested: false }))
+                        }
                       />
                       {r.status !== "saved" && (
                         <PaperCheck rowKey={r.key} paper={r.paper} onResult={setDuplicate} />
@@ -620,7 +648,11 @@ export function EnterBills() {
                         placeholder="DD/MM/YYYY"
                         value={r.date}
                         disabled={locked}
-                        onChange={(e) => edit(r.key, (x) => ({ ...x, date: autoSlashDate(e.target.value) }))}
+                        onChange={(e) => {
+                          const date = autoSlashDate(e.target.value);
+                          edit(r.key, (x) => ({ ...x, date }));
+                          void refreshPrices(r.key, date);
+                        }}
                       />
                     </td>
                     <td>

@@ -136,6 +136,7 @@ class SalesReports {
                 .money("Products", products).number("Bills", bills).money("Below standard (agreed prices)", below);
         b.chart(ChronoUnit.DAYS.between(from, to) < CHART_DAYS ? "By day" : "By month", salesChart(from, to, p));
         groupTable(b, "By sale type", "Sale type", byKind);
+        byBottleType(b, p, products);
         groupTable(b, "By customer type", "Customer type", groups("coalesce(ct.name, 'Walk-in')",
                 "left join customer c on c.id = tx.customer_id left join customer_type ct on ct.id = c.customer_type_id", p,
                 "sum(w + d + p) desc"));
@@ -150,6 +151,32 @@ class SalesReports {
         agreed.forEach(a -> t.row(a.name(), a.type(), a.bottles(), a.billed(), a.standard(), a.billed().subtract(a.standard())));
         t.done();
         return b.build();
+    }
+
+    /**
+     * Sales by bottle type (section 8): bills with that bottle type, filled bottles sold, water and deposits from the bill
+     * lines (a reversal counts against them); products in one row, so the totals match the summary.
+     */
+    private void byBottleType(ReportBuilder b, MapSqlParameterSource p, BigDecimal products) {
+        ReportBuilder.Table t = b.table("By bottle type").col("Bottle type", TEXT).col("Bills", NUMBER).col("Bottles", NUMBER)
+                .col("Water", MONEY).col("Deposits", MONEY).col("Total", MONEY);
+        jdbc.query(TX + "select bt.name, count(distinct tx.id) filter (where tx.bill = 1) as n, "
+                        + "coalesce(sum((2 * tx.bill - 1) * l.filled), 0) as bottles, "
+                        + "coalesce(sum((2 * tx.bill - 1) * l.filled * l.unit_price), 0) as w, "
+                        + "coalesce(sum((2 * tx.bill - 1) * coalesce(l.deposit_unit, 0) * l.deposit_count), 0) as d "
+                        + "from tx join sales_txn_line l on l.txn_id = tx.id join bottle_type bt on bt.code = l.bottle_type_code "
+                        + "group by bt.code, bt.name, bt.litres order by bt.litres desc", p,
+                rs -> {
+                    BigDecimal w = Money.of(rs.getBigDecimal("w"));
+                    BigDecimal d = Money.of(rs.getBigDecimal("d"));
+                    t.row(rs.getString("name"), rs.getLong("n"), rs.getLong("bottles"), w, d, w.add(d));
+                });
+        if (products.signum() != 0) {
+            Long n = jdbc.queryForObject(TX + "select count(distinct tx.id) filter (where tx.bill = 1) from tx "
+                    + "join sales_txn_line l on l.txn_id = tx.id where l.product_code is not null", p, Long.class);
+            t.row("Products", n == null ? 0 : n, "", Money.ZERO, Money.ZERO, products);
+        }
+        t.done();
     }
 
     private List<ChartPoint> salesChart(LocalDate from, LocalDate to, MapSqlParameterSource p) {

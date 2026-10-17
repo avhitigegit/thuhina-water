@@ -246,6 +246,8 @@ function NeedPane() {
   const req = useRequirement(bottle, true);
   const r = req.data;
   const max = Math.max(1, ...(r?.rows ?? []).map((d) => d.needed));
+  // First day the filled bottles in store are not enough (r.runsOutOn also counts the bottles at the factory).
+  const storeOut = r?.rows.find((d) => d.filledLeft < 0);
 
   return (
     <div className="card">
@@ -274,13 +276,23 @@ function NeedPane() {
             {r.label} stock now: <b>{r.filledInStore}</b> filled in store, <b>{r.atFactory}</b> at the
             factory, <b>{r.emptyInStore}</b> empties in store.
           </p>
-          {r.runsOutOn ? (
+          {storeOut ? (
             <div className="banner bad">
-              Filled bottles run out on{" "}
+              Filled bottles in store run out on{" "}
               <b>
-                {r.rows.find((d) => d.date === r.runsOutOn)?.dayName} {formatDate(r.runsOutOn)}
+                {storeOut.dayName} {formatDate(storeOut.date)}
               </b>
-              . Send more empties to the factory before then.
+              {r.runsOutOn ? (
+                <>
+                  , and even with the {r.atFactory} at the factory on{" "}
+                  <b>
+                    {r.rows.find((d) => d.date === r.runsOutOn)?.dayName} {formatDate(r.runsOutOn)}
+                  </b>
+                  . Send more empties to the factory before then.
+                </>
+              ) : (
+                <>. Bring back the filled bottles from the factory before then.</>
+              )}
             </div>
           ) : (
             <div className="banner ok">Enough filled bottles for the next 14 days of usual deliveries.</div>

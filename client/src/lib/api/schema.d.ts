@@ -5247,7 +5247,10 @@ export interface operations {
     };
     detail_1: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Water prices in force on this date (default today) */
+                date?: string;
+            };
             header?: never;
             path: {
                 id: number;

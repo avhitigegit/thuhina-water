@@ -51,6 +51,8 @@ export interface Row {
   /** auto = filled in from the due list (replaced when the date changes); typed = the user typed in it. */
   source: "auto" | "typed";
   paper: string;
+  /** The paper number was suggested (not typed): if it turns out to be entered already, the next free one is taken. */
+  paperSuggested: boolean;
   /** Row date as typed (DD/MM/YYYY). */
   date: string;
   /** Text in the customer cell, and the customer it means (null = none / not found). */
@@ -152,6 +154,7 @@ export function emptyRow(date: string, paper = ""): Row {
     key: nextKey(),
     source: "typed",
     paper,
+    paperSuggested: paper !== "",
     date: formatDate(date),
     customerText: "",
     customer: null,
@@ -228,14 +231,26 @@ export function nextAfter(next: string, cycleWeeks: number, date: string): strin
   return n;
 }
 
-/** Suggested paper bill number: previous numeric row + 1, else the highest entered + 1 (server). */
+/**
+ * Suggested paper bill number: previous numeric row + 1, else the highest entered + 1 (server). Numbers already in
+ * another row are skipped.
+ */
 export function suggestPaper(rows: Row[], beforeKey: number, serverNext: string | null): string {
   const i = rows.findIndex((r) => r.key === beforeKey);
   for (let j = (i < 0 ? rows.length : i) - 1; j >= 0; j--) {
     const v = rows[j].paper.trim();
-    if (/^\d{1,15}$/.test(v)) return String(Number(v) + 1);
+    if (/^\d{1,15}$/.test(v)) return freePaper(rows, beforeKey, Number(v) + 1);
   }
-  return serverNext ?? "";
+  return serverNext && /^\d{1,15}$/.test(serverNext)
+    ? freePaper(rows, beforeKey, Number(serverNext))
+    : (serverNext ?? "");
+}
+
+/** The first number from {@code from} on that no other row of the grid uses. */
+export function freePaper(rows: Row[], key: number, from: number): string {
+  let n = from;
+  while (rows.some((r) => r.key !== key && r.paper.trim() === String(n))) n++;
+  return String(n);
 }
 
 export type MsgKind = "ok" | "warn" | "err" | "muted" | "amount";

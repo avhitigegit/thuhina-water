@@ -392,7 +392,7 @@ describe("Purchasing – quotations", () => {
     });
   });
 
-  it("compares quotations side by side; an expired one is refused; the chosen one becomes a PO", async () => {
+  it("compares quotations side by side; an expired one cannot be chosen; the chosen one becomes a PO", async () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(await screen.findByRole("button", { name: "Open" }));
@@ -407,15 +407,11 @@ describe("Purchasing – quotations", () => {
     expect(within(dialog).getByRole("button", { name: "+ Add quotation" })).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Create purchase order" })).not.toBeInTheDocument();
 
-    // The expired quotation: the server refuses and says why.
-    await user.click(within(dialog).getAllByRole("button", { name: "Choose" })[1]);
-    const ask = await screen.findByRole("dialog", { name: "Choose Ceylon PET?" });
-    await user.type(within(ask).getByLabelText("Reason for choosing"), "Cheaper");
-    await user.click(within(ask).getByRole("button", { name: "Choose" }));
-    expect(await screen.findByText(/This quotation expired on/)).toBeInTheDocument();
+    // The expired quotation has no Choose button (B-03) – only the valid one can be chosen.
+    expect(within(dialog).getAllByRole("button", { name: "Choose" })).toHaveLength(1);
+    expect(within(dialog).getByText("Expired – cannot be chosen")).toBeInTheDocument();
 
-    const again = await screen.findByRole("dialog", { name: /QR-2026-013/ });
-    await user.click(within(again).getAllByRole("button", { name: "Choose" })[0]);
+    await user.click(within(dialog).getByRole("button", { name: "Choose" }));
     const ask2 = await screen.findByRole("dialog", { name: "Choose Lanka Polymer?" });
     await user.type(within(ask2).getByLabelText("Reason for choosing"), "Lowest");
     await user.click(within(ask2).getByRole("button", { name: "Choose" }));

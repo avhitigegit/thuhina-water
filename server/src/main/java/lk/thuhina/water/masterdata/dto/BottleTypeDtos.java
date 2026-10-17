@@ -15,7 +15,7 @@ public final class BottleTypeDtos {
     private BottleTypeDtos() {
     }
 
-    /** {@code deposit} = deposit in force today; {@code inCirculation} comes with stock (M04) – null until then. */
+    /** {@code deposit} = deposit in force today; {@code inCirculation} = all statuses except Written off. */
     public record BottleTypeResponse(
             String code,
             String name,

@@ -59,6 +59,7 @@ class ReportRulesTest {
         assertThat(ReportTestAccess.saleType("OWED_SETTLEMENT")).isEqualTo("Bottles owed (deposit)");
         assertThat(ReportTestAccess.location("AT_FACTORY")).isEqualTo("At factory");
         assertThat(ReportTestAccess.location("EMPTY")).isEqualTo("Empty in store");
-        assertThat(ReportTestAccess.location(null)).isEqualTo("At the customer");
+        assertThat(ReportTestAccess.location(null)).isEqualTo("At customer");
+        assertThat(ReportTestAccess.location("AT_CUSTOMER")).isEqualTo("At customer");
     }
 }

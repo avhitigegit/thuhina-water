@@ -563,9 +563,13 @@ function Comparison({
                   <td />
                   {quotes.map((q) => (
                     <td key={q.id}>
-                      <button type="button" className="btn primary sm" onClick={() => onChoose(q)}>
-                        Choose
-                      </button>
+                      {q.expired ? (
+                        <span className="small muted">Expired – cannot be chosen</span>
+                      ) : (
+                        <button type="button" className="btn primary sm" onClick={() => onChoose(q)}>
+                          Choose
+                        </button>
+                      )}
                     </td>
                   ))}
                 </tr>

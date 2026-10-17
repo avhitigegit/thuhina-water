@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AccessProvider } from "@/features/auth/access";
 import type { CustomerDetail, DueCustomer, DueList, MeResponse } from "@/lib/api/types";
-import { formatDate, todayIso } from "@/lib/format";
+import { addDaysIso, formatDate, todayIso } from "@/lib/format";
 import { P } from "@/lib/permissions";
 import { EnterBills } from "./EnterBills";
 
@@ -186,7 +186,14 @@ function server(): ReturnType<typeof vi.fn<Fetch>> {
         : json({ paperBillNo: no, entered: false, txn: null, message: "not yet" });
     }
     const cust = /^\/api\/customers\/(\d+)$/.exec(path);
-    if (cust) return json(detail(LIST.items.find((x) => x.id === Number(cust[1]))!));
+    if (cust) {
+      const d = detail(LIST.items.find((x) => x.id === Number(cust[1]))!);
+      // Before TODAY the customer had a price Rs. 50 lower (BR-08: a back-dated row uses the price of its date).
+      const on = new URL("http://x" + url).searchParams.get("date");
+      return json(
+        on && on < TODAY ? { ...d, prices: d.prices.map((x) => ({ ...x, price: Number(x.price) - 50 })) } : d,
+      );
+    }
     if (path === "/api/customers/lookup") {
       const q = new URL("http://x" + url).searchParams.get("q") ?? "";
       return json(
@@ -394,5 +401,18 @@ describe("Enter Bills", () => {
     await waitFor(() => expect(cust).toHaveValue("C0004 – Vertex Software – 077 000 0004"));
     expect(screen.getByLabelText("20L filled row 2")).toHaveValue(2);
     expect(screen.getByLabelText("20L empties row 2")).toHaveValue(2);
+  });
+
+  it("a back-dated row shows the price in force on its date (B-05)", async () => {
+    const user = userEvent.setup();
+    search = "cust=C0004";
+    renderPage();
+    const cust = await screen.findByLabelText("Customer row 1");
+    await waitFor(() => expect(cust).toHaveValue("C0004 – Vertex Software – 077 000 0004"));
+    await waitFor(() => expect(screen.getByTestId("result-1")).toHaveTextContent("Rs. 600.00"));
+    const date = screen.getByLabelText("Date row 1");
+    await user.clear(date);
+    await user.type(date, formatDate(addDaysIso(TODAY, -5)));
+    await waitFor(() => expect(screen.getByTestId("result-1")).toHaveTextContent("Rs. 500.00"));
   });
 });

@@ -138,7 +138,7 @@ public class AgingService {
     @Transactional(readOnly = true)
     public AccountSummary summary(LocalDate asOf) {
         LocalDate on = date(asOf);
-        return jdbc.queryForObject("select count(*) as n, count(*) filter (where over_limit) as over_n, coalesce(sum(balance), 0) as tb, "
+        return jdbc.queryForObject("select count(*) as n, count(*) filter (where over_limit) as over_n, coalesce(sum(greatest(balance, 0)), 0) as tb, "
                         + "coalesce(sum(b0), 0) as t0, coalesce(sum(b30), 0) as t30, coalesce(sum(b60), 0) as t60, coalesce(sum(b90), 0) as t90 "
                         + "from (" + AGED + ") r", new MapSqlParameterSource("asOf", on),
                 (rs, i) -> new AccountSummary(Money.of(rs.getBigDecimal("tb")), Money.of(rs.getBigDecimal("t0")),
