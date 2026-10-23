@@ -16,13 +16,14 @@ import { ReasonDialog } from "@/components/shared/ReasonDialog";
 import { Badge } from "@/components/shared/StatusBadge";
 import { Tabs, useHashTab } from "@/components/shared/Tabs";
 import { Can, useCan } from "@/features/auth/access";
+import { exportUrl } from "@/features/reports/api";
 import type { ExpenseMonthView, ExpenseRow, ExpenseSummary } from "@/lib/api/types";
-import { downloadCsv } from "@/lib/csv";
-import { formatDate, formatMoney, formatNumber, MONTHS, todayIso } from "@/lib/format";
+import { daysInMonth, formatDate, formatMoney, formatNumber, MONTHS, todayIso } from "@/lib/format";
 import { errorText } from "@/lib/forms";
 import { P } from "@/lib/permissions";
 import { toast } from "@/lib/toast";
 import { useDebounced } from "@/lib/useDebounced";
+import { cn } from "@/lib/utils";
 import {
   expenseStatementUrl,
   useDeleteExpense,
@@ -81,6 +82,7 @@ export function Expenses({ today = todayIso() }: { today?: string }) {
   }
 
   const columns: Column<ExpenseRow>[] = [
+    { key: "no", header: "No.", cell: (e) => <span className="nowrap">{e.expenseNo}</span> },
     {
       key: "paid",
       header: "Paid on",
@@ -266,6 +268,7 @@ export function Expenses({ today = todayIso() }: { today?: string }) {
               footer={[
                 "Total",
                 "",
+                "",
                 `${n} entr${n === 1 ? "y" : "ies"}`,
                 "",
                 <b key="t">{formatMoney(v?.shownTotal)}</b>,
@@ -353,6 +356,13 @@ function TypeBars({ view }: { view: ExpenseMonthView }) {
   );
 }
 
+/** The last day of a month ("2026-10" → "2026-10-31"), but not after today. */
+function monthEnd(month: string, today = todayIso()): string {
+  const [y, m] = month.split("-").map(Number);
+  const end = `${month}-${String(daysInMonth(y, m)).padStart(2, "0")}`;
+  return end > today ? today : end;
+}
+
 function SummaryCard({
   summary,
   loading,
@@ -367,23 +377,19 @@ function SummaryCard({
   const months = summary?.months ?? [];
   const amount = (v: number | string) => (Number(v) ? formatNumber(v) : <span className="muted">–</span>);
 
-  function exportCsv() {
-    if (!summary) return;
-    downloadCsv("Expenses_by_month.csv", [
-      ["Type", ...months.map((m) => m.label), "Total"],
-      ...summary.rows.map((r) => [r.name, ...r.amounts.map(Number), Number(r.total)]),
-      ["Total", ...months.map((m) => Number(m.total)), Number(summary.total)],
-    ]);
-    toast("Excel (CSV) file downloaded", "ok");
-  }
+  // A real Excel file (.xlsx): the Expenses report for the months shown – the same "By type and month" table, and every
+  // entry on a second sheet.
+  const excelUrl = summary
+    ? exportUrl("expenses", "xlsx", `${summary.from}-01`, monthEnd(summary.to))
+    : undefined;
 
   return (
     <div className="card">
       <div className="card-head">
         <h2>Month by month</h2>
-        <button className="btn" type="button" disabled={!summary} onClick={exportCsv}>
+        <a className={cn("btn", !summary && "disabled")} href={excelUrl} download>
           Export Excel
-        </button>
+        </a>
       </div>
       <p className="small muted">Expenses are counted in the month they are for. Click a month to open it.</p>
       {error ? (

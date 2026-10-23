@@ -176,8 +176,8 @@ const STATUS_BADGE: Record<string, { label: string; kind: "ok" | "info" | "" }> 
 
 const historyColumns: Column<PriceHistoryRow>[] = [
   { key: "from", header: "From", cell: (r) => <span className="nowrap">{formatDate(r.effectiveFrom)}</span> },
-  { key: "price", header: "Price", cell: (r) => r.label },
-  { key: "amount", header: "Amount", align: "num", cell: (r) => <MoneyText value={r.price} /> },
+  { key: "price", header: "Item", cell: (r) => r.label },
+  { key: "amount", header: "Price", align: "num", cell: (r) => <MoneyText value={r.price} /> },
   { key: "reason", header: "Reason", cell: (r) => r.reason },
   { key: "by", header: "By", cell: (r) => r.createdByName ?? r.createdBy },
   {

@@ -51,13 +51,18 @@ export function SendEmptiesDialog({
   const [date, setDate] = useState<string | null>(today);
   const [vehicle, setVehicle] = useState("");
   const [note, setNote] = useState("");
-  const [qty, setQty] = useState<Record<string, string>>(() =>
-    Object.fromEntries(bottles.map((b) => [b.bottleTypeCode, String(b.empty)])),
-  );
+  // Typed quantities; until typed, all empties in store – or 0 for a size the factory does not fill (N-05).
+  const [typed, setQty] = useState<Record<string, string>>({});
   const [error, setError] = useState("");
   const factoryId = factory || (active[0] ? String(active[0].id) : "");
   const chosen = active.find((f) => String(f.id) === factoryId);
   const chargeOf = (code: string) => chosen?.charges.find((c) => c.bottleTypeCode === code)?.charge ?? null;
+  const qty: Record<string, string> = Object.fromEntries(
+    bottles.map((b) => [
+      b.bottleTypeCode,
+      typed[b.bottleTypeCode] ?? (chosen && chargeOf(b.bottleTypeCode) === null ? "0" : String(b.empty)),
+    ]),
+  );
 
   let totalQty = 0;
   let totalCost = 0;
@@ -182,7 +187,7 @@ export function SendEmptiesDialog({
                     min={0}
                     style={{ width: 90 }}
                     value={qty[b.bottleTypeCode] ?? ""}
-                    onChange={(e) => setQty({ ...qty, [b.bottleTypeCode]: e.target.value })}
+                    onChange={(e) => setQty({ ...typed, [b.bottleTypeCode]: e.target.value })}
                   />
                 </td>
                 <td className="num" style={left < 0 ? { color: "var(--bad)" } : undefined}>

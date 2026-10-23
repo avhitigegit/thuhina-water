@@ -139,6 +139,19 @@ export function DateField({
     onBlur?.();
   }
 
+  // Escape while the calendar is open closes only the calendar, not the pop-up around the field (N-02). Pop-ups listen
+  // on the document in the capture phase, so the key is caught earlier, on the window.
+  useEffect(() => {
+    if (!open) return;
+    function onEscape(e: globalThis.KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      setOpen(false);
+    }
+    window.addEventListener("keydown", onEscape, true);
+    return () => window.removeEventListener("keydown", onEscape, true);
+  }, [open]);
+
   // Keep the calendar next to its field (also while the page or a pop-up scrolls).
   useLayoutEffect(() => {
     if (!open) return;

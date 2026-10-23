@@ -42,13 +42,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Filling factories (FR-22, BR-11): code {@code F01…} on save; name required; payment terms from the fixed list;
- * a charge per bottle &gt; 0 for every active bottle type. A changed charge is saved from today (history kept);
+ * a charge per bottle &gt; 0 for each bottle type it fills (at least one; N-05). A changed charge is saved from today (history kept);
  * batches copy the charge when they are sent (M10), so it applies only to batches sent after saving.
  */
 @Service
 public class FactoryService {
 
     static final String ENTITY = "Filling factory";
+    public static final String MSG_CHARGE_NONE = "Enter the charge for at least one bottle type.";
+    public static final String MSG_CHARGE_KEPT = "This factory already has a charge for this size – enter the new charge, or make the factory inactive.";
 
     private final FactoryRepository repository;
     private final FactoryChargeRepository charges;
@@ -108,7 +110,7 @@ public class FactoryService {
         int terms = SupplierService.checkTerms(request.termsDays());
         SupplierService.checkEmail(request.email());
         List<BottleType> active = bottleTypes.findByActiveTrueOrderByLitresDesc();
-        Map<String, BigDecimal> newCharges = checkCharges(request.charges(), active);
+        Map<String, BigDecimal> newCharges = checkCharges(request.charges(), active, Set.of());
 
         Factory f = new Factory(numbering.next(SequenceNames.FACTORY));
         apply(f, request, terms, request.active() == null || request.active());
@@ -117,6 +119,9 @@ public class FactoryService {
         List<String> text = new ArrayList<>();
         for (BottleType b : active) {
             BigDecimal charge = newCharges.get(b.getCode());
+            if (charge == null) {
+                continue;
+            }
             charges.save(new FactoryCharge(f.getId(), b.getCode(), charge, today));
             text.add(label(b) + " " + Money.format(charge));
         }
@@ -133,10 +138,12 @@ public class FactoryService {
         int terms = SupplierService.checkTerms(request.termsDays());
         SupplierService.checkEmail(request.email());
         List<BottleType> active = bottleTypes.findByActiveTrueOrderByLitresDesc();
-        Map<String, BigDecimal> newCharges = checkCharges(request.charges(), active);
-        boolean isActive = request.active() == null ? f.isActive() : request.active();
         LocalDate today = today();
         List<FactoryCharge> history = charges.findByFactoryIdOrderByEffectiveFromDescIdDesc(id);
+        Set<String> charged = active.stream().map(BottleType::getCode)
+                .filter(code -> inForce(history, code, today).isPresent()).collect(Collectors.toSet());
+        Map<String, BigDecimal> newCharges = checkCharges(request.charges(), active, charged);
+        boolean isActive = request.active() == null ? f.isActive() : request.active();
 
         List<String> changes = new ArrayList<>();
         String name = request.name().trim();
@@ -146,7 +153,7 @@ public class FactoryService {
         for (BottleType b : active) {
             BigDecimal now = inForce(history, b.getCode(), today).map(FactoryCharge::getCharge).orElse(null);
             BigDecimal next = newCharges.get(b.getCode());
-            if (now == null || now.compareTo(next) != 0) {
+            if (next != null && (now == null || now.compareTo(next) != 0)) {
                 charges.save(new FactoryCharge(id, b.getCode(), next, today));
                 changes.add("charge " + label(b) + " " + (now == null ? "none" : Money.format(now)) + " → " + Money.format(next));
             }
@@ -185,8 +192,11 @@ public class FactoryService {
                 Texts.blankToNull(r.email()), Texts.blankToNull(r.licence()), terms, active);
     }
 
-    /** A charge &gt; 0 (2 decimals) for every active bottle type; charges for other codes are refused. */
-    private static Map<String, BigDecimal> checkCharges(Map<String, BigDecimal> sent, List<BottleType> active) {
+    /**
+     * A charge &gt; 0 (2 decimals) per active bottle type; blank = the factory does not fill that size (N-05), but at least one
+     * is needed, and a type in {@code charged} (has a charge now) cannot be made blank. Charges for other codes are refused.
+     */
+    private static Map<String, BigDecimal> checkCharges(Map<String, BigDecimal> sent, List<BottleType> active, Set<String> charged) {
         Map<String, BigDecimal> in = sent == null ? Map.of() : sent;
         Set<String> activeCodes = active.stream().map(BottleType::getCode).collect(Collectors.toSet());
         for (String code : in.keySet()) {
@@ -198,11 +208,18 @@ public class FactoryService {
         Map<String, BigDecimal> out = new LinkedHashMap<>();
         for (BottleType b : active) {
             BigDecimal c = in.get(b.getCode());
-            if (!Money.isPositive(c) || Money.of(c).compareTo(c) != 0) {
+            if (c == null) {
+                if (charged.contains(b.getCode())) {
+                    errors.put("charges." + b.getCode(), MSG_CHARGE_KEPT);
+                }
+            } else if (!Money.isPositive(c) || Money.of(c).compareTo(c) != 0) {
                 errors.put("charges." + b.getCode(), "Enter the charge per " + label(b) + " bottle (more than 0).");
             } else {
                 out.put(b.getCode(), Money.of(c));
             }
+        }
+        if (errors.isEmpty() && out.isEmpty() && !active.isEmpty()) {
+            errors.put("charges." + active.get(0).getCode(), MSG_CHARGE_NONE);
         }
         if (!errors.isEmpty()) {
             throw new ValidationException(errors);

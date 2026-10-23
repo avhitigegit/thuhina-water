@@ -3,7 +3,6 @@
  * (Ops.saveSupplier, Ops.saveFactory). The server checks again.
  */
 import { z } from "zod";
-import { moneyText } from "@/lib/forms";
 
 /** The fixed payment terms list (prototype TERMS, server PaymentTerms). */
 export const TERMS: { days: number; label: string }[] = [
@@ -39,7 +38,21 @@ export const supplierSchema = z.object({
 });
 export type SupplierValues = z.input<typeof supplierSchema>;
 
-/** Factory form: a charge for every active bottle type ({code → "Enter the charge per 20L bottle (more than 0)."}). */
+/** A blank charge = the factory does not fill that size (N-05); a typed one must be more than 0. */
+function optionalCharge(message: string) {
+  return z
+    .string()
+    .trim()
+    .refine((v) => v === "" || Number(v) > 0, message)
+    .refine((v) => v === "" || /^\d+(\.\d{1,2})?$/.test(v), "Use rupees and cents, e.g. 1350 or 1350.50.");
+}
+
+export const MSG_CHARGE_NONE = "Enter the charge for at least one bottle type.";
+
+/**
+ * Factory form: a charge for each bottle type the factory fills, at least one ({code → "Enter the charge per 20L bottle
+ * (more than 0)."}). The server also refuses blanking a charge that is already set.
+ */
 export function factorySchema(bottles: { code: string; label: string }[]) {
   return z.object({
     name: z.string().trim().min(1, "Enter the factory name.").max(100, "Name: at most 100 characters."),
@@ -49,11 +62,19 @@ export function factorySchema(bottles: { code: string; label: string }[]) {
     phone: z.string().trim().max(20, "Phone: at most 20 characters."),
     email,
     termsDays: terms,
-    charges: z.object(
-      Object.fromEntries(
-        bottles.map((b) => [b.code, moneyText(`Enter the charge per ${b.label} bottle (more than 0).`)]),
-      ),
-    ),
+    charges: z
+      .object(
+        Object.fromEntries(
+          bottles.map((b) => [
+            b.code,
+            optionalCharge(`Enter the charge per ${b.label} bottle (more than 0).`),
+          ]),
+        ),
+      )
+      .refine((c) => bottles.length === 0 || Object.values(c).some((v) => v !== ""), {
+        message: MSG_CHARGE_NONE,
+        path: [bottles[0]?.code ?? ""],
+      }),
     active: z.boolean(),
   });
 }

@@ -32,6 +32,8 @@ export interface GridCustomer {
   bottles: Record<string, Bottles>;
   usual: Record<string, number>;
   prices: Record<string, { price: number; agreed: boolean } | null>;
+  /** Inactive customers cannot get new bills (FR-13); warned as soon as chosen (N-06). Due customers are active. */
+  inactive?: boolean;
 }
 
 export interface Qty {
@@ -132,6 +134,7 @@ export function fromDetail(c: CustomerDetail): GridCustomer {
     bottles,
     usual: { ...c.usualQty },
     prices,
+    inactive: c.status !== "ACTIVE",
   };
 }
 
@@ -295,6 +298,9 @@ export function rowView(
   else if (iso && iso > today) err("Bills cannot be entered for a future date");
   const customerMissing = r.customerText.trim() !== "" && !r.customer;
   if (customerMissing) err("Customer not found");
+  // The server's wording (SalesService CUSTOMER_INACTIVE).
+  if (r.customer?.inactive)
+    err(`${r.customer.name} is inactive. Reactivate the customer before entering sales.`);
 
   const calc = rowCalc(r, cols);
   let overLimit = false;

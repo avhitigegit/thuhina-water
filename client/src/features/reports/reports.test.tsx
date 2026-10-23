@@ -125,6 +125,8 @@ const SALES: ReportView = {
   note: "Deposits count as revenue.",
 };
 
+const DELIVERY_NOTE = "The Delivery report shows at most the last 92 days of the range.";
+
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 let calls: { method: string; url: string; body: unknown }[] = [];
 let opened: string[] = [];
@@ -140,9 +142,14 @@ function server() {
       return json([
         { key: "sales", name: "Sales" },
         { key: "profit", name: "Profit" },
+        { key: "delivery", name: "Delivery" },
       ]);
     if (path.startsWith("/api/reports/")) {
       const key = path.split("/")[3];
+      if (key === "delivery") {
+        const to = new URL(url, "http://x").searchParams.get("to");
+        return json({ ...SALES, key, name: "Delivery", from: "2026-09-20", to, note: DELIVERY_NOTE });
+      }
       return json({ ...SALES, key, name: key === "profit" ? "Profit" : "Sales" });
     }
     if (path === "/api/admin/demo-data" && method === "POST")
@@ -304,6 +311,18 @@ describe("Reports", () => {
     await user.type(from, "20/10/2026");
     await user.click(screen.getByRole("button", { name: "Apply" }));
     expect(screen.getByText("The From date must be on or before the To date.")).toBeInTheDocument();
+  });
+});
+
+describe("Reports – shortened range", () => {
+  it("says at the top when the server shows a shorter range (N-11)", async () => {
+    search = "r=delivery";
+    renderWith(<Reports today={TODAY} />, [P.REPORTS_VIEW, P.REPORTS_ALL]);
+    expect(
+      await screen.findByText(
+        `You chose 01/09/2026 to 15/10/2026; this report shows 20/09/2026 to 15/10/2026. ${DELIVERY_NOTE}`,
+      ),
+    ).toBeInTheDocument();
   });
 });
 

@@ -130,6 +130,8 @@ export function Reports({ today = todayIso() }: { today?: string }) {
   const [error, setError] = useState("");
   const report = useReport(chosen, applied.from, applied.to);
   const v = report.data;
+  // The server shortened the range (e.g. the Delivery report shows at most 92 days) – say so at the top (N-11).
+  const cut = !!v && !!applied.from && (v.from > applied.from || v.to < applied.to);
 
   function apply(f = from, t = to) {
     if (!f || !t) {
@@ -218,6 +220,12 @@ export function Reports({ today = todayIso() }: { today?: string }) {
           <p className="small muted" style={{ margin: "0 0 8px" }} data-testid="rep-range">
             {v.name} report – {formatDate(v.from)} to {formatDate(v.to)}
           </p>
+          {cut && (
+            <div className="banner info" style={{ marginBottom: 8 }}>
+              You chose {formatDate(applied.from)} to {formatDate(applied.to)}; this report shows{" "}
+              {formatDate(v.from)} to {formatDate(v.to)}.{v.note && ` ${v.note}`}
+            </div>
+          )}
           {v.kpis.length > 0 && (
             <KpiGrid>
               {v.kpis.map((k) => (
@@ -243,7 +251,7 @@ export function Reports({ today = todayIso() }: { today?: string }) {
           {v.tables.map((t, i) => (
             <TableCard key={`${v.key}-${i}`} t={t} />
           ))}
-          {v.note && <p className="small muted">{v.note}</p>}
+          {v.note && !cut && <p className="small muted">{v.note}</p>}
         </>
       )}
     </>

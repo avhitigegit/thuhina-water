@@ -4,7 +4,8 @@
  * One quotation (prototype quotations.html "openQ", FR-65, FR-66): steps bar, banners (expired, not accepted, accepted with
  * the customer and prices), details, lines with the price now beside a changed price, history; buttons by step and role:
  * Print / PDF, Email (mailto with the server's text), Make a copy, Edit and Next: Mark as sent (draft), Not accepted (reason)
- * and Next: Accepted (sent, also expired), Apply prices to customer (from a date) and Register as customer (accepted).
+ * and Next: Accepted (sent, also expired), Apply prices to customer (from a date; warns which planned prices it cancels,
+ * N-14) and Register as customer (accepted).
  */
 import Link from "next/link";
 import { useState } from "react";
@@ -14,12 +15,14 @@ import { ReasonDialog } from "@/components/shared/ReasonDialog";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { StepBar } from "@/components/shared/StepBar";
 import { useCan } from "@/features/auth/access";
+import { useCustomerPrices } from "@/features/customers/api";
 import type { CqView } from "@/lib/api/types";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { errorText } from "@/lib/forms";
 import { P } from "@/lib/permissions";
 import { toast } from "@/lib/toast";
 import { quotationPdfUrl, useQuotation, useQuotationStep, type Step } from "./api";
+import { applyWarnings } from "./applyWarnings";
 
 export const SENT_VIA = [
   { value: "EMAIL", label: "Email" },
@@ -379,6 +382,8 @@ function ApplyDialog({
   onApply: (from: string) => void;
 }) {
   const [from, setFrom] = useState<string | null>(today);
+  const prices = useCustomerPrices(q.customerId ?? 0, q.customerId != null);
+  const warnings = from && prices.data ? applyWarnings(q.lines, prices.data, from) : [];
   return (
     <FormDialog
       open
@@ -396,6 +401,16 @@ function ApplyDialog({
         <label htmlFor="cq-from">From</label>
         <DateField id="cq-from" value={from} onChange={setFrom} today={today} />
       </div>
+      {warnings.length > 0 && (
+        <div className="banner warn" role="alert">
+          This also changes planned prices:
+          <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+            {warnings.map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </FormDialog>
   );
 }

@@ -122,7 +122,7 @@ export function Billing({ today = todayIso() }: { today?: string }) {
         />
       )}
       {tab === "invoices" && (
-        <InvoicesTab onOpen={setPanelId} onView={(id) => setDialog({ kind: "invoice", id })} />
+        <InvoicesTab onOpen={setPanelId} onView={(id) => setDialog({ kind: "invoice", id })} today={today} />
       )}
 
       <CustomerPanel customerId={panelId} onClose={() => setPanelId(null)} />

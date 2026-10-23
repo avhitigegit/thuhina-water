@@ -64,6 +64,13 @@ export function customerSchema(isNew: boolean, today: string, bottleCodes: strin
         if (q !== "" && !/^\d+$/.test(q))
           ctx.addIssue({ code: "custom", path: ["usualQty", code], message: "A whole number, 0 or more." });
       }
+      // Without a usual quantity the customer is "due" with nothing to load (N-09).
+      if (bottleCodes.length > 0 && !bottleCodes.some((code) => Number(v.usualQty[code] ?? "") > 0))
+        ctx.addIssue({
+          code: "custom",
+          path: ["usualQty", bottleCodes[0]],
+          message: "Enter the usual quantity for at least one bottle type.",
+        });
       if (v.payType !== "CASH") {
         if (!(Number(v.creditLimit) > 0))
           ctx.addIssue({

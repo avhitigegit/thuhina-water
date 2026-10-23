@@ -287,7 +287,11 @@ function server() {
             amount: 700,
           },
         ]);
-      if (path === "/api/invoices/preview") return json(PREVIEW);
+      if (path === "/api/invoices/preview") {
+        const period = new URL(url, "http://x").searchParams.get("period");
+        const o = PREVIEW.periods.find((x) => x.period === period);
+        return json(o ? { ...PREVIEW, period: o.period, periodLabel: o.label } : PREVIEW);
+      }
       if (path === "/api/invoices/41") return json(INVOICE);
       if (path === "/api/customers/lookup")
         return json([
@@ -545,6 +549,19 @@ describe("Billing & Payments", () => {
 
     await user.selectOptions(screen.getByLabelText("Month", { selector: "select" }), "2026-08");
     await waitFor(() => expect(calls.some((c) => /period=2026-08/.test(c.url))).toBe(true));
+  });
+
+  it("the current month can be viewed but not invoiced until it ends (N-13)", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole("tab", { name: "Monthly invoices" }));
+    await user.selectOptions(await screen.findByLabelText("Month", { selector: "select" }), "2026-10");
+    expect(
+      await screen.findByText(
+        "October 2026 has not ended yet, so these are the totals so far. Its invoices can be made from 01/11/2026.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Generate invoices" })).toBeDisabled();
   });
 
   it("opens an invoice from a link (?invoice=41)", async () => {

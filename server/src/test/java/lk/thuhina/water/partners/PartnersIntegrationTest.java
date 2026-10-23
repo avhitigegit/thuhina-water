@@ -188,7 +188,7 @@ class PartnersIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    void factoryNeedsANameAndAChargeForEveryActiveBottleType() throws Exception {
+    void factoryNeedsANameValidChargesAndTermsFromTheList() throws Exception {
         Map<String, Object> f = factory(0);
         f.put("name", "");
         mvc.perform(json(post("/factories"), admin, f))
@@ -205,6 +205,33 @@ class PartnersIntegrationTest extends IntegrationTest {
         f.put("termsDays", 90);
         mvc.perform(json(post("/factories"), admin, f))
                 .andExpect(jsonPath("$.details.fields.termsDays").value("Choose the payment terms from the list."));
+    }
+
+    @Test
+    void aFactoryCanLeaveOutSizesItDoesNotFillButNeedsOneCharge() throws Exception {
+        // Only this test's bottle: no charge for the other sizes (N-05).
+        Map<String, Object> f = factory(45);
+        f.put("charges", Map.of(bottle, 45));
+        Map<String, Object> created = read(mvc.perform(json(post("/factories"), admin, f))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.charges.length()").value(1))
+                .andExpect(jsonPath("$.charges[0].bottleTypeCode").value(bottle))
+                .andReturn());
+
+        // A charge already set cannot be made blank.
+        Map<String, Object> edit = factory(45);
+        edit.put("name", created.get("name"));
+        edit.put("charges", Map.of());
+        edit.put("version", created.get("version"));
+        mvc.perform(json(put("/factories/" + created.get("id")), admin, edit))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fields['charges." + bottle + "']").value(FactoryService.MSG_CHARGE_KEPT));
+
+        f = factory(45);
+        f.put("charges", Map.of());
+        mvc.perform(json(post("/factories"), admin, f))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fields").value(org.hamcrest.Matchers.hasValue(FactoryService.MSG_CHARGE_NONE)));
     }
 
     @Test

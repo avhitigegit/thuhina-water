@@ -16,6 +16,7 @@ import com.lowagie.text.pdf.PdfReader;
 import com.lowagie.text.pdf.parser.PdfTextExtractor;
 import jakarta.servlet.http.Cookie;
 import lk.thuhina.water.billing.rules.AgingRules.Aging;
+import lk.thuhina.water.billing.rules.InvoiceRules;
 import lk.thuhina.water.billing.service.AgingService;
 import lk.thuhina.water.billing.service.InvoiceGenerated;
 import lk.thuhina.water.sales.SalesTestSupport;
@@ -250,6 +251,10 @@ class BillingIntegrationTest extends SalesTestSupport {
 
         mvc.perform(json(post("/invoices/generate"), map("period", YearMonth.from(today).plusMonths(1).toString())))
                 .andExpect(status().isBadRequest());
+        // The current month cannot be invoiced before it ends (N-13).
+        mvc.perform(json(post("/invoices/generate"), map("period", YearMonth.from(today).toString())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fields.period").value(InvoiceRules.notEndedText(YearMonth.from(today).toString())));
         Map<String, Object> result = read(mvc.perform(json(post("/invoices/generate"), map("period", period))).andExpect(status().isOk()).andReturn());
         Map<String, Object> inv = ((List<Map<String, Object>>) result.get("created")).stream()
                 .filter(r -> ((Number) ((Map<String, Object>) r.get("customer")).get("id")).longValue() == c).findFirst().orElseThrow();

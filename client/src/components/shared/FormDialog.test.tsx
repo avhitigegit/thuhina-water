@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { DateField } from "./DateField";
 import { FormDialog } from "./FormDialog";
 
 function renderDialog(onSubmit = vi.fn(), onOpenChange = vi.fn()) {
@@ -16,6 +17,24 @@ function renderDialog(onSubmit = vi.fn(), onOpenChange = vi.fn()) {
 }
 
 describe("FormDialog", () => {
+  it("Escape in a date field closes only the calendar; the next Escape closes the pop-up (N-02)", async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    render(
+      <FormDialog open onOpenChange={onOpenChange} title="New expense" onSubmit={vi.fn()}>
+        <label htmlFor="d">Date paid</label>
+        <DateField id="d" value={null} onChange={vi.fn()} today="2026-10-09" />
+      </FormDialog>,
+    );
+    await user.click(screen.getByLabelText("Date paid"));
+    expect(screen.getByRole("dialog", { name: "Choose a date" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Choose a date" })).not.toBeInTheDocument();
+    expect(onOpenChange).not.toHaveBeenCalled();
+    await user.keyboard("{Escape}");
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
   it("Enter moves to the next field and does not save", async () => {
     const user = userEvent.setup();
     const { onSubmit } = renderDialog();

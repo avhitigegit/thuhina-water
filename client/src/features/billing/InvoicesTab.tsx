@@ -4,7 +4,8 @@
  * Monthly invoices (FR-49, prototype billing.html): month (this and the 3 before, default last month), one row per Monthly
  * bill customer – deliveries, this month, previous balance, payments, total due, Generated + number / Not generated,
  * View / Print. Generate invoices (confirm) makes one invoice per customer for the month; the toast says how many were
- * made and why the others were skipped. The invoice pop-up lists every line with the totals and prints the PDF.
+ * made and why the others were skipped. The current month can be viewed but not invoiced until it has ended (N-13). The
+ * invoice pop-up lists every line with the totals and prints the PDF.
  */
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -13,7 +14,7 @@ import { FormDialog } from "@/components/shared/FormDialog";
 import { Badge } from "@/components/shared/StatusBadge";
 import { Can } from "@/features/auth/access";
 import type { GenerateResult, InvoiceMonthRow } from "@/lib/api/types";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, todayIso } from "@/lib/format";
 import { errorText } from "@/lib/forms";
 import { P } from "@/lib/permissions";
 import { toast } from "@/lib/toast";
@@ -38,18 +39,27 @@ export function generatedText(r: GenerateResult): string {
   return text;
 }
 
+/** The first day after the month: "2026-11-01" for "2026-10". */
+function nextMonthStart(period: string): string {
+  const [y, m] = period.split("-").map(Number);
+  return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+}
+
 export function InvoicesTab({
   onOpen,
   onView,
+  today = todayIso(),
 }: {
   onOpen: (customerId: number) => void;
   onView: (invoiceId: number) => void;
+  today?: string;
 }) {
   const [period, setPeriod] = useState<string | null>(null);
   const preview = useInvoicePreview(period);
   const generate = useGenerateInvoices();
   const [confirm, setConfirm] = useState(false);
   const p = preview.data;
+  const notEnded = !!p && p.period === today.slice(0, 7);
 
   function runGenerate() {
     if (!p) return;
@@ -140,7 +150,7 @@ export function InvoicesTab({
             <button
               className="btn primary"
               type="button"
-              disabled={!p || p.toGenerate === 0}
+              disabled={!p || p.toGenerate === 0 || notEnded}
               onClick={() => setConfirm(true)}
             >
               Generate invoices
@@ -150,6 +160,12 @@ export function InvoicesTab({
         <p className="small muted" style={{ marginTop: 6 }}>
           Monthly bill customers get one invoice per month listing every delivery.
         </p>
+        {notEnded && (
+          <div className="banner info" style={{ marginTop: 6 }}>
+            {p.periodLabel} has not ended yet, so these are the totals so far. Its invoices can be made from{" "}
+            {formatDate(nextMonthStart(p.period))}.
+          </div>
+        )}
       </div>
       <div className="card">
         {preview.isError ? (

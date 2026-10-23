@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AccessProvider } from "@/features/auth/access";
 import type { MeResponse, Supplier } from "@/lib/api/types";
 import { P } from "@/lib/permissions";
-import { factorySchema, MSG_ITEMS, supplierSchema, TERMS } from "./schemas";
+import { factorySchema, MSG_CHARGE_NONE, MSG_ITEMS, supplierSchema, TERMS } from "./schemas";
 import { SuppliersTab } from "./SuppliersTab";
 
 const SUPPLIER: Supplier = {
@@ -103,7 +103,7 @@ describe("supplier form rules", () => {
     expect(TERMS.map((t) => t.days)).toEqual([0, 7, 14, 30, 45, 60]);
   });
 
-  it("factory needs a charge for every active bottle type", () => {
+  it("factory needs a charge for at least one bottle type; an empty one = does not fill that size (N-05)", () => {
     const schema = factorySchema([
       { code: "B20", label: "20L" },
       { code: "B10", label: "10L" },
@@ -119,9 +119,14 @@ describe("supplier form rules", () => {
       active: true,
     };
     expect(schema.safeParse({ ...base, charges: { B20: "60", B10: "35" } }).success).toBe(true);
-    const r = schema.safeParse({ ...base, charges: { B20: "60", B10: "" } });
-    expect(r.error?.issues.map((i) => [i.path.join("."), i.message])).toEqual([
+    expect(schema.safeParse({ ...base, charges: { B20: "60", B10: "" } }).success).toBe(true);
+    const zero = schema.safeParse({ ...base, charges: { B20: "60", B10: "0" } });
+    expect(zero.error?.issues.map((i) => [i.path.join("."), i.message])).toEqual([
       ["charges.B10", "Enter the charge per 10L bottle (more than 0)."],
+    ]);
+    const none = schema.safeParse({ ...base, charges: { B20: "", B10: "" } });
+    expect(none.error?.issues.map((i) => [i.path.join("."), i.message])).toEqual([
+      ["charges.B20", MSG_CHARGE_NONE],
     ]);
   });
 });

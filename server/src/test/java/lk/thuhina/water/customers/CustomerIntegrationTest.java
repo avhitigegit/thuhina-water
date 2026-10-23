@@ -17,6 +17,7 @@ import java.util.Map;
 import jakarta.servlet.http.Cookie;
 import lk.thuhina.water.common.BusinessDates;
 import lk.thuhina.water.common.BusinessException;
+import lk.thuhina.water.customers.service.CustomerService;
 import lk.thuhina.water.delivery.rules.ScheduleRules;
 import lk.thuhina.water.ledger.model.CustomerField;
 import lk.thuhina.water.ledger.model.Effect;
@@ -82,6 +83,13 @@ class CustomerIntegrationTest extends CustomerTestSupport {
         req.put("registeredOn", today.plusDays(1).toString());
         mvc.perform(json(post("/customers/register"), req))
                 .andExpect(jsonPath("$.details.fields.registeredOn").value("Registration date cannot be in the future."));
+
+        // At least one bottle type needs a usual quantity (N-09).
+        req = customer("No usual");
+        req.put("usualQty", Map.of(bottle, 0));
+        mvc.perform(json(post("/customers/register"), req))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fields.usualQty").value(CustomerService.MSG_USUAL));
     }
 
     @Test

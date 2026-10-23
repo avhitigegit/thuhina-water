@@ -66,7 +66,7 @@ class RegistrationWithBottlesTest extends SalesTestSupport {
                 .andReturn();
         String text = new PdfTextExtractor(new PdfReader(pdf.getResponse().getContentAsByteArray())).getTextFromPage(1).replaceAll("\\s+", " ");
         assertThat(text).contains("BILL", (String) bill.get("billNo"), "Water – " + label + " S", "Bottle deposit – " + label + " (not refundable)",
-                "Old " + brandName + " bottles handed in – no deposit", "Rs. 3,050.00", "Account balance now", "Bottles held: 3 × " + label,
+                "Old " + brandName + " bottles handed in – no deposit", "Rs. 3,050.00", "Account balance now", "Bottles held now: 3 × " + label + " · next delivery",
                 "Customer signature", "First purchase – Bottles given at registration");
     }
 

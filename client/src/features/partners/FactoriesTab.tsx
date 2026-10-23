@@ -2,8 +2,9 @@
 
 /*
  * Filling factories tab (FR-22, BR-11, prototype master-data/suppliers.html): factory + code, contact, charge per bottle
- * ("20L Rs. 60.00 · 10L Rs. 35.00"), terms, at factory now, owed, status, Edit. Pop-up with a charge for every
- * active bottle type – a new charge applies to batches sent after saving. Admin full; Accountant view only.
+ * ("20L Rs. 60.00 · 10L Rs. 35.00"), terms, at factory now, owed, status, Edit. Pop-up with a charge for each
+ * active bottle type it fills (empty = does not fill that size, N-05) – a new charge applies to batches sent after
+ * saving. Admin full; Accountant view only.
  */
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
@@ -77,7 +78,12 @@ function FactoryDialog({
         body: {
           ...v,
           termsDays: Number(v.termsDays),
-          charges: Object.fromEntries(Object.entries(v.charges).map(([k, c]) => [k, Number(c)])),
+          // A blank charge is left out: the factory does not fill that size (N-05).
+          charges: Object.fromEntries(
+            Object.entries(v.charges)
+              .filter(([, c]) => c.trim() !== "")
+              .map(([k, c]) => [k, Number(c)]),
+          ),
           version: factory?.version,
         },
       },
@@ -166,7 +172,7 @@ function FactoryDialog({
         {bottles.map((b) => {
           const err = errors.charges?.[b.code];
           return (
-            <div className="field req" key={b.code}>
+            <div className="field" key={b.code}>
               <label htmlFor={`fac-charge-${b.code}`}>Charge per {sizeLabel(b)} bottle (Rs.)</label>
               <input
                 id={`fac-charge-${b.code}`}
@@ -186,7 +192,10 @@ function FactoryDialog({
           </label>
         )}
       </div>
-      <p className="small muted">A new charge applies to batches sent after saving.</p>
+      <p className="small muted">
+        Leave a charge empty if the factory does not fill that size. A new charge applies to batches sent
+        after saving.
+      </p>
     </FormDialog>
   );
 }
