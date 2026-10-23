@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import lk.thuhina.water.common.BusinessDates;
 import lk.thuhina.water.common.Money;
 import lk.thuhina.water.customers.model.PayType;
 
@@ -81,7 +82,10 @@ public final class InvoiceRules {
         return YearMonth.from(today).minusMonths(1).toString();
     }
 
-    /** Null when the month can be invoiced; otherwise the message. */
+    /**
+     * Null when the month can be invoiced; otherwise the message. The current month is shown (running totals) but cannot be
+     * invoiced until it has ended, so every bill of the month is on the invoice (N-13).
+     */
     public static String periodProblem(String period, LocalDate today) {
         if (!isPeriod(period)) {
             return "Choose the month.";
@@ -89,7 +93,16 @@ public final class InvoiceRules {
         if (!periods(today).contains(period)) {
             return "Choose this month or one of the " + MONTHS_BACK + " months before it.";
         }
+        if (period.equals(period(today))) {
+            return notEndedText(period);
+        }
         return null;
+    }
+
+    /** "October 2026 has not ended yet. Its invoices can be made from 01/11/2026." */
+    public static String notEndedText(String period) {
+        return periodLabel(period) + " has not ended yet. Its invoices can be made from "
+                + BusinessDates.format(YearMonth.parse(period).plusMonths(1).atDay(1)) + ".";
     }
 
     /** Why a customer gets no invoice for the month; null = gets one. */

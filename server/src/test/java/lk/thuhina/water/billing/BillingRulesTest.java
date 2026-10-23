@@ -95,6 +95,8 @@ class BillingRulesTest {
         assertThat(InvoiceRules.periods(AS_OF)).containsExactly("2026-10", "2026-09", "2026-08", "2026-07");
         assertThat(InvoiceRules.defaultPeriod(AS_OF)).isEqualTo("2026-09");
         assertThat(InvoiceRules.periodProblem("2026-09", AS_OF)).isNull();
+        assertThat(InvoiceRules.periodProblem("2026-10", AS_OF))
+                .isEqualTo("October 2026 has not ended yet. Its invoices can be made from 01/11/2026.");
         assertThat(InvoiceRules.periodProblem("2026-11", AS_OF)).isEqualTo("Choose this month or one of the 3 months before it.");
         assertThat(InvoiceRules.periodProblem("2026-13", AS_OF)).isEqualTo("Choose the month.");
         assertThat(InvoiceRules.periodLabel("2026-09")).isEqualTo("September 2026");

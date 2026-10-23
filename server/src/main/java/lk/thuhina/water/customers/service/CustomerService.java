@@ -63,6 +63,7 @@ public class CustomerService {
     public static final String DUP_PHONE = "DUP_PHONE";
     static final String ENTITY = "Customer";
     public static final String MSG_PHONE = "Phone must be a Sri Lankan number, e.g. 077 123 4567 or 011 285 4471.";
+    public static final String MSG_USUAL = "Enter the usual quantity for at least one bottle type.";
     private static final Pattern PHONE = Pattern.compile("^0\\d{2} ?\\d{3} ?\\d{4}$");
     private static final List<Integer> CREDIT_TERMS = List.of(7, 14, 30, 45, 60);
 
@@ -266,6 +267,10 @@ public class CustomerService {
                     usual.put(e.getKey(), q);
                 }
             }
+        }
+        // Without a usual quantity the customer is "due" with nothing to load (N-09).
+        if (usual.isEmpty()) {
+            throw new ValidationException("usualQty", MSG_USUAL);
         }
         boolean optIn = Boolean.TRUE.equals(r.whatsappOptIn());
         String wa = Texts.blankToNull(r.whatsappNumber());

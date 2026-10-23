@@ -19,6 +19,7 @@ import { CustomerPanel } from "@/features/customers/CustomerPanel";
 import { cycleShort, DAYS, dayName, payLabel, PAY_TYPES } from "@/features/customers/labels";
 import { StatusDialog } from "@/features/customers/StatusDialog";
 import { TypesAreasDialog } from "@/features/customers/TypesAreasDialog";
+import { usualFromQuote } from "@/features/quotations/usualFromQuote";
 import { api } from "@/lib/api/client";
 import type { CqView, CustomerListRow, CustomerLookupRow } from "@/lib/api/types";
 import { formatDate } from "@/lib/format";
@@ -96,6 +97,7 @@ function CustomersPage() {
           notes: q.registerNotes,
           agreedPrices: Object.fromEntries(q.agreedPrices.map((a) => [a.bottleTypeCode, a.price])),
           agreedReason: `Quotation ${q.cqNo} accepted`,
+          usualQty: usualFromQuote(q.lines),
         });
         setEditing(null);
       })

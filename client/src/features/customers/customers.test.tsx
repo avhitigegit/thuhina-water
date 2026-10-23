@@ -348,6 +348,13 @@ describe("CustomerDialog", () => {
     await user.type(within(dialog).getByLabelText("Phone"), "075 882 1043");
     await user.type(within(dialog).getByLabelText("Address"), "5, Lake Road");
     await user.selectOptions(within(dialog).getByLabelText("Area"), "1");
+    // A usual quantity is required for at least one bottle type (N-09).
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(
+      await within(dialog).findByText("Enter the usual quantity for at least one bottle type."),
+    ).toBeInTheDocument();
+    expect(posts).toBe(0);
+    await user.type(within(dialog).getByLabelText("Usual 20L per delivery"), "2");
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
     const confirm = await screen.findByRole("dialog", { name: "Phone already used" });
@@ -362,11 +369,107 @@ describe("CustomerDialog", () => {
     expect(bodies[0]).toMatchObject({
       allowDuplicatePhone: false,
       deliveryDay: 3,
+      usualQty: { B20: 2 },
       payType: "CASH",
       areaId: 1,
       customerTypeId: 1,
     });
     expect(bodies[1].allowDuplicatePhone).toBe(true);
+  });
+
+  it("offers a brand choice when more than one old-bottle brand is accepted for the size (N-03)", async () => {
+    const user = userEvent.setup();
+    const { fetch, wrap } = setup(
+      [P.CUSTOMERS_VIEW, P.CUSTOMERS_EDIT, P.MASTERDATA_VIEW, P.SALES_EDIT],
+      (url, init) => {
+        if (url === "/api/areas")
+          return {
+            status: 200,
+            body: [{ id: 1, name: "Nugegoda", active: true, activeCustomers: 3, version: 0 }],
+          };
+        if (url === "/api/customer-types")
+          return {
+            status: 200,
+            body: [
+              { id: 1, name: "Household", description: null, active: true, activeCustomers: 3, version: 0 },
+            ],
+          };
+        if (url === "/api/bottle-types")
+          return {
+            status: 200,
+            body: [
+              {
+                code: "B20",
+                name: "20L Bottle",
+                litres: 20,
+                active: true,
+                deposit: 1000,
+                inCirculation: null,
+                version: 0,
+              },
+            ],
+          };
+        if (url === "/api/prices/current")
+          return {
+            status: 200,
+            body: { date: todayIso(), bottleTypes: [], customerTypes: [], deposits: [], water: [] },
+          };
+        if (url === "/api/old-bottle-brands")
+          return {
+            status: 200,
+            body: [
+              { id: 1, name: "American Water", bottleTypeCode: "B20", active: true, version: 0 },
+              { id: 2, name: "Test Brand", bottleTypeCode: "B20", active: true, version: 0 },
+            ],
+          };
+        if (url === "/api/customers/register/preview")
+          return {
+            status: 200,
+            body: {
+              lines: [],
+              water: 700,
+              deposit: 2000,
+              amount: 2700,
+              paid: 2700,
+              credit: { balance: 0, after: 0, limit: 0, exceeds: false },
+              problems: [],
+            },
+          };
+        if (url === "/api/customers/register" && init?.method === "POST")
+          return { status: 201, body: { customer: { ...C0008, id: 41, code: "C0041" }, agreedPricesSet: 0 } };
+        return { status: 200, body: [] };
+      },
+    );
+    render(wrap(<CustomerDialog customerId={null} onClose={vi.fn()} />));
+    const dialog = await screen.findByRole("dialog", { name: "New customer" });
+    await within(dialog).findByRole("option", { name: "Nugegoda" });
+    expect(await within(dialog).findByRole("combobox", { name: "Old bottle brand" })).toHaveValue("1");
+    expect(within(dialog).getByLabelText("Old bottles handed in")).toBeInTheDocument();
+
+    await user.type(within(dialog).getByLabelText("Name"), "Nimali Silva");
+    await user.type(within(dialog).getByLabelText("Phone"), "075 882 1043");
+    await user.type(within(dialog).getByLabelText("Address"), "5, Lake Road");
+    await user.selectOptions(within(dialog).getByLabelText("Area"), "1");
+    await user.type(within(dialog).getByLabelText("Usual 20L per delivery"), "2");
+    await user.selectOptions(within(dialog).getByLabelText("Old bottle brand"), "2");
+    await user.clear(within(dialog).getByLabelText("Old bottles handed in"));
+    await user.type(within(dialog).getByLabelText("Old bottles handed in"), "1");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await vi.waitFor(() =>
+      expect(
+        fetch.mock.calls.some(
+          ([u, i]) => u.split("?")[0] === "/api/customers/register" && i?.method === "POST",
+        ),
+      ).toBe(true),
+    );
+    const body = JSON.parse(
+      String(
+        fetch.mock.calls.find(
+          ([u, i]) => u.split("?")[0] === "/api/customers/register" && i?.method === "POST",
+        )![1]!.body,
+      ),
+    );
+    expect(body).toMatchObject({ oldBottles: 1, oldBrandId: 2 });
   });
 
   it("registers from an accepted quotation with its details and quoted price, linked to it (M16)", async () => {
@@ -442,6 +545,7 @@ describe("CustomerDialog", () => {
             notes: "From quotation QT-2026-001 · contact Mrs. W.A. Dilrukshi",
             agreedPrices: { B20: 300 },
             agreedReason: "Quotation QT-2026-001 accepted",
+            usualQty: { B20: 10 },
           }}
           onClose={vi.fn()}
         />,
@@ -452,6 +556,7 @@ describe("CustomerDialog", () => {
     expect(within(dialog).getByLabelText("Name")).toHaveValue("Divisional Secretariat – Maharagama");
     expect(within(dialog).getByLabelText("Customer type")).toHaveValue("3");
     expect(within(dialog).getByLabelText("20L agreed price (Rs.)")).toHaveValue(300);
+    expect(within(dialog).getByLabelText("Usual 20L per delivery")).toHaveValue(10);
     expect(within(dialog).getByLabelText("Reason for the agreed price")).toHaveValue(
       "Quotation QT-2026-001 accepted",
     );
@@ -475,6 +580,7 @@ describe("CustomerDialog", () => {
       fromQuotationId: 7,
       customerTypeId: 3,
       areaId: 2,
+      usualQty: { B20: 10 },
       agreedPrices: { B20: 300 },
       agreedReason: "Quotation QT-2026-001 accepted",
     });

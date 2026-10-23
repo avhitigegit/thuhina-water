@@ -158,6 +158,16 @@ describe("Enter Bills grid model", () => {
     });
   });
 
+  it("an inactive customer is an error as soon as chosen (N-06)", () => {
+    const r = rowFor({ ...CUST, inactive: true }, COLS, "2026-10-12", "typed");
+    const v = rowView(r, [r], COLS, "2026-10-12", null);
+    expect(v.hasError).toBe(true);
+    expect(v.msgs[0]).toEqual({
+      kind: "err",
+      text: `${CUST.name} is inactive. Reactivate the customer before entering sales.`,
+    });
+  });
+
   it("live result: duplicates, unknown customer, future date, shortage note, left at door", () => {
     const a = { ...rowFor(CUST, COLS, "2026-10-12", "typed"), paper: "500" };
     const b = { ...emptyRow("2026-10-13"), paper: "500", customerText: "Nobody" };

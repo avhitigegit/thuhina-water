@@ -7,7 +7,6 @@ import { PageActionsSlotContext } from "@/components/layout/PageActions";
 import { Toaster } from "@/components/shared/Toaster";
 import { AccessProvider } from "@/features/auth/access";
 import type { ExpenseMonthView, ExpenseRow, ExpenseSummary, ExpenseType, MeResponse } from "@/lib/api/types";
-import { toCsv } from "@/lib/csv";
 import { P } from "@/lib/permissions";
 import { Expenses } from "./Expenses";
 
@@ -209,17 +208,6 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-describe("CSV", () => {
-  it("quotes every cell and doubles quotes", () => {
-    expect(
-      toCsv([
-        ["Type", "Total"],
-        ['Say "hi"', 1250],
-      ]),
-    ).toBe('"Type","Total"\r\n"Say ""hi""","1250"');
-  });
-});
-
 describe("Expenses", () => {
   it("shows the month's KPIs, the list with the paid-in-another-month mark, totals and bars", async () => {
     const user = userEvent.setup();
@@ -232,7 +220,7 @@ describe("Expenses", () => {
     expect(prev).toHaveTextContent("−Rs. 50,330.00 this month");
     expect(screen.getByText("Biggest expense type").parentElement).toHaveTextContent("SalariesRs. 46,000.00");
     const elec = (await screen.findByText("Store – September bill")).closest("tr") as HTMLElement;
-    expect(elec).toHaveTextContent("02/10/2026paid Oct");
+    expect(elec).toHaveTextContent("EX-002002/10/2026paid Oct");
     expect(elec).toHaveTextContent("CEB · bill A/C 4471230981");
     const foot = screen.getByText("Total", { selector: "td" }).closest("tr") as HTMLElement;
     expect(foot).toHaveTextContent("2 entries");
@@ -316,19 +304,18 @@ describe("Expenses", () => {
 
   it("shows month by month, opens a month from it and exports Excel", async () => {
     const user = userEvent.setup();
-    const createObjectURL = vi.fn(() => "blob:x");
-    vi.stubGlobal("URL", Object.assign(URL, { createObjectURL, revokeObjectURL: vi.fn() }));
-    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     renderPage();
     await user.click(screen.getByRole("tab", { name: "Month by month" }));
     expect(await screen.findByTestId("summary-total")).toHaveTextContent("150,850");
     const salaries = screen.getByText("Salaries", { selector: "b" }).closest("tr") as HTMLElement;
     expect(salaries).toHaveTextContent("46,00046,000–92,000");
-    await user.click(screen.getByRole("button", { name: "Export Excel" }));
-    expect(createObjectURL).toHaveBeenCalled();
-    expect(click).toHaveBeenCalled();
-    click.mockRestore();
-    expect(await screen.findByText("Excel (CSV) file downloaded")).toBeInTheDocument();
+    // A real .xlsx: the Expenses report for the months shown (Step 4).
+    expect(screen.getByRole("link", { name: "Export Excel" })).toHaveAttribute(
+      "href",
+      expect.stringMatching(
+        /^\/api\/reports\/expenses\/export\?format=xlsx&from=2026-08-01&to=2026-\d\d-\d\d$/,
+      ),
+    );
 
     await user.click(screen.getByRole("button", { name: "August ’26" }));
     expect(await screen.findByRole("heading", { name: "Expenses for August 2026" })).toBeInTheDocument();

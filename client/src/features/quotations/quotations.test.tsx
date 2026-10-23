@@ -200,6 +200,32 @@ const ITEMS = (type: string | null, customer: string | null): CqItemOption[] => 
   ];
 };
 
+/** C0004: 20L at 280 until 30/11 (then back to the standard price). */
+const PRICES = [
+  {
+    id: 9,
+    cpNo: "CP0009",
+    customerId: 4,
+    customerCode: "C0004",
+    customerName: "Vertex Software (Pvt) Ltd",
+    customerTypeName: "Office",
+    bottleTypeCode: "B20",
+    label: "20L",
+    price: 280,
+    standardAtSet: 320,
+    standardNow: 320,
+    validFrom: "2026-09-01",
+    validUntil: "2026-11-30",
+    reason: "Opening offer",
+    quotationId: null,
+    state: "IN_FORCE",
+    cancelReason: null,
+    createdBy: "nimal.admin",
+    createdByName: "Nimal Perera",
+    bottlesPerMonth: 40,
+  },
+];
+
 type Fetch = (url: string, init?: RequestInit) => Promise<Response>;
 let calls: { method: string; url: string; path: string; body: unknown }[] = [];
 let opened: string[] = [];
@@ -239,6 +265,7 @@ function server() {
         ]);
       if (path === "/api/customers/4")
         return json({ id: 4, code: "C0004", customerTypeId: 3, name: "Vertex Software (Pvt) Ltd" });
+      if (path === "/api/customers/4/prices") return json(PRICES);
     }
     if (path === "/api/customer-quotations" && method === "POST")
       return json(
@@ -455,6 +482,9 @@ describe("Customer Quotations", () => {
     await user.click(within(dialog).getByRole("button", { name: "Apply prices to customer" }));
     const apply = await screen.findByRole("dialog", { name: "Apply quoted prices?" });
     expect(within(apply).getByLabelText("From")).toHaveValue("14/10/2026");
+    expect(await within(apply).findByRole("alert")).toHaveTextContent(
+      "This also changes planned prices:20L: the plan to go back to the standard price from 01/12/2026 will be removed.",
+    );
     await user.click(within(apply).getByRole("button", { name: "Apply prices" }));
     await waitFor(() => expect(posted(/\/apply-prices$/)).toHaveLength(1));
     expect(posted(/\/apply-prices$/)[0].body).toEqual({ from: TODAY });

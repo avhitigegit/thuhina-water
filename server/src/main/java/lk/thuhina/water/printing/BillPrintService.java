@@ -78,8 +78,9 @@ public class BillPrintService {
             party.add(t.customerAddress() + ", " + c.get("area"));
             party.add(t.customerPhone() + " · " + PayType.valueOf(t.payType()).label());
             summary.add(new PrintDocument.SummaryRow("Account balance now", Money.format((BigDecimal) c.get("balance")), false));
+            // A reprint shows the account as it is now, not on the bill date (N-08) – hence "now" on both lines.
             LocalDate next = ((java.sql.Date) c.get("next_delivery_date")).toLocalDate();
-            footer.add("Bottles held: " + held(t.customerId()) + " · next delivery "
+            footer.add("Bottles held now: " + held(t.customerId()) + " · next delivery "
                     + next.getDayOfWeek().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + BusinessDates.format(next));
         }
         String subtitle = t.kindLabel() + (t.note() == null ? "" : " – " + t.note());
@@ -133,8 +134,9 @@ public class BillPrintService {
     }
 
     private String held(long customerId) {
+        // Only the bottle types the customer holds (N-04).
         List<String> parts = jdbc.query("select b.held, t.litres from customer_bottle_balance b join bottle_type t on t.code = b.bottle_type_code "
-                        + "where b.customer_id = :c and (t.active or b.held > 0) order by t.litres desc",
+                        + "where b.customer_id = :c and b.held > 0 order by t.litres desc",
                 new MapSqlParameterSource("c", customerId),
                 (rs, i) -> rs.getInt("held") + " × " + LedgerRules.bottleLabel(rs.getBigDecimal("litres")));
         return parts.isEmpty() ? "none" : String.join(", ", parts);

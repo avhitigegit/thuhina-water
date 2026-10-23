@@ -2,8 +2,8 @@
 
 /*
  * Users tab (prototype admin/administration.html): name with a "you" badge, username, role badge, phone, last login,
- * status, and Edit / Reset password / Deactivate | Activate. Nobody can deactivate their own account or reset their
- * own password here (they use Change password in the top bar).
+ * status, and Edit / Reset password / Deactivate | Activate. Nobody can deactivate their own account (no button on
+ * their row) or reset their own password here (they use Change password in the top bar).
  */
 import { useState } from "react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -138,16 +138,13 @@ export function UsersTab() {
           >
             Reset password
           </button>
+          {/* Your own account cannot be deactivated, so no button on your row (N-12). */}
           {u.active ? (
-            <button
-              className="btn sm danger"
-              type="button"
-              disabled={isSelf(u)}
-              title={isSelf(u) ? "You cannot deactivate your own account." : undefined}
-              onClick={() => setToDeactivate(u)}
-            >
-              Deactivate
-            </button>
+            !isSelf(u) && (
+              <button className="btn sm danger" type="button" onClick={() => setToDeactivate(u)}>
+                Deactivate
+              </button>
+            )
           ) : (
             <button
               className="btn sm"

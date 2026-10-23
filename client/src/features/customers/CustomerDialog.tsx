@@ -81,6 +81,8 @@ export interface CustomerPrefill {
   /** Quoted water prices that differ from the standard price, by bottle type. */
   agreedPrices: Record<string, number>;
   agreedReason: string;
+  /** Usual quantity per delivery from the quoted water lines (N-09). */
+  usualQty?: Record<string, number>;
 }
 
 /** Opens the pop-up for a new customer (`customerId` null) or loads the customer first. */
@@ -140,6 +142,8 @@ function CustomerForm({
   const [allowDup, setAllowDup] = useState(false);
   // Cash paid on the registration bills: the total for Cash customers (0 otherwise) until typed in.
   const [paidText, setPaidText] = useState<string | null>(null);
+  // Old-bottle brand chosen when more than one is accepted for the size ("" = the first, N-03).
+  const [oldBrand, setOldBrand] = useState("");
   const brands = useOldBottleBrands();
   const [status, setStatus] = useState({
     value: customer?.status ?? "ACTIVE",
@@ -178,7 +182,9 @@ function CustomerForm({
       deliveryDay: String(defaultDay),
       cycleWeeks: String(customer?.cycleWeeks ?? 1),
       nextDeliveryDate: customer?.nextDeliveryDate ?? nextDeliveryAfter(today, defaultDay),
-      usualQty: Object.fromEntries(Object.entries(customer?.usualQty ?? {}).map(([k, v]) => [k, String(v)])),
+      usualQty: Object.fromEntries(
+        Object.entries(customer?.usualQty ?? prefill?.usualQty ?? {}).map(([k, v]) => [k, String(v)]),
+      ),
       payType: (customer?.payType as CustomerValues["payType"]) ?? "CASH",
       creditLimit: customer && customer.creditLimit > 0 ? String(customer.creditLimit) : "",
       termsDays: String(customer && customer.termsDays > 0 ? customer.termsDays : 30),
@@ -235,9 +241,8 @@ function CustomerForm({
   const rp = anyGiven ? regPreview.data : undefined;
   const paidValue = paidText ?? (rp ? String(payType === "CASH" ? Number(rp.amount) : 0) : "");
   const paidNumber = Number(paidValue) || 0;
-  const oldBrandNames = (brands.data ?? [])
-    .filter((b) => b.active && b.bottleTypeCode === mainBottle)
-    .map((b) => b.name);
+  const oldBrands = (brands.data ?? []).filter((b) => b.active && b.bottleTypeCode === mainBottle);
+  const oldBrandId = oldBrands.find((b) => String(b.id) === oldBrand)?.id ?? oldBrands[0]?.id;
 
   // A new customer starts as Household once the types have loaded (the prototype's default).
   const household = types.data?.find((t) => t.name === "Household" && t.active)?.id;
@@ -302,6 +307,7 @@ function CustomerForm({
               ? Object.fromEntries(bottles.map((b) => [b.code, whole(v.bottlesGiven[b.code])]))
               : {},
             oldBottles: canSell ? whole(v.oldBottles) : 0,
+            oldBrandId: canSell && whole(v.oldBottles) > 0 ? oldBrandId : undefined,
             paid: anyGiven ? paidNumber : 0,
             approveOverLimit,
             fromQuotationId: prefill?.quotationId,
@@ -527,9 +533,10 @@ function CustomerForm({
                 id={`cu-usual-${b.code}`}
                 type="number"
                 min="0"
-                className="num"
+                className={errors.usualQty?.[b.code] ? "invalid num" : "num"}
                 {...register(`usualQty.${b.code}`)}
               />
+              {errors.usualQty?.[b.code] && <span className="error">{errors.usualQty[b.code]?.message}</span>}
             </div>
           ))}
 
@@ -654,10 +661,26 @@ function CustomerForm({
                   )}
                 </div>
               ))}
+              {oldBrands.length > 1 && (
+                <div className="field">
+                  <label htmlFor="cu-oldBrand">Old bottle brand</label>
+                  <select
+                    id="cu-oldBrand"
+                    value={String(oldBrandId)}
+                    onChange={(e) => setOldBrand(e.target.value)}
+                  >
+                    {oldBrands.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="field">
                 <label htmlFor="cu-oldBottles">
-                  {oldBrandNames.length
-                    ? `Old ${oldBrandNames.join(" / ")} bottles handed in`
+                  {oldBrands.length === 1
+                    ? `Old ${oldBrands[0].name} bottles handed in`
                     : "Old bottles handed in"}
                 </label>
                 <input

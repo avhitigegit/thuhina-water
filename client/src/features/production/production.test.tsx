@@ -253,8 +253,12 @@ describe("Filling Factory", () => {
     await user.clear(b20);
     await user.type(b20, "50");
     expect(within(dialog).getByText(/Only 48 empty 20L in store/)).toBeInTheDocument();
-    // Pure Lanka has no charge for 10L.
+    // Pure Lanka has no charge for 10L: none are offered (N-05), and typing some warns.
     await user.selectOptions(within(dialog).getByLabelText("Filling factory"), "2");
+    expect(within(dialog).getByLabelText("Sent now 10L")).toHaveValue(0);
+    expect(within(dialog).queryByText(/Pure Lanka has no filling charge for 10L/)).not.toBeInTheDocument();
+    await user.clear(within(dialog).getByLabelText("Sent now 10L"));
+    await user.type(within(dialog).getByLabelText("Sent now 10L"), "5");
     expect(within(dialog).getByText(/Pure Lanka has no filling charge for 10L/)).toBeInTheDocument();
     await user.selectOptions(within(dialog).getByLabelText("Filling factory"), "1");
     await user.clear(b20);

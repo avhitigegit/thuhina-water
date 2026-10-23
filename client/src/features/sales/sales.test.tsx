@@ -519,6 +519,7 @@ describe("Registration with bottles", () => {
     await user.type(within(dialog).getByLabelText("Phone"), "075 882 1043");
     await user.type(within(dialog).getByLabelText("Address"), "5, Lake Road");
     await user.selectOptions(within(dialog).getByLabelText("Area"), "1");
+    await user.type(within(dialog).getByLabelText("Usual 20L per delivery"), "3");
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
 
     const done = await screen.findByRole("dialog", { name: "Customer registered" });
