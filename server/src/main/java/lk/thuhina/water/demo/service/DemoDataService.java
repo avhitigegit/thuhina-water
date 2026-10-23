@@ -7,6 +7,8 @@ import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -275,9 +277,7 @@ public class DemoDataService {
 
     private void dispatch(LocalDate d, List<Long> openBatches, Run run) {
         Long factory = jdbc.query("select id from factory where active order by id limit 1", Map.of(), rs -> rs.next() ? rs.getLong(1) : null);
-        List<DispatchLine> lines = jdbc.query("select s.bottle_type_code, s.qty from stock_balance s join bottle_type b on b.code = s.bottle_type_code "
-                + "where b.active and s.bucket = 'EMPTY' and s.qty > 0 order by b.litres desc", Map.of(),
-                (rs, i) -> new DispatchLine(rs.getString(1), rs.getInt(2)));
+        List<DispatchLine> lines = emptiesFreeFrom(d).entrySet().stream().map(e -> new DispatchLine(e.getKey(), e.getValue())).toList();
         if (factory == null || lines.isEmpty()) {
             return;
         }
@@ -288,6 +288,42 @@ public class DemoDataService {
         } catch (RuntimeException e) {
             run.problem(d, "factory dispatch", e);
         }
+    }
+
+    /**
+     * Empties that can go to the factory on date d, per bottle type (biggest first): the lowest "Empty in store" on any day
+     * from d on, the way the Stock report counts it (balance now less the movements after that day). The seed's own
+     * factory returns are dated the day after its dispatches, so the balance now can hold empties that are not in the
+     * store yet on d (B-10).
+     */
+    private Map<String, Integer> emptiesFreeFrom(LocalDate d) {
+        Map<String, Integer> balance = new LinkedHashMap<>();
+        jdbc.query("select s.bottle_type_code, s.qty from stock_balance s join bottle_type b on b.code = s.bottle_type_code "
+                + "where b.active and s.bucket = 'EMPTY' and s.qty > 0 order by b.litres desc", Map.of(),
+                rs -> { balance.put(rs.getString(1), rs.getInt(2)); });
+        Map<String, List<Integer>> later = new HashMap<>();
+        jdbc.query("select item_code, sum(qty_delta) from stock_movement where bucket = 'EMPTY' and movement_date > :d "
+                + "group by item_code, movement_date order by movement_date desc", Map.of("d", d),
+                rs -> { later.computeIfAbsent(rs.getString(1), k -> new ArrayList<>()).add(rs.getInt(2)); });
+        Map<String, Integer> free = new LinkedHashMap<>();
+        balance.forEach((code, qty) -> {
+            int q = lowestFrom(qty, later.getOrDefault(code, List.of()));
+            if (q > 0) {
+                free.put(code, q);
+            }
+        });
+        return free;
+    }
+
+    /** The lowest level from a day on: the balance now, stepped back through the later days' changes (newest first). */
+    static int lowestFrom(int balanceNow, List<Integer> laterDayChangesNewestFirst) {
+        int level = balanceNow;
+        int lowest = balanceNow;
+        for (int change : laterDayChangesNewestFirst) {
+            level -= change;
+            lowest = Math.min(lowest, level);
+        }
+        return lowest;
     }
 
     private void receiveBatches(LocalDate d, List<Long> openBatches, Run run) {
