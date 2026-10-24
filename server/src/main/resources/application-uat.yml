@@ -1,0 +1,16 @@
+# UAT (NUVI shared UAT server). Seed data is loaded; Swagger UI is available for testing.
+
+spring:
+  flyway:
+    locations: classpath:db/migration,classpath:db/seed
+
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
+app:
+  demo-data:
+    # Demo-data generator (M12) on – never in production.
+    enabled: true

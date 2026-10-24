@@ -1,0 +1,18 @@
+# Integration tests: PostgreSQL from Testcontainers (no seed data), fixed test secrets.
+app:
+  demo-data:
+    enabled: true
+  jwt:
+    secret: test-secret-for-integration-tests-0123456789
+  cookie:
+    secure: true
+  bootstrap:
+    admin-username: First.Admin
+    admin-temp-password: Temp-Pass-123
+  storage:
+    dir: ${java.io.tmpdir}/thuhina-water-test-files
+
+logging:
+  level:
+    root: WARN
+    lk.thuhina.water: INFO

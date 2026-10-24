@@ -1,0 +1,15 @@
+# Production (Thuhina Water's own server). No seed data, no Swagger UI.
+# Required environment variables: DB_URL, DB_USERNAME, DB_PASSWORD, JWT_SECRET;
+# on the very first start also ADMIN_USERNAME and ADMIN_TEMP_PASSWORD.
+
+spring:
+  flyway:
+    locations: classpath:db/migration
+
+app:
+  cookie:
+    secure: true
+
+logging:
+  level:
+    root: INFO

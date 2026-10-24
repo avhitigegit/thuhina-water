@@ -1,0 +1,196 @@
+{
+  "_comment": "Shared test cases for ExchangeRules (server, Java) and its TypeScript copy in client/src/features/enter-bills/exchangeRules.ts (M07 C4). Both test suites read this file; keep the messages exactly as the server writes them. Bottles are [held, toCollect, owed].",
+  "bottles": {
+    "B20": { "label": "20L", "name": "20L Bottle" },
+    "B10": { "label": "10L", "name": "10L Bottle" }
+  },
+  "customer": { "name": "Dilshan Fernando", "typeName": "Household" },
+  "cases": [
+    {
+      "name": "exchange, empties equal filled",
+      "bottles": { "B20": [2, 0, 0] },
+      "leftAtDoor": false,
+      "lines": [{ "bottle": "B20", "filled": 2, "empties": 2, "price": 350, "agreed": false }],
+      "note": null,
+      "phoneConfirmed": false,
+      "expect": {
+        "amount": 700,
+        "after": { "B20": [2, 0, 0] },
+        "lines": [{ "bottle": "B20", "filled": 2, "empties": 2, "owedAdded": 0, "owedCleared": 0, "toCollectAdded": 0, "toCollectCleared": 0, "lineAmount": 700 }],
+        "problems": []
+      }
+    },
+    {
+      "name": "shortage without a note: one owed, note required (agreed price)",
+      "bottles": { "B20": [3, 0, 0] },
+      "leftAtDoor": false,
+      "lines": [{ "bottle": "B20", "filled": 3, "empties": 2, "price": 270, "agreed": true }],
+      "note": "  ",
+      "phoneConfirmed": false,
+      "expect": {
+        "amount": 810,
+        "after": { "B20": [3, 0, 1] },
+        "lines": [{ "bottle": "B20", "filled": 3, "empties": 2, "owedAdded": 1, "owedCleared": 0, "toCollectAdded": 0, "toCollectCleared": 0, "lineAmount": 810 }],
+        "problems": [
+          { "field": "note", "code": "NOTE_REQUIRED", "message": "Fewer empties than filled bottles: 1 bottle(s) will be recorded as owed. Add a note explaining the shortage." }
+        ]
+      }
+    },
+    {
+      "name": "shortage with a note",
+      "bottles": { "B20": [3, 0, 0] },
+      "leftAtDoor": false,
+      "lines": [{ "bottle": "B20", "filled": 3, "empties": 2, "price": 270, "agreed": true }],
+      "note": "One bottle at the neighbour",
+      "phoneConfirmed": false,
+      "expect": {
+        "amount": 810,
+        "after": { "B20": [3, 0, 1] },
+        "lines": [{ "bottle": "B20", "filled": 3, "empties": 2, "owedAdded": 1, "owedCleared": 0, "toCollectAdded": 0, "toCollectCleared": 0, "lineAmount": 810 }],
+        "problems": []
+      }
+    },
+    {
+      "name": "extra empties clear empties to collect first, then bottles owed",
+      "bottles": { "B20": [3, 1, 2] },
+      "leftAtDoor": false,
+      "lines": [{ "bottle": "B20", "filled": 2, "empties": 5, "price": 350, "agreed": false }],
+      "note": null,
+      "phoneConfirmed": false,
+      "expect": {
+        "amount": 700,
+        "after": { "B20": [3, 0, 0] },
+        "lines": [{ "bottle": "B20", "filled": 2, "empties": 5, "owedAdded": 0, "owedCleared": 2, "toCollectAdded": 0, "toCollectCleared": 1, "lineAmount": 700 }],
+        "problems": []
+      }
+    },
+    {
+      "name": "more extra empties than waiting or owed",
+      "bottles": { "B20": [3, 1, 0] },
+      "leftAtDoor": false,
+      "lines": [{ "bottle": "B20", "filled": 2, "empties": 5, "price": 350, "agreed": false }],
+      "note": null,
+      "phoneConfirmed": false,
+      "expect": {
+        "amount": 700,
+        "after": { "B20": [3, 0, 0] },
+        "lines": [{ "bottle": "B20", "filled": 2, "empties": 5, "owedAdded": 0, "owedCleared": 0, "toCollectAdded": 0, "toCollectCleared": 1, "lineAmount": 700 }],
+        "problems": [
+          { "field": null, "code": "SALE_RULE", "message": "Dilshan Fernando returned 2 more 20L empties than they hold, owe or have waiting for collection. Check the bill." }
+        ]
+      }
+    },
+    {
+      "name": "customer without bottles",
+      "bottles": { "B20": [0, 0, 0] },
+      "leftAtDoor": false,
+      "lines": [{ "bottle": "B20", "filled": 2, "empties": 2, "price": 350, "agreed": false }],
+      "note": null,
+      "phoneConfirmed": false,
+      "expect": {
+        "amount": 700,
+        "after": { "B20": [0, 0, 0] },
+        "lines": [{ "bottle": "B20", "filled": 2, "empties": 2, "owedAdded": 0, "owedCleared": 0, "toCollectAdded": 0, "toCollectCleared": 0, "lineAmount": 700 }],
+        "problems": [
+          { "field": null, "code": "SALE_RULE", "message": "Dilshan Fernando has no bottles yet. Record a First purchase instead." },
+          { "field": null, "code": "SALE_RULE", "message": "Dilshan Fernando holds no 20L bottles. Use Extra order (deposit needed) for new bottles." }
+        ]
+      }
+    },
+    {
+      "name": "left at door without phone agreement and note; empties are ignored",
+      "bottles": { "B20": [2, 0, 0] },
+      "leftAtDoor": true,
+      "lines": [{ "bottle": "B20", "filled": 2, "empties": 2, "price": 350, "agreed": false }],
+      "note": "",
+      "phoneConfirmed": false,
+      "expect": {
+        "amount": 700,
+        "after": { "B20": [2, 2, 0] },
+        "lines": [{ "bottle": "B20", "filled": 2, "empties": 0, "owedAdded": 0, "owedCleared": 0, "toCollectAdded": 2, "toCollectCleared": 0, "lineAmount": 700 }],
+        "problems": [
+          { "field": "phoneConfirmed", "code": "SALE_RULE", "message": "Confirm that the customer agreed by phone." },
+          { "field": "note", "code": "SALE_RULE", "message": "Add a note for the \"Left at door\" delivery." }
+        ]
+      }
+    },
+    {
+      "name": "left at door with phone agreement and note",
+      "bottles": { "B20": [2, 0, 0] },
+      "leftAtDoor": true,
+      "lines": [{ "bottle": "B20", "filled": 2, "empties": 0, "price": 350, "agreed": false }],
+      "note": "Wife agreed, at the gate",
+      "phoneConfirmed": true,
+      "expect": {
+        "amount": 700,
+        "after": { "B20": [2, 2, 0] },
+        "lines": [{ "bottle": "B20", "filled": 2, "empties": 0, "owedAdded": 0, "owedCleared": 0, "toCollectAdded": 2, "toCollectCleared": 0, "lineAmount": 700 }],
+        "problems": []
+      }
+    },
+    {
+      "name": "nothing entered",
+      "bottles": { "B20": [2, 0, 0] },
+      "leftAtDoor": false,
+      "lines": [{ "bottle": "B20", "filled": 0, "empties": 0, "price": 350, "agreed": false }],
+      "note": null,
+      "phoneConfirmed": false,
+      "expect": {
+        "amount": 0,
+        "after": { "B20": [2, 0, 0] },
+        "lines": [],
+        "problems": [{ "field": "lines", "code": "SALE_RULE", "message": "Enter the filled bottles given and/or empties collected." }]
+      }
+    },
+    {
+      "name": "no water price for the customer type",
+      "bottles": { "B20": [2, 0, 0] },
+      "leftAtDoor": false,
+      "lines": [{ "bottle": "B20", "filled": 2, "empties": 2, "price": null, "agreed": false }],
+      "note": null,
+      "phoneConfirmed": false,
+      "expect": {
+        "amount": 0,
+        "after": { "B20": [2, 0, 0] },
+        "lines": [{ "bottle": "B20", "filled": 2, "empties": 2, "owedAdded": 0, "owedCleared": 0, "toCollectAdded": 0, "toCollectCleared": 0, "lineAmount": 0 }],
+        "problems": [{ "field": null, "code": "SALE_RULE", "message": "No water price set for 20L Bottle / Household." }]
+      }
+    },
+    {
+      "name": "two bottle types, shortage on 10L",
+      "bottles": { "B20": [2, 0, 0], "B10": [1, 0, 0] },
+      "leftAtDoor": false,
+      "lines": [
+        { "bottle": "B20", "filled": 2, "empties": 2, "price": 350, "agreed": false },
+        { "bottle": "B10", "filled": 1, "empties": 0, "price": 200, "agreed": false }
+      ],
+      "note": null,
+      "phoneConfirmed": false,
+      "expect": {
+        "amount": 900,
+        "after": { "B20": [2, 0, 0], "B10": [1, 0, 1] },
+        "lines": [
+          { "bottle": "B20", "filled": 2, "empties": 2, "owedAdded": 0, "owedCleared": 0, "toCollectAdded": 0, "toCollectCleared": 0, "lineAmount": 700 },
+          { "bottle": "B10", "filled": 1, "empties": 0, "owedAdded": 1, "owedCleared": 0, "toCollectAdded": 0, "toCollectCleared": 0, "lineAmount": 200 }
+        ],
+        "problems": [
+          { "field": "note", "code": "NOTE_REQUIRED", "message": "Fewer empties than filled bottles: 1 bottle(s) will be recorded as owed. Add a note explaining the shortage." }
+        ]
+      }
+    },
+    {
+      "name": "negative quantity",
+      "bottles": { "B20": [2, 0, 0] },
+      "leftAtDoor": false,
+      "lines": [{ "bottle": "B20", "filled": -1, "empties": 2, "price": 350, "agreed": false }],
+      "note": null,
+      "phoneConfirmed": false,
+      "expect": {
+        "amount": 0,
+        "after": { "B20": [2, 0, 0] },
+        "lines": [],
+        "problems": [{ "field": "lines", "code": "SALE_RULE", "message": "Quantities cannot be negative." }]
+      }
+    }
+  ]
+}
