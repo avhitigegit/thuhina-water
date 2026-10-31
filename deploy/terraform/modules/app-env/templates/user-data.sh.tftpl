@@ -1,0 +1,79 @@
+#!/bin/bash
+# Server start-up script (plan 7.1) – runs once, when the server is first created.
+# Installs the base software only; the application files arrive with each deployment (deploy.sh).
+# Log: /var/log/${project}-bootstrap.log
+set -euxo pipefail
+exec > >(tee -a /var/log/${project}-bootstrap.log) 2>&1
+
+export DEBIAN_FRONTEND=noninteractive
+APT="apt-get -y -o Acquire::Retries=5 -o Dpkg::Options::=--force-confold"
+
+# 1. Wait for the internet – the Elastic IP is attached a few seconds after the server starts.
+until curl -fsS --max-time 5 https://download.docker.com >/dev/null; do
+  echo "waiting for internet access..."
+  sleep 5
+done
+
+# 2. Time zone, updates, basic tools (automatic security updates are on by default in Ubuntu).
+timedatectl set-timezone Asia/Colombo
+$APT update
+$APT upgrade
+$APT install ca-certificates curl unzip jq cron
+
+# 3. Swap file – extra safety for 2 GiB of RAM (JVM + Next.js + PostgreSQL).
+if [ ! -f /swapfile ]; then
+  fallocate -l ${swap_size_gb}G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile
+  swapon /swapfile
+  echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+echo 'vm.swappiness=10' > /etc/sysctl.d/99-swappiness.conf
+sysctl --system
+
+# 4. Docker Engine + Compose plugin from Docker's own repository; logs limited to 3 × 10 MB per container.
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+chmod a+r /etc/apt/keyrings/docker.asc
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" \
+  > /etc/apt/sources.list.d/docker.list
+$APT update
+$APT install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+cat > /etc/docker/daemon.json <<'JSON'
+{
+  "log-driver": "json-file",
+  "log-opts": { "max-size": "10m", "max-file": "3" }
+}
+JSON
+systemctl enable docker
+systemctl restart docker
+
+# 5. AWS CLI v2 (ARM) – used by deploy.sh and backup.sh with the server's role.
+curl -fsSL https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip -o /tmp/awscliv2.zip
+unzip -q -o /tmp/awscliv2.zip -d /tmp
+/tmp/aws/install --update
+rm -rf /tmp/aws /tmp/awscliv2.zip
+
+# 6. CloudWatch agent – memory and disk metrics for the alarms; config from Parameter Store.
+curl -fsSL https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/arm64/latest/amazon-cloudwatch-agent.deb -o /tmp/cwagent.deb
+dpkg -i -E /tmp/cwagent.deb
+rm -f /tmp/cwagent.deb
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c ssm:${cw_config_parameter}
+
+# 7. SSM agent (comes with the Ubuntu image) – Session Manager terminal and GitHub deploy commands.
+snap start amazon-ssm-agent || systemctl start snap.amazon-ssm-agent.amazon-ssm-agent.service || true
+
+# 8. Application folder and the facts the deploy / backup scripts need.
+mkdir -p /opt/${project}/releases /opt/${project}/backups
+chmod 750 /opt/${project}
+cat > /etc/${project}-deploy.env <<ENV
+AWS_REGION=${aws_region}
+ENV_PARAM_PATH=${env_param_path}
+BACKUP_BUCKET=${backup_bucket}
+RELEASES_BUCKET=${releases_bucket}
+APP_DIR=/opt/${project}
+ENV
+chmod 640 /etc/${project}-deploy.env
+
+touch /var/lib/cloud/instance/${project}-bootstrap-done
+echo "bootstrap finished"
