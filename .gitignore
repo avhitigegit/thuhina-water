@@ -32,3 +32,15 @@ Thumbs.db
 
 # Project documents – kept only on this computer from M01 on (not in the repository)
 /doc/
+
+# Terraform – state and plans hold secrets and stay out of Git (the lock file IS committed)
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
