@@ -82,8 +82,11 @@ class MobileDeliveryIntegrationTest extends SalesTestSupport {
         Map<String, Object> row = ((List<Map<String, Object>>) dueList.get("items")).stream()
                 .filter(x -> ((Number) x.get("id")).longValue() == c).findFirst().orElseThrow();
         assertThat(row).containsEntry("entered", true);
-        assertThat((List<Map<String, Object>>) row.get("enteredBills")).singleElement().satisfies(b -> assertThat(b)
-                .containsEntry("onPhone", true).containsEntry("enteredBy", staffUser.getFullName()));
+        // The registration's first purchase (office) and the phone bill.
+        assertThat((List<Map<String, Object>>) row.get("enteredBills")).anySatisfy(b -> assertThat(b)
+                .containsEntry("billNo", txn.get("billNo")).containsEntry("onPhone", true)
+                .containsEntry("enteredBy", staffUser.getFullName()))
+                .anySatisfy(b -> assertThat(b).containsEntry("kind", "FIRST_PURCHASE").containsEntry("onPhone", false));
         Map<String, Object> phoneBills = read(mvc.perform(get("/sales/txns").param("customerId", String.valueOf(c)).param("onPhone", "true")
                 .cookie(admin)).andExpect(status().isOk()).andReturn());
         assertThat((List<Map<String, Object>>) phoneBills.get("items")).singleElement()
