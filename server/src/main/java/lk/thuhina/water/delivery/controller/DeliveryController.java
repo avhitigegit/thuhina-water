@@ -27,7 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class DeliveryController {
 
     private static final String DUE = "hasAnyAuthority('" + Permissions.SALES_EDIT + "', '" + Permissions.DELIVERY_PLANNING_VIEW + "', '"
-            + Permissions.DELIVERY_LIST_VIEW + "')";
+            + Permissions.DELIVERY_LIST_VIEW + "', '" + Permissions.DELIVERY_ENTRY + "')";
 
     private static final String PLANNING = "hasAuthority('" + Permissions.DELIVERY_PLANNING_VIEW + "')";
 

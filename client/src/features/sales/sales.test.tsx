@@ -176,6 +176,7 @@ function bill(over: Partial<TxnDetail>): TxnDetail {
     amount: 3050,
     paid: 0,
     payMethod: null,
+    payReference: null,
     note: null,
     phoneConfirmed: false,
     damageMode: null,

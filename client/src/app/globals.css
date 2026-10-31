@@ -1286,6 +1286,172 @@
     flex: 1;
     min-width: 280px;
   }
+
+  /* My Deliveries (M17) – the delivery person's phone screen: big touch targets, one column. */
+  .mob {
+    max-width: 560px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .mob .tabs {
+    margin-bottom: 0;
+  }
+  .mob-filters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 130px;
+    gap: 8px;
+  }
+  .mob-filters input,
+  .mob-filters select,
+  .mob input,
+  .mob select {
+    font-size: 16px;
+    min-height: 42px;
+  }
+  .mob-count {
+    margin: 0;
+  }
+  .mob-sub {
+    margin: 4px 0 0;
+    font-size: 14px;
+  }
+  .mob-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .mob-card {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 100%;
+    text-align: left;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--brand);
+    border-radius: var(--radius);
+    padding: 12px;
+    box-shadow: var(--shadow);
+    font: inherit;
+    color: inherit;
+    cursor: pointer;
+  }
+  .mob-card.done {
+    border-left-color: var(--ok);
+    background: #f7fbf8;
+  }
+  .mob-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .mob-owes {
+    color: var(--bad);
+    font-weight: 600;
+  }
+  .mob-who {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .mob-tel {
+    font-weight: 600;
+    color: var(--brand);
+  }
+  .mob-toggle {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .mob-toggle .btn {
+    flex: 1 1 0;
+    min-height: 44px;
+    justify-content: center;
+  }
+  .mob-bottle {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .mob-bottle-head {
+    display: flex;
+    flex-direction: column;
+  }
+  .mob-step {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .mob-step > div {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .mob-step .btn {
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+    justify-content: center;
+    padding: 0;
+  }
+  .mob-step input {
+    width: 64px;
+    text-align: center;
+    font-size: 18px;
+  }
+  .mob-money {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .mob-sum {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 12px;
+    font-size: 15px;
+  }
+  .mob-quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 4px;
+  }
+  .mob-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 6px;
+    font-weight: 600;
+  }
+  .mob-wide {
+    width: 100%;
+    min-height: 48px;
+    justify-content: center;
+    font-size: 16px;
+  }
+  .mob-save {
+    position: sticky;
+    bottom: 8px;
+  }
+  .mob-entry.cancelled {
+    opacity: 0.6;
+  }
+  .mob-day-bottles {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  /* Phone: the menu opens from the button in the brand bar. */
+  .nav-toggle {
+    display: none;
+    margin-left: auto;
+  }
 }
 
 @keyframes tin {
@@ -1325,6 +1491,27 @@
   .sidebar {
     position: static;
     height: auto;
+    padding-bottom: 0;
+  }
+  .nav-toggle {
+    display: inline-flex;
+  }
+  .sidebar:not(.open) nav {
+    display: none;
+  }
+  .sidebar.open nav {
+    padding-bottom: 12px;
+  }
+  .topbar {
+    padding: 8px 16px;
+    gap: 8px;
+  }
+  .topbar .crumbs,
+  .topbar .biz-date {
+    display: none;
+  }
+  .page-head .sub {
+    display: none;
   }
   .grid.c2,
   .grid.c3,

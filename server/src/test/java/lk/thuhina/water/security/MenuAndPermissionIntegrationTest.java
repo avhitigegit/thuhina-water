@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 
@@ -49,16 +50,16 @@ class MenuAndPermissionIntegrationTest extends IntegrationTest {
     }
 
     @Test
-    void deliveryStaffOnlyGetsTheDailyDeliveryList() throws Exception {
+    void deliveryStaffGetsMyDeliveriesAndTheDailyDeliveryList() throws Exception {
         Cookie cookie = login(createUser(Role.DELIVERY_STAFF));
         mvc.perform(get("/auth/me").cookie(cookie))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.landingPage").value("/delivery/daily-list"))
+                .andExpect(jsonPath("$.landingPage").value("/delivery/my-deliveries"))
                 .andExpect(jsonPath("$.menu.length()").value(1))
                 .andExpect(jsonPath("$.menu[0].module").value("Delivery Schedule"))
                 .andExpect(jsonPath("$.menu[0].group").value(true))
-                .andExpect(jsonPath("$.menu[0].items[*].path").value(contains("/delivery/daily-list")))
-                .andExpect(jsonPath("$.permissions").value(contains(Permissions.DELIVERY_LIST_VIEW)));
+                .andExpect(jsonPath("$.menu[0].items[*].path").value(contains("/delivery/my-deliveries", "/delivery/daily-list")))
+                .andExpect(jsonPath("$.permissions").value(containsInAnyOrder(Permissions.DELIVERY_LIST_VIEW, Permissions.DELIVERY_ENTRY)));
     }
 
     @Test

@@ -23,6 +23,7 @@ export const P = {
   SALES_APPROVE_OVER_LIMIT: "sales.approve-over-limit",
   DELIVERY_PLANNING_VIEW: "delivery-planning.view",
   DELIVERY_LIST_VIEW: "delivery-list.view",
+  DELIVERY_ENTRY: "delivery.entry",
   BILLING_VIEW: "billing.view",
   BILLING_EDIT: "billing.edit",
   EXPENSES_VIEW: "expenses.view",

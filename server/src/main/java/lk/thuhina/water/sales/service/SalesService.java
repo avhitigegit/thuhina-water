@@ -12,6 +12,7 @@ import java.util.Optional;
 
 import lk.thuhina.water.audit.model.AuditAction;
 import lk.thuhina.water.audit.service.AuditService;
+import lk.thuhina.water.billing.rules.PaymentRules;
 import lk.thuhina.water.common.BusinessDates;
 import lk.thuhina.water.common.BusinessException;
 import lk.thuhina.water.common.Money;
@@ -153,24 +154,63 @@ public class SalesService {
 
     @Transactional(readOnly = true)
     public SalePreview previewBill(BillRequest r) {
-        Ctx x = ctx(r.customerId(), r.date());
-        return preview(x, billCalc(x, r), common(x, r.paperBillNo(), true, r.paid()), r.paid());
+        return previewBill(ctx(r.customerId(), r.date()), r, true);
     }
 
     @Transactional
     public SaleResult postBill(BillRequest r) {
-        Ctx x = ctx(r.customerId(), r.date());
+        return saveBill(ctx(r.customerId(), r.date()), r, true, r.approveOverLimit());
+    }
+
+    /**
+     * My Deliveries on the phone (M17): the bill is always for today, the paper bill number is optional (the system bill
+     * number is the record) and the delivery staff cannot approve a sale over the credit limit.
+     */
+    @Transactional(readOnly = true)
+    public SalePreview previewMobileBill(BillRequest r) {
+        return previewBill(ctx(r.customerId(), today()), r, false);
+    }
+
+    @Transactional
+    public SaleResult postMobileBill(BillRequest r) {
+        return saveBill(ctx(r.customerId(), today()), r, false, false);
+    }
+
+    private SalePreview previewBill(Ctx x, BillRequest r, boolean paperRequired) {
+        List<Problem> problems = new ArrayList<>(common(x, r.paperBillNo(), paperRequired, r.paid()));
+        Problem reference = referenceProblem(r);
+        if (reference != null) {
+            problems.add(reference);
+        }
+        return preview(x, billCalc(x, r), problems, r.paid());
+    }
+
+    private SaleResult saveBill(Ctx x, BillRequest r, boolean paperRequired, Boolean approveOverLimit) {
+        Problem reference = referenceProblem(r);
+        if (reference != null) {
+            throw toException(reference);
+        }
         SaleCalc calc = billCalc(x, r);
         SalesKind kind = billKind(r);
         String details = kind.label() + " for " + x.customer().getName() + ": " + String.join(", ", calc.lines().stream()
                 .map(l -> l.getLabel() + " filled " + l.getFilled() + " / empties " + l.getEmpties()).toList()) + ", "
                 + Money.format(calc.amount());
-        Posted posted = postAndSave(new Spec(kind, x, null, r.paperBillNo(), true, calc, r.paid(), null, r.note(),
-                Boolean.TRUE.equals(r.phoneConfirmed()), null, null, r.approveOverLimit(), details, true));
+        Posted posted = postAndSave(new Spec(kind, x, null, r.paperBillNo(), paperRequired, calc, r.paid(), r.payMethod(),
+                Texts.blankToNull(r.payReference()), r.note(), Boolean.TRUE.equals(r.phoneConfirmed()), null, null, approveOverLimit,
+                details, true));
         if (kind == SalesKind.LEFT_AT_DOOR) {
             events.publishEvent(new LeftAtDoorBillSaved(posted.txn().getId(), x.customer().getId(), x.date()));
         }
         return result(posted);
+    }
+
+    /** Money received by bank transfer or cheque needs its reference (as for payments, FR-50). */
+    private static Problem referenceProblem(BillRequest r) {
+        if (Money.of(r.paid()).signum() <= 0) {
+            return null;
+        }
+        String problem = PaymentRules.referenceProblem(r.payMethod(), Texts.blankToNull(r.payReference()));
+        return problem == null ? null : Problem.field("payReference", problem);
     }
 
     private static SalesKind billKind(BillRequest r) {
@@ -582,8 +622,17 @@ public class SalesService {
 
     /** Who, what and how: everything {@link #post} needs. {@code walkInName} only for a walk-in product sale. */
     private record Spec(SalesKind kind, Ctx x, String walkInName, String paperBillNo, boolean paperRequired, SaleCalc calc,
-                        BigDecimal paid, PayMethod payMethod, String note, boolean phoneConfirmed, DamageMode damageMode,
-                        SettleMethod settleMethod, Boolean approveOverLimit, String auditDetails, boolean advanceSchedule) {
+                        BigDecimal paid, PayMethod payMethod, String payReference, String note, boolean phoneConfirmed,
+                        DamageMode damageMode, SettleMethod settleMethod, Boolean approveOverLimit, String auditDetails,
+                        boolean advanceSchedule) {
+
+        /** A sale without a payment reference (only delivery bills take one). */
+        Spec(SalesKind kind, Ctx x, String walkInName, String paperBillNo, boolean paperRequired, SaleCalc calc, BigDecimal paid,
+             PayMethod payMethod, String note, boolean phoneConfirmed, DamageMode damageMode, SettleMethod settleMethod,
+             Boolean approveOverLimit, String auditDetails, boolean advanceSchedule) {
+            this(kind, x, walkInName, paperBillNo, paperRequired, calc, paid, payMethod, null, note, phoneConfirmed, damageMode,
+                    settleMethod, approveOverLimit, auditDetails, advanceSchedule);
+        }
     }
 
     private record Posted(SalesTxn txn, ScheduleChange schedule) {
@@ -630,7 +679,8 @@ public class SalesService {
                 c == null ? s.walkInName() : null)
                 .amounts(calc.water(), calc.deposit(), calc.product(), calc.productCost(), paid, method)
                 .details(Texts.blankToNull(s.paperBillNo()), Texts.blankToNull(s.note()), s.phoneConfirmed(), s.damageMode(),
-                        s.settleMethod(), overrideBy);
+                        s.settleMethod(), overrideBy)
+                .payReference(s.payReference());
         t = txns.saveAndFlush(t);
         List<SalesTxnLine> lines = new ArrayList<>();
         for (int i = 0; i < calc.lines().size(); i++) {

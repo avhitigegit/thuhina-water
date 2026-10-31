@@ -127,6 +127,24 @@ public class ScheduleService {
      */
     @Transactional(readOnly = true)
     public List<DueCustomer> customers(LocalDate d, Long areaId, boolean all, boolean withPrices, List<BottleInfo> bottles) {
+        return customers(d, areaId, all, withPrices, bottles, null, 0);
+    }
+
+    /**
+     * My Deliveries (M17): active customers matching {@code q} (code, name, phone or address), with today's bottles, prices
+     * and bills – for a stop that is not on today's list. At most {@code limit}.
+     */
+    @Transactional(readOnly = true)
+    public List<DueCustomer> find(String q, int limit) {
+        String text = q == null ? "" : q.trim();
+        if (text.length() < 2) {
+            return List.of();
+        }
+        return customers(today(), null, true, true, activeBottles(), text, limit);
+    }
+
+    private List<DueCustomer> customers(LocalDate d, Long areaId, boolean all, boolean withPrices, List<BottleInfo> bottles, String text,
+                                        int limit) {
         boolean isToday = d.equals(today());
         MapSqlParameterSource p = new MapSqlParameterSource("d", d).addValue("dow", d.getDayOfWeek().getValue());
         String sql = "select c.id, c.code, c.name, c.phone, c.address, c.notes, c.area_id, a.name as area_name, c.pay_type, "
@@ -141,7 +159,16 @@ public class ScheduleService {
             sql += " and c.area_id = :area";
             p.addValue("area", areaId);
         }
+        if (text != null) {
+            sql += " and (lower(c.code) like :text or lower(c.name) like :text or lower(c.address) like :text"
+                    + " or regexp_replace(c.phone, '[^0-9]', '', 'g') like :digits)";
+            String digits = text.replaceAll("[^0-9]", "");
+            p.addValue("text", "%" + text.toLowerCase() + "%").addValue("digits", digits.isEmpty() ? "-" : "%" + digits + "%");
+        }
         sql += " order by a.name, c.name, c.id";
+        if (limit > 0) {
+            sql += " limit " + limit;
+        }
         List<Row> rows = jdbc.query(sql, p, (rs, i) -> new Row(rs.getLong("id"), rs.getString("code"), rs.getString("name"),
                 rs.getString("phone"), rs.getString("address"), rs.getString("notes"), rs.getLong("area_id"), rs.getString("area_name"),
                 PayType.valueOf(rs.getString("pay_type")), rs.getBigDecimal("credit_limit"), rs.getBigDecimal("balance"),

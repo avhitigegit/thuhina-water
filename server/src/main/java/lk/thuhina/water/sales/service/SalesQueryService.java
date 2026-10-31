@@ -135,7 +135,7 @@ public class SalesQueryService {
                 t.getCustomerId(), (String) c.get("code"), t.getCustomerId() == null ? t.getWalkInName() : (String) c.get("name"),
                 (String) c.get("address"), (String) c.get("phone"), (String) c.get("pay_type"), saleLines,
                 t.getWaterAmount(), t.getDepositAmount(), t.getProductAmount(), t.getProductCost(), t.getAmount(), t.getPaidOnBill(),
-                t.getPayMethod() == null ? null : t.getPayMethod().label(), t.getNote(), t.isPhoneConfirmed(),
+                t.getPayMethod() == null ? null : t.getPayMethod().label(), t.getPayReference(), t.getNote(), t.isPhoneConfirmed(),
                 t.getDamageMode() == null ? null : t.getDamageMode().name(), t.getSettleMethod() == null ? null : t.getSettleMethod().name(),
                 t.getCreditOverrideBy(), names.get(t.getCreditOverrideBy()), reversalOf, reversedBy, effects(id, labels),
                 t.getCreatedBy(), names.get(t.getCreatedBy()), t.getCreatedAt());
