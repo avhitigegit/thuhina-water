@@ -49,6 +49,9 @@ public class SalesTxn extends BaseEntity {
     @Column(name = "pay_method", length = 15, updatable = false)
     private PayMethod payMethod;
 
+    @Column(name = "pay_reference", length = 100, updatable = false)
+    private String payReference;
+
     @Column(name = "water_amount", nullable = false, updatable = false)
     private BigDecimal waterAmount = Money.ZERO;
 
@@ -107,6 +110,12 @@ public class SalesTxn extends BaseEntity {
         return this;
     }
 
+    /** Cheque number or bank transfer reference of the money paid on the bill. */
+    public SalesTxn payReference(String reference) {
+        this.payReference = reference;
+        return this;
+    }
+
     /** Opening balance migrated from the old ledger: an amount without water / deposit / product split. */
     public SalesTxn openingAmount(BigDecimal amount) {
         this.amount = Money.of(amount);
@@ -135,6 +144,7 @@ public class SalesTxn extends BaseEntity {
         r.amount = original.amount.negate();
         r.paidOnBill = original.paidOnBill.negate();
         r.payMethod = original.payMethod;
+        r.payReference = original.payReference;
         r.note = note;
         r.reversalOfId = original.getId();
         return r;
@@ -179,6 +189,10 @@ public class SalesTxn extends BaseEntity {
 
     public BigDecimal getPaidOnBill() {
         return paidOnBill;
+    }
+
+    public String getPayReference() {
+        return payReference;
     }
 
     public PayMethod getPayMethod() {

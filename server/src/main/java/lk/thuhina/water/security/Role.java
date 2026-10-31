@@ -4,7 +4,7 @@ package lk.thuhina.water.security;
 public enum Role {
     ADMIN("Admin", "/dashboard"),
     ACCOUNTANT("Accountant", "/dashboard"),
-    DELIVERY_STAFF("Delivery Staff", "/delivery/daily-list");
+    DELIVERY_STAFF("Delivery Staff", "/delivery/my-deliveries");
 
     private final String label;
     private final String landingPage;

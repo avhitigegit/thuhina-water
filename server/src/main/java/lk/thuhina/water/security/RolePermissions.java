@@ -22,7 +22,7 @@ public final class RolePermissions {
                 PRODUCTION_VIEW, PRODUCTION_EDIT,
                 STOCK_VIEW, STOCK_EDIT,
                 SALES_VIEW, SALES_EDIT, SALES_APPROVE_OVER_LIMIT,
-                DELIVERY_PLANNING_VIEW, DELIVERY_LIST_VIEW,
+                DELIVERY_PLANNING_VIEW, DELIVERY_LIST_VIEW, DELIVERY_ENTRY,
                 BILLING_VIEW, BILLING_EDIT,
                 EXPENSES_VIEW, EXPENSES_EDIT,
                 QUOTATIONS_VIEW, QUOTATIONS_EDIT,
@@ -43,7 +43,7 @@ public final class RolePermissions {
                 REPORTS_VIEW));
 
         MAP.put(Role.DELIVERY_STAFF, Set.of(
-                DELIVERY_LIST_VIEW));
+                DELIVERY_LIST_VIEW, DELIVERY_ENTRY));
     }
 
     private RolePermissions() {

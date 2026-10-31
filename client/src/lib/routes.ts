@@ -87,6 +87,13 @@ export const ROUTES: RouteInfo[] = [
     buildModule: "M16",
   },
   {
+    path: "/delivery/my-deliveries",
+    module: "Delivery Schedule",
+    title: "My Deliveries",
+    description: "On the phone: bottles left, empties collected and money received at each home today",
+    buildModule: "M17",
+  },
+  {
     path: "/delivery/planning",
     module: "Delivery Schedule",
     title: "Delivery Planning",

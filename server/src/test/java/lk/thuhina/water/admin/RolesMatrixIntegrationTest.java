@@ -52,6 +52,7 @@ class RolesMatrixIntegrationTest extends IntegrationTest {
                 Map.entry("Sales & Deliveries › Enter Bills", "FULL | NONE | NONE"),
                 Map.entry("Sales & Deliveries › Sales & Bills", "FULL | NONE | NONE"),
                 Map.entry("Sales & Deliveries › Customer Quotations", "FULL | VIEW | NONE"),
+                Map.entry("Delivery Schedule › My Deliveries", "FULL | NONE | FULL"),
                 Map.entry("Delivery Schedule › Delivery Planning", "FULL | NONE | NONE"),
                 Map.entry("Delivery Schedule › Daily Delivery List", "FULL | NONE | VIEW"),
                 Map.entry("Billing & Payments", "FULL | FULL | NONE"),

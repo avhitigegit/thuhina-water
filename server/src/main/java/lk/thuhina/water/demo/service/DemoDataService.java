@@ -215,11 +215,11 @@ public class DemoDataService {
             try {
                 BigDecimal paid = BigDecimal.ZERO;
                 if ("CASH".equals(c.payType()) && !left) {
-                    BigDecimal amount = sales.previewBill(new BillRequest(c.id(), d, null, kind, lines, null, note, true, true)).amount();
+                    BigDecimal amount = sales.previewBill(new BillRequest(c.id(), d, null, kind, lines, null, null, null, note, true, true)).amount();
                     paid = rnd.nextDouble() < 0.06 ? amount.divide(BigDecimal.valueOf(200), 0, RoundingMode.DOWN).multiply(BigDecimal.valueOf(100))
                             : amount;
                 }
-                sales.postBill(new BillRequest(c.id(), d, run.paper(), kind, lines, paid, note, true, true));
+                sales.postBill(new BillRequest(c.id(), d, run.paper(), kind, lines, paid, null, null, note, true, true));
                 run.bills++;
                 run.left += left ? 1 : 0;
                 run.shortages += shortOne ? 1 : 0;

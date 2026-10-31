@@ -4,6 +4,7 @@
  * Sidebar built from the /auth/me menu (prototype layout.js): a single link when the module has one page,
  * a heading with sub-items for Master Data, Sales & Deliveries and Delivery Schedule, a "view" tag on
  * view-only pages, hidden modules (e.g. Data Migration) left out. Collapsed groups are remembered.
+ * On a phone the menu is closed behind a "Menu" button and closes again when a page is opened.
  */
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -27,6 +28,9 @@ function isActive(pathname: string, path: string) {
 
 export function Sidebar({ menu, pathname }: { menu: MenuModule[]; pathname: string }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  // The page the phone menu was opened on – opening another page closes it.
+  const [openOn, setOpenOn] = useState<string | null>(null);
+  const open = openOn === pathname;
 
   useEffect(() => {
     // localStorage is only available in the browser, after the first render.
@@ -49,13 +53,21 @@ export function Sidebar({ menu, pathname }: { menu: MenuModule[]; pathname: stri
   const viewTag = <span className="view-tag">view</span>;
 
   return (
-    <aside className="sidebar no-print">
+    <aside className={cn("sidebar no-print", open && "open")}>
       <div className="brandbar">
         <div className="logo">T</div>
         <div>
           <b>Thuhina Water</b>
           <span>Inventory &amp; Sales</span>
         </div>
+        <button
+          className="btn sm nav-toggle"
+          type="button"
+          aria-expanded={open}
+          onClick={() => setOpenOn(open ? null : pathname)}
+        >
+          {open ? "Close" : "Menu"}
+        </button>
       </div>
       <nav aria-label="Main menu">
         {menu

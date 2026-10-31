@@ -2846,6 +2846,7 @@ export interface components {
             amount: number;
             paid: number;
             payMethod: string | null;
+            payReference: string | null;
             note: string | null;
             phoneConfirmed: boolean;
             damageMode: string | null;
@@ -3334,6 +3335,13 @@ export interface components {
             kind?: "FIRST_PURCHASE" | "EXCHANGE" | "LEFT_AT_DOOR" | "COLLECT_EMPTIES" | "EXTRA_ORDER" | "PRODUCT_SALE" | "CUSTOMER_DAMAGE" | "OWED_SETTLEMENT" | "OPENING_BALANCE" | "REVERSAL";
             lines?: components["schemas"]["BillLineRequest"][];
             paid?: number;
+            /**
+             * @description How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE
+             * @enum {string}
+             */
+            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            /** @description Cheque number or bank transfer reference (needed for those methods) */
+            payReference?: string;
             note?: string;
             phoneConfirmed?: boolean;
             approveOverLimit?: boolean;

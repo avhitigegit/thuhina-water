@@ -140,6 +140,7 @@ export type DueCustomer = Schemas["DueCustomer"];
 export type DueCounts = Schemas["DueCounts"];
 export type DueList = Schemas["DueList"];
 export type NextPaperBill = Schemas["NextPaperBill"];
+export type BillRequest = Schemas["BillRequest"];
 export type BottleQty = Schemas["BottleQty"];
 export type DueTotals = Schemas["DueTotals"];
 export type PlanKpis = Schemas["PlanKpis"];
@@ -340,4 +341,54 @@ export interface WhatsAppRunResult {
   queued: number;
   skipped: number;
   message: string;
+}
+
+// My Deliveries on the phone (M17) – typed here until the next `npm run api:types`
+export interface MobilePaymentRequest {
+  customerId: number;
+  amount: number;
+  method: PayMethod;
+  reference?: string;
+  bank?: string;
+  chequeDate?: string;
+  note?: string;
+}
+export interface MyEntry {
+  entry: "BILL" | "PAYMENT";
+  id: number;
+  number: string;
+  kindLabel: string;
+  at: string;
+  customerId: number | null;
+  customerCode: string | null;
+  customerName: string;
+  filled: number;
+  empties: number;
+  /** Bill amount; null for a payment. */
+  amount: number | null;
+  received: number;
+  method: string | null;
+  reference: string | null;
+  /** The office reversed the bill. */
+  cancelled: boolean;
+}
+export interface MyBottles {
+  bottleTypeCode: string;
+  label: string;
+  filled: number;
+  empties: number;
+}
+export interface MyMoney {
+  cash: number;
+  bankTransfer: number;
+  cheque: number;
+  total: number;
+}
+export interface MyDay {
+  date: string;
+  bills: number;
+  payments: number;
+  bottles: MyBottles[];
+  money: MyMoney;
+  entries: MyEntry[];
 }
