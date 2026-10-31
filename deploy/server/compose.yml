@@ -1,0 +1,81 @@
+# Thuhina Water – the 4 containers on a UAT / production server (plan 7.2).
+# Differences from deploy/docker-compose.yml (laptop): images come from ECR (built by GitHub Actions,
+# never on the server), only Nginx has ports, HTTPS with Let's Encrypt, values from .env written by deploy.sh.
+# Always started through scripts/deploy.sh (it sets the project name, .env file and NGINX_CONF).
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?}
+      POSTGRES_USER: ${POSTGRES_USER:?}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      TZ: Asia/Colombo
+      PGTZ: Asia/Colombo
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    image: ${ECR_REGISTRY:?}/thuhina/api:${APP_VERSION:?}
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:?}
+      DB_URL: jdbc:postgresql://db:5432/${POSTGRES_DB}
+      DB_USERNAME: ${POSTGRES_USER}
+      DB_PASSWORD: ${POSTGRES_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?}
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-}
+      ADMIN_TEMP_PASSWORD: ${ADMIN_TEMP_PASSWORD:-}
+      APP_ENCRYPTION_KEY: ${APP_ENCRYPTION_KEY:-}
+      JAVA_OPTS: ${JAVA_OPTS}
+      FILES_DIR: /data/files
+    volumes:
+      - files-data:/data/files
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    image: ${ECR_REGISTRY}/thuhina/web:${APP_VERSION}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+    depends_on:
+      - api
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?}
+    volumes:
+      # http = before the first certificate exists, https = normal (chosen by deploy.sh).
+      # The Nginx image fills ${APP_DOMAIN} into the template when it starts.
+      - ./nginx/${NGINX_CONF:-https}.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ${APP_DIR:?}/letsencrypt:/etc/letsencrypt:ro
+      - ${APP_DIR}/acme:/var/www/certbot:ro
+    depends_on:
+      - api
+      - web
+
+  # One-off: certificate issue / renewal (scripts/deploy.sh and scripts/renew-cert.sh).
+  certbot:
+    image: certbot/certbot:v2.11.0
+    profiles: ["tools"]
+    volumes:
+      - ${APP_DIR}/letsencrypt:/etc/letsencrypt
+      - ${APP_DIR}/acme:/var/www/certbot
+
+volumes:
+  db-data:
+  files-data:

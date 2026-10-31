@@ -1,0 +1,60 @@
+# Nginx on the server (plan 7.2): port 80 only answers the Let's Encrypt check and redirects to HTTPS;
+# port 443 serves the app: "/" → web (Next.js), "/api" → api (Spring Boot).
+# ${APP_DOMAIN} is filled in by the Nginx image when the container starts.
+
+# Docker's internal DNS: containers get a new address when they are recreated by a deployment,
+# so names are looked up again instead of once at start-up.
+resolver 127.0.0.11 valid=10s ipv6=off;
+
+server {
+    listen 80;
+    server_name _;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${APP_DOMAIN};
+
+    ssl_certificate     /etc/letsencrypt/live/${APP_DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${APP_DOMAIN}/privkey.pem;
+    ssl_protocols       TLSv1.2 TLSv1.3;
+    ssl_session_cache   shared:SSL:10m;
+    ssl_session_timeout 1d;
+
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options    "nosniff" always;
+    add_header X-Frame-Options           "SAMEORIGIN" always;
+    add_header Referrer-Policy           "strict-origin-when-cross-origin" always;
+
+    client_max_body_size 10m;   # CSV imports and attachments
+
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    # Health and other actuator endpoints stay internal (design 11).
+    location /api/actuator/ {
+        return 404;
+    }
+
+    location /api/ {
+        set $api_upstream http://api:8080;
+        proxy_pass $api_upstream;
+        proxy_read_timeout 120s;    # large report exports
+    }
+
+    location / {
+        set $web_upstream http://web:3000;
+        proxy_pass $web_upstream;
+    }
+}

@@ -4,9 +4,9 @@ name: client-ci
 on:
   # Runs on every pull request (no path filter) so it can be a required status check.
   pull_request:
-    branches: [dev, main]
+    branches: [dev, uat, prod, main]
   push:
-    branches: [dev, main]
+    branches: [dev, uat, prod, main]
     paths:
       - "client/**"
       - ".github/workflows/client-ci.yml"
