@@ -1,0 +1,2 @@
+# Copy to backend.hcl (not committed) and fill in the bucket from: terraform -chdir=../../bootstrap output state_bucket
+bucket = "thuhina-tfstate-<aws account id>"
