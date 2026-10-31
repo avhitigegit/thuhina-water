@@ -46,6 +46,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/login", "/auth/logout").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        // Meta's WhatsApp webhook: no login – checked by the verify token / X-Hub-Signature-256 (design 9.2).
+                        .requestMatchers("/whatsapp/webhook").permitAll()
                         // Only reachable when springdoc is switched on (local and UAT profiles).
                         .requestMatchers("/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll()
                         .requestMatchers("/error").permitAll()

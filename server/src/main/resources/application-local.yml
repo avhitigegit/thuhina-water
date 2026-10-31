@@ -20,6 +20,8 @@ app:
     secret: ${JWT_SECRET:local-dev-secret-change-me-0123456789abcdef}
   cookie:
     secure: ${COOKIE_SECURE:false}
+  # Local only – UAT and production set APP_ENCRYPTION_KEY.
+  encryption-key: ${APP_ENCRYPTION_KEY:local-dev-encryption-key-0123456789}
 
 logging:
   level:
