@@ -160,7 +160,9 @@ class WhatsAppIntegrationTest extends SalesTestSupport {
         sale("/sales/bills", map("customerId", c, "date", month.atDay(5).toString(), "paperBillNo", "I" + System.nanoTime() % 10_000_000_000L,
                 "lines", List.of(map("bottleTypeCode", bottle, "filled", 2, "empties", 2)), "paid", 0));
 
-        Map<String, Object> result = read(mvc.perform(json(post("/invoices/generate"), map("period", month.toString()))).andReturn());
+        MvcResult generated = mvc.perform(json(post("/invoices/generate"), map("period", month.toString()))).andReturn();
+        assertThat(generated.getResponse().getStatus()).as(generated.getResponse().getContentAsString()).isEqualTo(200);
+        Map<String, Object> result = read(generated);
         Map<String, Object> inv = ((List<Map<String, Object>>) result.get("created")).stream()
                 .filter(r -> ((Number) ((Map<String, Object>) r.get("customer")).get("id")).longValue() == c).findFirst().orElseThrow();
         List<Map<String, Object>> m = messages(c);
