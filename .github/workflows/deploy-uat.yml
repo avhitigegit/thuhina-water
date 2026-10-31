@@ -126,9 +126,10 @@ jobs:
 
       - name: Run deploy.sh on the server (SSM)
         run: |
+          # SSM runs this with sh (dash), not bash – keep it POSIX; deploy.sh itself runs in bash.
           script=$(cat <<EOF
-          set -euo pipefail
-          source /etc/thuhina-deploy.env
+          set -eu
+          . /etc/thuhina-deploy.env
           dir="\$APP_DIR/releases/$TAG"
           rm -rf "\$dir" && mkdir -p "\$dir"
           aws s3 cp "s3://\$RELEASES_BUCKET/releases/$TAG.tar.gz" - --region "\$AWS_REGION" | tar -xz -C "\$dir"
