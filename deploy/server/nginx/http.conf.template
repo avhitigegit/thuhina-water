@@ -1,0 +1,16 @@
+# Used only until the first HTTPS certificate exists (first deployment on a new server).
+# Answers the Let's Encrypt check; everything else waits for HTTPS. deploy.sh then switches to https.conf.template.
+
+server {
+    listen 80;
+    server_name _;
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        default_type text/plain;
+        return 503 "Starting – the HTTPS certificate for ${APP_DOMAIN} is being issued.\n";
+    }
+}

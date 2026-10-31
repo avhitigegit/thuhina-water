@@ -1,4 +1,4 @@
-# UAT (NUVI shared UAT server). Seed data is loaded; Swagger UI is available for testing.
+# UAT (AWS test server, demo data only). Seed data is loaded; Swagger UI is available for testing.
 
 spring:
   flyway:
