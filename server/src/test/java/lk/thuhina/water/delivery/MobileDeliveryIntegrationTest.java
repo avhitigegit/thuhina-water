@@ -53,6 +53,8 @@ class MobileDeliveryIntegrationTest extends SalesTestSupport {
     @SuppressWarnings("unchecked")
     void staffSavesTodaysBillWithBottlesAndMoneyAndSeesTheirDay() throws Exception {
         long c = customerHolding("Mobile Home", 4);
+        // Due today, so the office's due list shows the bill entered on the phone.
+        jdbc.update("update customer set delivery_day = ?, next_delivery_date = ? where id = ?", today.getDayOfWeek().getValue(), today, c);
 
         // Bank transfer without its reference: shown by the preview, refused on save.
         Map<String, Object> preview = read(mvc.perform(json(post("/delivery/mobile/bills/preview"), staff,
@@ -70,8 +72,25 @@ class MobileDeliveryIntegrationTest extends SalesTestSupport {
         assertThat(txn).containsEntry("date", today.toString()).containsEntry("paperBillNo", null)
                 .containsEntry("payMethod", "Bank transfer").containsEntry("payReference", "TRF-77")
                 .containsEntry("createdBy", staffUser.getUsername());
+        assertThat(txn).containsEntry("enteredOnPhone", true);
         assertThat(bottles(c)).containsExactly(4, 0, 0);
         assertThat(balance(c)).isEqualByComparingTo("0");
+
+        // The office sees it as entered on the phone, by whom (Enter Bills / due list), and can list phone bills only.
+        Map<String, Object> dueList = read(mvc.perform(get("/delivery/due").param("area", String.valueOf(areaId)).cookie(admin))
+                .andExpect(status().isOk()).andReturn());
+        Map<String, Object> row = ((List<Map<String, Object>>) dueList.get("items")).stream()
+                .filter(x -> ((Number) x.get("id")).longValue() == c).findFirst().orElseThrow();
+        assertThat(row).containsEntry("entered", true);
+        assertThat((List<Map<String, Object>>) row.get("enteredBills")).singleElement().satisfies(b -> assertThat(b)
+                .containsEntry("onPhone", true).containsEntry("enteredBy", staffUser.getFullName()));
+        Map<String, Object> phoneBills = read(mvc.perform(get("/sales/txns").param("customerId", String.valueOf(c)).param("onPhone", "true")
+                .cookie(admin)).andExpect(status().isOk()).andReturn());
+        assertThat((List<Map<String, Object>>) phoneBills.get("items")).singleElement()
+                .satisfies(b -> assertThat(b).containsEntry("billNo", txn.get("billNo")).containsEntry("enteredOnPhone", true));
+        Map<String, Object> officeBills = read(mvc.perform(get("/sales/txns").param("customerId", String.valueOf(c)).param("onPhone", "false")
+                .cookie(admin)).andExpect(status().isOk()).andReturn());
+        assertThat((List<Map<String, Object>>) officeBills.get("items")).extracting(b -> b.get("billNo")).doesNotContain(txn.get("billNo"));
 
         // Money without a delivery: a payment for today.
         MvcResult paid = mvc.perform(json(post("/delivery/mobile/payments"), staff, map("customerId", c, "amount", 500, "method", "CASH")))

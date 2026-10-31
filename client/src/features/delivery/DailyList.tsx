@@ -216,7 +216,8 @@ function DayRow({ c, canEnter }: { c: DueCustomer; canEnter: boolean }) {
           <>
             <StatusBadge status="Entered" />
             <div className="small muted">
-              bill {c.enteredBills.map((b) => b.billNo).join(", ")} · next {formatDate(c.nextDeliveryDate)}
+              bill {c.enteredBills.map((b) => b.billNo + (b.onPhone ? " (phone)" : "")).join(", ")} · next{" "}
+              {formatDate(c.nextDeliveryDate)}
             </div>
           </>
         ) : c.overdue ? (

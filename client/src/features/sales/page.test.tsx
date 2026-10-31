@@ -26,6 +26,7 @@ const ROW: TxnRow = {
   paid: 500,
   reversed: true,
   reversalOfBillNo: null,
+  enteredOnPhone: false,
 };
 
 const ME = {

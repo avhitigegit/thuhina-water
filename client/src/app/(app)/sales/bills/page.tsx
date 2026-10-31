@@ -60,6 +60,12 @@ const columns: Column<TxnRow>[] = [
     cell: (x) => (
       <>
         <b className="mono">{x.billNo}</b>
+        {x.enteredOnPhone && (
+          <>
+            {" "}
+            <Badge kind="info">phone</Badge>
+          </>
+        )}
         {x.paperBillNo && <div className="small muted">paper {x.paperBillNo}</div>}
       </>
     ),
@@ -119,13 +125,22 @@ function SalesBillsPage() {
   const [bill, setBill] = useState(billParam);
   const [customer, setCustomer] = useState<CustomerLookupRow | null>(null);
   const [kind, setKind] = useState("");
+  // "" = all, "true" = saved on the phone (My Deliveries), "false" = typed in the office.
+  const [entered, setEntered] = useState("");
   const [from, setFrom] = useState<string | null>(addDaysIso(today, -14));
   const [to, setTo] = useState<string | null>(today);
   const q = useDebounced(bill.trim(), 300);
   // A bill number searches all bills (the other filters are ignored, as in the prototype).
   const filters = q
-    ? { q, customerId: null, kind: "", from: null, to: null }
-    : { q: "", customerId: customer?.id ?? null, kind, from, to };
+    ? { q, customerId: null, kind: "", from: null, to: null, onPhone: null }
+    : {
+        q: "",
+        customerId: customer?.id ?? null,
+        kind,
+        from,
+        to,
+        onPhone: entered === "" ? null : entered === "true",
+      };
   const filterKey = JSON.stringify(filters);
   const [paging, setPaging] = useState({ key: filterKey, page: 0 });
   const page = paging.key === filterKey ? paging.page : 0;
@@ -206,6 +221,14 @@ function SalesBillsPage() {
                   {k.label}
                 </option>
               ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="b-entered">Entered</label>
+            <select id="b-entered" value={entered} onChange={(e) => setEntered(e.target.value)}>
+              <option value="">All</option>
+              <option value="true">On the phone</option>
+              <option value="false">In the office</option>
             </select>
           </div>
           <div className="field">

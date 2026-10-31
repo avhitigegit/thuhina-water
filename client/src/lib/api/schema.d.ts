@@ -2847,6 +2847,7 @@ export interface components {
             paid: number;
             payMethod: string | null;
             payReference: string | null;
+            enteredOnPhone: boolean;
             note: string | null;
             phoneConfirmed: boolean;
             damageMode: string | null;
@@ -4059,6 +4060,8 @@ export interface components {
             paid: number;
             reversed: boolean;
             reversalOfBillNo: string | null;
+            /** @description Saved by the delivery staff on the phone (My Deliveries) */
+            enteredOnPhone: boolean;
         };
         PaperBillCheck: {
             paperBillNo: string;
@@ -4444,6 +4447,10 @@ export interface components {
             paperBillNo: string | null;
             kind: string;
             kindLabel: string;
+            /** @description Saved on the phone (My Deliveries) */
+            onPhone: boolean;
+            /** @description Full name of the user who saved it */
+            enteredBy: string;
         };
         LastDelivery: {
             /** Format: date */
