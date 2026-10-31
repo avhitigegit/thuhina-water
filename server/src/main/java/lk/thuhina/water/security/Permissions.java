@@ -43,6 +43,8 @@ public final class Permissions {
     public static final String DELIVERY_PLANNING_VIEW = "delivery-planning.view";
     /** Daily Delivery List – view and print. */
     public static final String DELIVERY_LIST_VIEW = "delivery-list.view";
+    /** My Deliveries on the phone: today's bottles left / empties collected and money received (Delivery Staff, Admin). */
+    public static final String DELIVERY_ENTRY = "delivery.entry";
 
     public static final String BILLING_VIEW = "billing.view";
     public static final String BILLING_EDIT = "billing.edit";

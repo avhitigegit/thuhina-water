@@ -45,6 +45,9 @@ public final class SalesDtos {
             @Schema(description = "EXCHANGE (default) or LEFT_AT_DOOR") SalesKind kind,
             List<BillLineRequest> lines,
             BigDecimal paid,
+            @Schema(description = "How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE") PayMethod payMethod,
+            @Schema(description = "Cheque number or bank transfer reference (needed for those methods)")
+            @Size(max = 100, message = "Reference: at most 100 characters.") String payReference,
             @Size(max = 500, message = MSG_NOTE) String note,
             Boolean phoneConfirmed,
             Boolean approveOverLimit) {
@@ -237,6 +240,7 @@ public final class SalesDtos {
             BigDecimal amount,
             BigDecimal paid,
             @Schema(nullable = true) String payMethod,
+            @Schema(nullable = true) String payReference,
             @Schema(nullable = true) String note,
             boolean phoneConfirmed,
             @Schema(nullable = true) String damageMode,

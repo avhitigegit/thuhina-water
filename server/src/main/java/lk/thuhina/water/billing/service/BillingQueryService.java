@@ -121,7 +121,7 @@ public class BillingQueryService {
                         + "p.method, p.reference, null as bill_no, p.amount from customer_payment p join customer c on c.id = p.customer_id "
                         + "union all "
                         + "select 'BILL', t.id, t.bill_no, t.txn_date, t.created_at, t.customer_id, coalesce(c.name, t.walk_in_name), t.pay_method, "
-                        + "null, t.bill_no, t.paid_on_bill from sales_txn t left join customer c on c.id = t.customer_id where t.paid_on_bill > 0"
+                        + "t.pay_reference, t.bill_no, t.paid_on_bill from sales_txn t left join customer c on c.id = t.customer_id where t.paid_on_bill > 0"
                         + ") x order by d desc, at desc, id desc limit :n", new MapSqlParameterSource("n", n),
                 (rs, i) -> {
                     String how;
@@ -131,6 +131,7 @@ public class BillingQueryService {
                     } else {
                         String m = rs.getString("method");
                         how = (m == null || PayMethod.CASH.name().equals(m) ? "Cash on delivery" : PayMethod.valueOf(m).label() + " on delivery")
+                                + (rs.getString("reference") == null ? "" : " – " + rs.getString("reference"))
                                 + " – bill " + rs.getString("bill_no");
                     }
                     return new RecentMoney(rs.getString("kind"), rs.getLong("id"), rs.getString("ref"), rs.getObject("d", LocalDate.class),

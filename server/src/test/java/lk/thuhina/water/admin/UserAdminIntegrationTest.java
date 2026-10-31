@@ -80,10 +80,10 @@ class UserAdminIntegrationTest extends IntegrationTest {
         MvcResult changed = mvc.perform(json(post("/auth/change-password"), cookie,
                         Map.of("currentPassword", "Start-123", "newPassword", "My-Own-Pass-9")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.landingPage").value("/delivery/daily-list"))
+                .andExpect(jsonPath("$.landingPage").value("/delivery/my-deliveries"))
                 .andExpect(jsonPath("$.menu.length()").value(1))
-                .andExpect(jsonPath("$.menu[0].items.length()").value(1))
-                .andExpect(jsonPath("$.menu[0].items[0].path").value("/delivery/daily-list"))
+                .andExpect(jsonPath("$.menu[0].items.length()").value(2))
+                .andExpect(jsonPath("$.menu[0].items[0].path").value("/delivery/my-deliveries"))
                 .andReturn();
         Cookie newCookie = changed.getResponse().getCookie(COOKIE);
         mvc.perform(get("/users").cookie(newCookie)).andExpect(status().isForbidden());

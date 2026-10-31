@@ -62,6 +62,7 @@ public class MenuService {
                     new Page("sales-bills", "Sales & Bills", "/sales/bills", SALES_VIEW, SALES_EDIT),
                     new Page("quotations", "Customer Quotations", "/sales/quotations", QUOTATIONS_VIEW, QUOTATIONS_EDIT))),
             new Module("Delivery Schedule", "calendar", null, List.of(
+                    new Page("my-deliveries", "My Deliveries", "/delivery/my-deliveries", DELIVERY_ENTRY, DELIVERY_ENTRY),
                     new Page("delivery-planning", "Delivery Planning", "/delivery/planning", DELIVERY_PLANNING_VIEW, null),
                     new Page("daily-delivery-list", "Daily Delivery List", "/delivery/daily-list", DELIVERY_LIST_VIEW, null))),
             new Module("Billing & Payments", "money", null, List.of(

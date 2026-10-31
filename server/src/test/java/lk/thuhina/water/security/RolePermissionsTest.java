@@ -31,18 +31,18 @@ class RolePermissionsTest {
                 .doesNotContain(CUSTOMERS_EDIT, CUSTOMER_PRICES_EDIT, PARTNERS_EDIT, PURCHASING_EDIT, PRODUCTION_EDIT, QUOTATIONS_EDIT);
         // None
         assertThat(acc).doesNotContain(MASTERDATA_VIEW, STOCK_VIEW, SALES_VIEW, DELIVERY_PLANNING_VIEW, DELIVERY_LIST_VIEW,
-                ADMIN_MANAGE, MIGRATION_MANAGE, REPORTS_ALL, SALES_APPROVE_OVER_LIMIT);
+                DELIVERY_ENTRY, ADMIN_MANAGE, MIGRATION_MANAGE, REPORTS_ALL, SALES_APPROVE_OVER_LIMIT);
     }
 
     @Test
-    void deliveryStaffOnlySeesTheDailyList() {
-        assertThat(RolePermissions.of(Role.DELIVERY_STAFF)).containsExactly(DELIVERY_LIST_VIEW);
+    void deliveryStaffSeesTheDailyListAndEntersTheirDeliveries() {
+        assertThat(RolePermissions.of(Role.DELIVERY_STAFF)).containsExactlyInAnyOrder(DELIVERY_LIST_VIEW, DELIVERY_ENTRY);
     }
 
     @Test
     void landingPages() {
         assertThat(Role.ADMIN.landingPage()).isEqualTo("/dashboard");
         assertThat(Role.ACCOUNTANT.landingPage()).isEqualTo("/dashboard");
-        assertThat(Role.DELIVERY_STAFF.landingPage()).isEqualTo("/delivery/daily-list");
+        assertThat(Role.DELIVERY_STAFF.landingPage()).isEqualTo("/delivery/my-deliveries");
     }
 }
