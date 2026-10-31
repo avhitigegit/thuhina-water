@@ -46,12 +46,22 @@ deploy/terraform/
 
 When a command says the credentials expired, run `aws login --profile thuhina-uat` again.
 
+## Values kept out of Git
+
+The repository is public, so the two values that identify the AWS account live in local files that Git ignores.
+Create them once per computer from the `.example` files in `envs/uat/`:
+
+| File | Holds | Where the value comes from |
+|---|---|---|
+| `backend.hcl` | `bucket = "<state bucket>"` | `terraform -chdir=../../bootstrap output state_bucket` |
+| `account.auto.tfvars` | `aws_account_id = "<id>"` | `aws sts get-caller-identity --profile thuhina-uat` |
+
 ## Everyday commands (UAT)
 
 ```powershell
 $env:AWS_PROFILE = "thuhina-uat-tf"
 cd deploy\terraform\envs\uat
-terraform init                                         # once, or after a provider / module change
+terraform init -backend-config="backend.hcl"           # once, or after a provider / module change
 terraform plan  -var-file="uat.tfvars" -out="uat.tfplan"   # what WILL change – read it
 terraform apply "uat.tfplan"                           # does exactly that plan
 terraform output                                       # UAT address, IP, instance ID, ECR, buckets
@@ -62,15 +72,16 @@ Rules:
   rebuilt – stop and ask.
 - Never change AWS by hand in the console. If it happened, bring it back into Terraform (import or re-apply).
 - `terraform plan` on a clean `dev` must say **No changes**.
-- Never commit `*.tfstate`, `*.tfplan` or `.terraform/` (they hold secrets). `.terraform.lock.hcl` **is** committed.
+- Never commit `*.tfstate`, `*.tfplan` or `.terraform/` (they hold secrets), nor `backend.hcl` / `account.auto.tfvars`.
+  `.terraform.lock.hcl` **is** committed.
 
 ## First-time setup of a new account
 
 ```powershell
 cd deploy\terraform\bootstrap
 terraform init ; terraform apply              # creates <project>-tfstate-<account id>
-# put the bucket name in envs/<env>/versions.tf (backend "s3"), then:
-cd ..\envs\uat ; terraform init ; terraform plan -var-file="uat.tfvars" -out="uat.tfplan" ; terraform apply "uat.tfplan"
+# write the bucket name into envs/<env>/backend.hcl and the account ID into account.auto.tfvars, then:
+cd ..\envs\uat ; terraform init -backend-config="backend.hcl" ; terraform plan -var-file="uat.tfvars" -out="uat.tfplan" ; terraform apply "uat.tfplan"
 ```
 
 After the first apply:

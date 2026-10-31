@@ -44,3 +44,6 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+# Terraform values that identify the AWS account (copy the *.example files)
+deploy/terraform/**/backend.hcl
+deploy/terraform/**/account.auto.tfvars

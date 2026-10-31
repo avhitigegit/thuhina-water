@@ -13,8 +13,9 @@ terraform {
   }
 
   # State in the bucket made by ../../bootstrap (plan 6.2). S3 lock file – no DynamoDB table needed.
+  # The bucket name holds the account ID, so it comes from backend.hcl (not in Git):
+  #   terraform init -backend-config="backend.hcl"      (copy backend.hcl.example)
   backend "s3" {
-    bucket       = "thuhina-tfstate-685253389970"
     key          = "uat/terraform.tfstate"
     region       = "ap-southeast-2"
     encrypt      = true
