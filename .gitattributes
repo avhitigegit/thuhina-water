@@ -4,3 +4,4 @@
 *.tf     text eol=lf
 *.tfvars text eol=lf
 *.hcl    text eol=lf
+*.template text eol=lf
