@@ -62,7 +62,11 @@ class NumberingServiceIntegrationTest extends IntegrationTest {
     void realSequencesUseTheDesignFormats() {
         String customer = tx.execute(s -> numbering.next(SequenceNames.CUSTOMER));
         String bill = tx.execute(s -> numbering.next(SequenceNames.BILL));
-        String invoice = tx.execute(s -> numbering.next(SequenceNames.MONTHLY_INVOICE, LocalDate.of(2099, 9, 30)));
+        // Rolled back: a 2099 number left in the shared database would close every real month for the other tests.
+        String invoice = tx.execute(s -> {
+            s.setRollbackOnly();
+            return numbering.next(SequenceNames.MONTHLY_INVOICE, LocalDate.of(2099, 9, 30));
+        });
         assertThat(customer).matches("C\\d{4}");
         assertThat(bill).matches("B\\d{6}");
         assertThat(invoice).isEqualTo("INV-9909-0001");

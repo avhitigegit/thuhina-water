@@ -248,6 +248,12 @@ function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDeta
         <div style={{ margin: "4px 0 12px" }}>
           <StatusBadge status={active ? "Active" : "Inactive"} /> <Badge>{c.typeName}</Badge>{" "}
           <StatusBadge status={payLabel(c.payType)} />
+          {c.whatsappOptIn && (
+            <>
+              {" "}
+              <Badge kind="ok">WhatsApp {c.whatsappNumber}</Badge>
+            </>
+          )}
           {anyAgreed && (
             <>
               {" "}

@@ -11,6 +11,12 @@ app:
     admin-temp-password: Temp-Pass-123
   storage:
     dir: ${java.io.tmpdir}/thuhina-water-test-files
+  encryption-key: test-encryption-key-0123456789abcdef
+  whatsapp:
+    # Never call Meta from tests; the jobs are run by the tests themselves ("-" = scheduling off).
+    allow-live: false
+    sender-cron: "-"
+    reminder-cron: "-"
 
 logging:
   level:

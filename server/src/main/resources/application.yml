@@ -74,6 +74,15 @@ app:
     admin-full-name: ${ADMIN_FULL_NAME:System Administrator}
   storage:
     dir: ${FILES_DIR:data/files}
+  # AES key for secrets stored in the database (WhatsApp token / app secret, design 9.2) – environment only.
+  encryption-key: ${APP_ENCRYPTION_KEY:}
+  whatsapp:
+    # Meta Graph API (Cloud API) base address; the credentials are entered in Administration → WhatsApp.
+    api-url: ${WHATSAPP_API_URL:https://graph.facebook.com/v23.0}
+    allow-live: true
+    batch-size: 20
+    sender-cron: "30 * * * * *"
+    reminder-cron: "0 0 * * * *"
 
 logging:
   level:
