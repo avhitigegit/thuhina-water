@@ -263,3 +263,81 @@ export type ReportChart = Schemas["ReportChart"];
 export type ReportView = Omit<Schemas["ReportView"], "chart"> & { chart: ReportChart | null };
 export type DemoDataStatus = Schemas["DemoDataStatus"];
 export type DemoDataResult = Schemas["DemoDataResult"];
+
+// WhatsApp (M13) – typed here until `npm run api:types` is run against an API with the /whatsapp endpoints.
+/** GET/PUT /whatsapp/settings – secrets are never returned, only whether each one is saved. */
+export interface WhatsAppSettings {
+  enabled: boolean;
+  phoneNumberId: string | null;
+  businessAccountId: string | null;
+  accessTokenSaved: boolean;
+  appSecretSaved: boolean;
+  verifyTokenSaved: boolean;
+  leftAtDoor: boolean;
+  paymentReminder: boolean;
+  monthlyInvoice: boolean;
+  reminderDay: number;
+  reminderHour: number;
+  language: string;
+  mode: "LIVE" | "TEST";
+  modeText: string;
+  encryptionReady: boolean;
+  webhookPath: string;
+}
+/** Fields left out stay as they are; secrets / ids: text = save, "" = remove. */
+export type WhatsAppSettingsRequest = Partial<
+  Omit<
+    WhatsAppSettings,
+    | "accessTokenSaved"
+    | "appSecretSaved"
+    | "verifyTokenSaved"
+    | "mode"
+    | "modeText"
+    | "encryptionReady"
+    | "webhookPath"
+  > & { accessToken: string; appSecret: string; verifyToken: string }
+>;
+export interface WhatsAppCheckResult {
+  ok: boolean;
+  mode: "LIVE" | "TEST";
+  message: string;
+}
+export interface WhatsAppMessageRow {
+  id: number;
+  createdAt: string;
+  customerId: number | null;
+  customerCode: string | null;
+  customerName: string | null;
+  type: "LEFT_AT_DOOR" | "PAYMENT_REMINDER" | "MONTHLY_INVOICE" | "TEST";
+  typeLabel: string;
+  toNumber: string;
+  status: "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED" | "SKIPPED";
+  statusLabel: string;
+  testMode: boolean;
+  params: string[];
+  attempts: number;
+  sentAt: string | null;
+  statusAt: string | null;
+  error: string | null;
+  sourceType: string | null;
+  sourceId: number | null;
+}
+export interface WhatsAppMonthCount {
+  month: string;
+  sent: number;
+  failed: number;
+  skipped: number;
+  test: number;
+}
+export interface WhatsAppMessagePage {
+  items: WhatsAppMessageRow[];
+  page: number;
+  size: number;
+  total: number;
+  thisMonth: WhatsAppMonthCount;
+}
+export interface WhatsAppRunResult {
+  queued: number;
+  skipped: number;
+  message: string;
+}

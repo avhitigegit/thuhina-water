@@ -84,6 +84,7 @@ import lk.thuhina.water.sales.rules.SaleLine;
 import lk.thuhina.water.security.AuthUser;
 import lk.thuhina.water.security.CurrentUser;
 import lk.thuhina.water.security.Permissions;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -121,13 +122,14 @@ public class SalesService {
     private final NumberingService numbering;
     private final AuditService audit;
     private final NamedParameterJdbcTemplate jdbc;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     public SalesService(SalesTxnRepository txns, SalesTxnLineRepository txnLines, SalesQueryService queries, CustomerRepository customers,
                         CustomerTypeRepository customerTypes, BottleTypeRepository bottleTypes, OldBottleBrandRepository brands,
                         ProductRepository products, DamageRecordRepository damages, PricingService pricing, LedgerService ledger,
                         AccountService accounts, NumberingService numbering, AuditService audit, NamedParameterJdbcTemplate jdbc,
-                        Clock clock) {
+                        ApplicationEventPublisher events, Clock clock) {
         this.txns = txns;
         this.txnLines = txnLines;
         this.queries = queries;
@@ -143,6 +145,7 @@ public class SalesService {
         this.numbering = numbering;
         this.audit = audit;
         this.jdbc = jdbc;
+        this.events = events;
         this.clock = clock;
     }
 
@@ -162,8 +165,12 @@ public class SalesService {
         String details = kind.label() + " for " + x.customer().getName() + ": " + String.join(", ", calc.lines().stream()
                 .map(l -> l.getLabel() + " filled " + l.getFilled() + " / empties " + l.getEmpties()).toList()) + ", "
                 + Money.format(calc.amount());
-        return post(new Spec(kind, x, null, r.paperBillNo(), true, calc, r.paid(), null, r.note(), Boolean.TRUE.equals(r.phoneConfirmed()),
-                null, null, r.approveOverLimit(), details, true));
+        Posted posted = postAndSave(new Spec(kind, x, null, r.paperBillNo(), true, calc, r.paid(), null, r.note(),
+                Boolean.TRUE.equals(r.phoneConfirmed()), null, null, r.approveOverLimit(), details, true));
+        if (kind == SalesKind.LEFT_AT_DOOR) {
+            events.publishEvent(new LeftAtDoorBillSaved(posted.txn().getId(), x.customer().getId(), x.date()));
+        }
+        return result(posted);
     }
 
     private static SalesKind billKind(BillRequest r) {
