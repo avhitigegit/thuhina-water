@@ -31,7 +31,9 @@ public final class DeliveryDtos {
     }
 
     /** A bill already entered for the customer on the date (not reversed). */
-    public record EnteredBill(long id, String billNo, @Schema(nullable = true) String paperBillNo, String kind, String kindLabel) {
+    public record EnteredBill(long id, String billNo, @Schema(nullable = true) String paperBillNo, String kind, String kindLabel,
+                              @Schema(description = "Saved on the phone (My Deliveries)") boolean onPhone,
+                              @Schema(description = "Full name of the user who saved it") String enteredBy) {
     }
 
     /**

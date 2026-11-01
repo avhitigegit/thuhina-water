@@ -143,7 +143,11 @@ export function BillDialog({
               <b className="num">
                 {formatMoney(b.paid)}
                 {b.payMethod && Number(b.paid) !== 0 && (
-                  <span className="muted small"> ({payMethodLabel(b.payMethod)})</span>
+                  <span className="muted small">
+                    {" "}
+                    ({payMethodLabel(b.payMethod)}
+                    {b.payReference && ` – ${b.payReference}`})
+                  </span>
                 )}
               </b>
               {b.note && (
@@ -161,6 +165,7 @@ export function BillDialog({
               <span className="muted">Entered by</span>
               <b>
                 {b.createdByName ?? b.createdBy} · {formatDateTime(b.createdAt)}
+                {b.enteredOnPhone && " · on the phone"}
               </b>
             </div>
             {b.creditOverrideBy && (

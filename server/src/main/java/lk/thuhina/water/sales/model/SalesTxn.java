@@ -52,6 +52,9 @@ public class SalesTxn extends BaseEntity {
     @Column(name = "pay_reference", length = 100, updatable = false)
     private String payReference;
 
+    @Column(name = "entered_on_phone", nullable = false, updatable = false)
+    private boolean enteredOnPhone;
+
     @Column(name = "water_amount", nullable = false, updatable = false)
     private BigDecimal waterAmount = Money.ZERO;
 
@@ -113,6 +116,12 @@ public class SalesTxn extends BaseEntity {
     /** Cheque number or bank transfer reference of the money paid on the bill. */
     public SalesTxn payReference(String reference) {
         this.payReference = reference;
+        return this;
+    }
+
+    /** Saved by the delivery staff on the phone (My Deliveries), not typed in the office. */
+    public SalesTxn enteredOnPhone(boolean onPhone) {
+        this.enteredOnPhone = onPhone;
         return this;
     }
 
@@ -189,6 +198,10 @@ public class SalesTxn extends BaseEntity {
 
     public BigDecimal getPaidOnBill() {
         return paidOnBill;
+    }
+
+    public boolean isEnteredOnPhone() {
+        return enteredOnPhone;
     }
 
     public String getPayReference() {

@@ -177,9 +177,10 @@ public class SalesController {
                                 @RequestParam(required = false) SalesKind kind,
                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
                                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+                                @RequestParam(required = false) Boolean onPhone,
                                 @RequestParam(defaultValue = "0") int page,
                                 @RequestParam(defaultValue = "50") int size) {
-        return queries.list(new SalesQueryService.Filter(q, customerId, kind, from, to), page, size);
+        return queries.list(new SalesQueryService.Filter(q, customerId, kind, from, to, onPhone), page, size);
     }
 
     @Operation(summary = "Bill details: lines, amounts, ledger effects, user, links to its reversal")

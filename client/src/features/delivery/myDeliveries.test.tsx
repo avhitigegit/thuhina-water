@@ -64,7 +64,15 @@ const LIST: DueList = {
       entered: true,
       listed: false,
       enteredBills: [
-        { id: 9, billNo: "B000009", paperBillNo: null, kind: "EXCHANGE", kindLabel: "Exchange" },
+        {
+          id: 9,
+          billNo: "B000009",
+          paperBillNo: null,
+          kind: "EXCHANGE",
+          kindLabel: "Exchange",
+          onPhone: true,
+          enteredBy: "Kasun Silva",
+        },
       ],
     }),
   ],

@@ -38,6 +38,7 @@ public class SalesQueryService {
 
     private static final String ROW_SELECT = "select t.id, t.bill_no, t.paper_bill_no, t.kind, t.txn_date, t.customer_id, c.code, "
             + "coalesce(c.name, t.walk_in_name) as party, t.amount, t.paid_on_bill, t.reversed_by_id, o.bill_no as reversal_of, "
+            + "t.entered_on_phone, "
             + "coalesce((select sum(l.filled) from sales_txn_line l where l.txn_id = t.id), 0) as filled, "
             + "coalesce((select sum(l.empties) from sales_txn_line l where l.txn_id = t.id), 0) as empties "
             + "from sales_txn t left join customer c on c.id = t.customer_id left join sales_txn o on o.id = t.reversal_of_id ";
@@ -53,7 +54,8 @@ public class SalesQueryService {
     }
 
     /** Filters of the bills list; all optional. {@code q} = part of the system or the paper bill number. */
-    public record Filter(String q, Long customerId, SalesKind kind, LocalDate from, LocalDate to) {
+    /** {@code onPhone}: true = only bills saved on the phone, false = only office bills, null = all. */
+    public record Filter(String q, Long customerId, SalesKind kind, LocalDate from, LocalDate to, Boolean onPhone) {
     }
 
     @Transactional(readOnly = true)
@@ -82,6 +84,10 @@ public class SalesQueryService {
         if (f.to() != null) {
             where.append(" and t.txn_date <= :to");
             p.addValue("to", f.to());
+        }
+        if (f.onPhone() != null) {
+            where.append(" and t.entered_on_phone = :phone");
+            p.addValue("phone", f.onPhone());
         }
         Long total = jdbc.queryForObject("select count(*) from sales_txn t " + where, p, Long.class);
         p.addValue("limit", pageSize).addValue("offset", (long) pageNo * pageSize);
@@ -135,7 +141,7 @@ public class SalesQueryService {
                 t.getCustomerId(), (String) c.get("code"), t.getCustomerId() == null ? t.getWalkInName() : (String) c.get("name"),
                 (String) c.get("address"), (String) c.get("phone"), (String) c.get("pay_type"), saleLines,
                 t.getWaterAmount(), t.getDepositAmount(), t.getProductAmount(), t.getProductCost(), t.getAmount(), t.getPaidOnBill(),
-                t.getPayMethod() == null ? null : t.getPayMethod().label(), t.getPayReference(), t.getNote(), t.isPhoneConfirmed(),
+                t.getPayMethod() == null ? null : t.getPayMethod().label(), t.getPayReference(), t.isEnteredOnPhone(), t.getNote(), t.isPhoneConfirmed(),
                 t.getDamageMode() == null ? null : t.getDamageMode().name(), t.getSettleMethod() == null ? null : t.getSettleMethod().name(),
                 t.getCreditOverrideBy(), names.get(t.getCreditOverrideBy()), reversalOf, reversedBy, effects(id, labels),
                 t.getCreatedBy(), names.get(t.getCreatedBy()), t.getCreatedAt());
@@ -164,7 +170,7 @@ public class SalesQueryService {
         return new TxnRow(rs.getLong("id"), rs.getString("bill_no"), rs.getString("paper_bill_no"), kind.name(), kind.label(),
                 rs.getObject("txn_date", LocalDate.class), walkIn ? null : customerId, rs.getString("code"), rs.getString("party"), walkIn,
                 rs.getInt("filled"), rs.getInt("empties"), amount, rs.getBigDecimal("paid_on_bill"),
-                rs.getObject("reversed_by_id") != null, rs.getString("reversal_of"));
+                rs.getObject("reversed_by_id") != null, rs.getString("reversal_of"), rs.getBoolean("entered_on_phone"));
     }
 
     private BillLink link(long id) {
