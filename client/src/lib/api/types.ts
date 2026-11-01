@@ -274,10 +274,19 @@ export interface WhatsAppSettings {
   accessTokenSaved: boolean;
   appSecretSaved: boolean;
   verifyTokenSaved: boolean;
-  leftAtDoor: boolean;
-  paymentReminder: boolean;
+  welcome: boolean;
+  quotation: boolean;
+  deliveryBill: boolean;
+  billCancelled: boolean;
+  paymentReceipt: boolean;
   monthlyInvoice: boolean;
-  reminderDay: number;
+  dueSoon: boolean;
+  overdue: boolean;
+  /** Payment due soon: days before the due date (1 – 30). */
+  daysBefore: number;
+  /** Payment overdue: days after the due date (1 – 30). */
+  daysAfter: number;
+  /** Hour of the daily reminder run (0 – 23). */
   reminderHour: number;
   language: string;
   mode: "LIVE" | "TEST";
@@ -309,7 +318,7 @@ export interface WhatsAppMessageRow {
   customerId: number | null;
   customerCode: string | null;
   customerName: string | null;
-  type: "LEFT_AT_DOOR" | "PAYMENT_REMINDER" | "MONTHLY_INVOICE" | "TEST";
+  type: WhatsAppMessageType;
   typeLabel: string;
   toNumber: string;
   status: "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED" | "SKIPPED";
@@ -322,6 +331,35 @@ export interface WhatsAppMessageRow {
   error: string | null;
   sourceType: string | null;
   sourceId: number | null;
+}
+export type WhatsAppMessageType =
+  | "WELCOME"
+  | "QUOTATION"
+  | "DELIVERY_BILL"
+  | "BILL_CANCELLED"
+  | "PAYMENT_RECEIPT"
+  | "MONTHLY_INVOICE"
+  | "PAYMENT_DUE_SOON"
+  | "PAYMENT_OVERDUE"
+  | "TEST";
+/** GET /whatsapp/templates – one Meta template to create in WhatsApp Manager. */
+export interface WhatsAppTemplateRow {
+  type: WhatsAppMessageType;
+  label: string;
+  name: string;
+  category: string;
+  document: boolean;
+  body: string;
+  params: string[];
+  switchedOn: boolean;
+}
+/** WhatsApp of one bill (My Deliveries) or quotation: NONE = nothing queued (see text). */
+export interface WhatsAppSendStatus {
+  state: "NONE" | "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED" | "SKIPPED";
+  text: string;
+  toNumber: string | null;
+  canSend: boolean;
+  messageId: number | null;
 }
 export interface WhatsAppMonthCount {
   month: string;

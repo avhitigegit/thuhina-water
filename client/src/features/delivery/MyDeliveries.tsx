@@ -5,7 +5,8 @@
  * with a search that also finds any other customer; tap one to enter the filled bottles left, the empties collected and
  * the money received (Cash, Bank transfer or Cheque with its number). With no bottles the money is saved as a payment.
  * "My day": what was saved today – bottles and money by method for the hand-over. A sale over the credit limit is
- * refused here; only the office can approve it.
+ * refused here; only the office can approve it. After a bill: "WhatsApp bill sent to 077…" or "Customer has no WhatsApp –
+ * give a paper bill", with Send again.
  */
 import { useState } from "react";
 import { KpiCard, KpiGrid } from "@/components/shared/KpiCard";
@@ -20,9 +21,11 @@ import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useDueList } from "./api";
 import {
+  useBillWhatsApp,
   useFindCustomers,
   useMobileBillPreview,
   useMyDay,
+  useResendBillWhatsApp,
   useSaveMobileBill,
   useSaveMobilePayment,
 } from "./mobileApi";
@@ -230,6 +233,7 @@ export function VisitForm({ customer: c, onDone }: { customer: DueCustomer; onDo
   const [again, setAgain] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  const [savedBill, setSavedBill] = useState<number | null>(null);
   const saveBill = useSaveMobileBill();
   const savePayment = useSaveMobilePayment();
 
@@ -298,6 +302,7 @@ export function VisitForm({ customer: c, onDone }: { customer: DueCustomer; onDo
       setSaved(
         `Bill ${r.txn.billNo} saved – ${formatMoney(r.txn.amount)}, received ${formatMoney(r.txn.paid)}.${next}`,
       );
+      setSavedBill(r.txn.id);
       toast(`Bill ${r.txn.billNo} saved`, "ok");
     } catch (e) {
       if (e instanceof ApiError && e.code === "CREDIT_LIMIT") {
@@ -316,6 +321,7 @@ export function VisitForm({ customer: c, onDone }: { customer: DueCustomer; onDo
         <div className="banner ok" data-testid="mob-saved">
           {saved}
         </div>
+        {savedBill !== null && <BillWhatsApp txnId={savedBill} />}
         <button type="button" className="btn primary mob-wide" onClick={onDone}>
           Back to my customers
         </button>
@@ -510,6 +516,47 @@ export function VisitForm({ customer: c, onDone }: { customer: DueCustomer; onDo
 }
 
 // ------------------------------------------------------------------ my day
+
+const WA_KIND: Record<string, string> = {
+  QUEUED: "info",
+  SENT: "ok",
+  DELIVERED: "ok",
+  READ: "ok",
+  FAILED: "bad",
+  SKIPPED: "warn",
+  NONE: "warn",
+};
+
+/** WhatsApp of the bill just saved: sent / no WhatsApp (give a paper bill) / failed, with Send again. */
+function BillWhatsApp({ txnId }: { txnId: number }) {
+  const status = useBillWhatsApp(txnId);
+  const resend = useResendBillWhatsApp();
+  const s = status.data;
+  if (!s) return null;
+  return (
+    <div className={`banner ${WA_KIND[s.state] ?? "info"}`} data-testid="mob-whatsapp">
+      {s.text}
+      {s.canSend && s.state !== "QUEUED" && (
+        <>
+          {" "}
+          <button
+            type="button"
+            className="btn sm"
+            disabled={resend.isPending}
+            onClick={() =>
+              resend.mutate(txnId, {
+                onSuccess: () => toast("WhatsApp bill sent again", "ok"),
+                onError: (e) => toast(errorText(e), "bad"),
+              })
+            }
+          >
+            {resend.isPending ? "Sending…" : "Send again"}
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
 
 function DayPane() {
   const day = useMyDay();

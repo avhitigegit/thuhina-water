@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -11,6 +12,7 @@ import java.util.List;
 
 import lk.thuhina.water.common.SecretCipher;
 import lk.thuhina.water.whatsapp.model.MessageStatus;
+import lk.thuhina.water.whatsapp.model.MessageType;
 import lk.thuhina.water.whatsapp.rules.WhatsAppRules;
 import org.junit.jupiter.api.Test;
 
@@ -68,25 +70,31 @@ class WhatsAppRulesTest {
     }
 
     @Test
-    void reminderOnlyWhenTheOldestUnpaidChargeIsOlderThanTheTerms() {
-        BigDecimal owed = new BigDecimal("2500.00");
-        assertThat(WhatsAppRules.reminderDue(owed, TODAY.minusDays(31), 30, TODAY)).isTrue();
-        assertThat(WhatsAppRules.reminderDue(owed, TODAY.minusDays(30), 30, TODAY)).as("due today – not overdue yet").isFalse();
-        assertThat(WhatsAppRules.reminderDue(owed, TODAY.minusDays(8), 7, TODAY)).isTrue();
-        assertThat(WhatsAppRules.reminderDue(owed, TODAY.minusDays(31), null, TODAY)).as("no terms = 30 days").isTrue();
-        assertThat(WhatsAppRules.reminderDue(BigDecimal.ZERO, TODAY.minusDays(90), 30, TODAY)).isFalse();
-        assertThat(WhatsAppRules.reminderDue(owed, null, 30, TODAY)).isFalse();
+    void dueByAndOldestUnpaidUseTheAgingFifo() {
+        List<WhatsAppRules.Charge> charges = List.of(new WhatsAppRules.Charge(TODAY.minusDays(40), new BigDecimal("1000")),
+                new WhatsAppRules.Charge(TODAY.minusDays(20), new BigDecimal("700")),
+                new WhatsAppRules.Charge(TODAY.minusDays(10), new BigDecimal("-200")),   // a reversal: a credit
+                new WhatsAppRules.Charge(TODAY.minusDays(5), new BigDecimal("500")));
+        // Credits 600 + 200 pay the oldest bill first: 200 of it left.
+        assertThat(WhatsAppRules.dueBy(charges, new BigDecimal("600"), TODAY.minusDays(30))).isEqualByComparingTo("200");
+        assertThat(WhatsAppRules.dueBy(charges, new BigDecimal("600"), TODAY.minusDays(20))).isEqualByComparingTo("900");
+        assertThat(WhatsAppRules.dueBy(charges, new BigDecimal("600"), TODAY)).isEqualByComparingTo("1400");
+        assertThat(WhatsAppRules.dueBy(charges, new BigDecimal("600"), TODAY.minusDays(50))).isEqualByComparingTo("0");
+        assertThat(WhatsAppRules.dueBy(charges, new BigDecimal("5000"), TODAY)).as("paid in advance").isEqualByComparingTo("0");
+        assertThat(WhatsAppRules.oldestUnpaid(charges, new BigDecimal("600"))).isEqualTo(TODAY.minusDays(40));
+        assertThat(WhatsAppRules.oldestUnpaid(charges, new BigDecimal("800"))).isEqualTo(TODAY.minusDays(20));
+        assertThat(WhatsAppRules.oldestUnpaid(charges, new BigDecimal("2000"))).isNull();
         assertThat(WhatsAppRules.dueDate(LocalDate.of(2026, 9, 15), 30)).isEqualTo(LocalDate.of(2026, 10, 15));
     }
 
     @Test
-    void reminderHourAndRecentLeftAtDoorBills() {
-        assertThat(WhatsAppRules.isReminderHour(1, 9, LocalDateTime.of(2026, 11, 2, 9, 0))).as("Monday 09:00").isTrue();
-        assertThat(WhatsAppRules.isReminderHour(1, 9, LocalDateTime.of(2026, 11, 2, 10, 0))).isFalse();
-        assertThat(WhatsAppRules.isReminderHour(1, 9, LocalDateTime.of(2026, 11, 3, 9, 0))).as("Tuesday").isFalse();
-        assertThat(WhatsAppRules.leftAtDoorRecent(TODAY, TODAY)).isTrue();
-        assertThat(WhatsAppRules.leftAtDoorRecent(TODAY.minusDays(1), TODAY)).isTrue();
-        assertThat(WhatsAppRules.leftAtDoorRecent(TODAY.minusDays(2), TODAY)).as("late entry").isFalse();
+    void reminderHourAndRecentBills() {
+        assertThat(WhatsAppRules.isReminderHour(9, LocalDateTime.of(2026, 11, 2, 9, 0))).isTrue();
+        assertThat(WhatsAppRules.isReminderHour(9, LocalDateTime.of(2026, 11, 3, 9, 59))).as("every day").isTrue();
+        assertThat(WhatsAppRules.isReminderHour(9, LocalDateTime.of(2026, 11, 2, 10, 0))).isFalse();
+        assertThat(WhatsAppRules.recent(TODAY, TODAY)).isTrue();
+        assertThat(WhatsAppRules.recent(TODAY.minusDays(1), TODAY)).isTrue();
+        assertThat(WhatsAppRules.recent(TODAY.minusDays(2), TODAY)).as("late entry").isFalse();
     }
 
     @Test
@@ -94,7 +102,30 @@ class WhatsAppRulesTest {
         assertThat(WhatsAppRules.bottlesText(List.of(new WhatsAppRules.Left(2, new BigDecimal("20.00")),
                 new WhatsAppRules.Left(1, new BigDecimal("0.50")), new WhatsAppRules.Left(0, new BigDecimal("10.00")))))
                 .isEqualTo("2 × 20L, 1 × 0.5L");
+        assertThat(WhatsAppRules.bottlesText(List.of(new WhatsAppRules.Left(0, new BigDecimal("20.00"))))).isEqualTo("none");
         assertThat(WhatsAppRules.monthLabel("2026-10")).isEqualTo("October 2026");
+        assertThat(WhatsAppRules.balanceText(new BigDecimal("1200"))).isEqualTo("Balance now: Rs. 1,200.00 to pay");
+        assertThat(WhatsAppRules.balanceText(new BigDecimal("-500"))).isEqualTo("Balance now: Rs. 500.00 paid in advance");
+        assertThat(WhatsAppRules.balanceText(BigDecimal.ZERO)).isEqualTo("Balance now: nothing to pay");
+        assertThat(WhatsAppRules.billOpening(true)).startsWith("nobody was home");
+        assertThat(WhatsAppRules.billOpening(false)).isEqualTo("here is the bill for your delivery");
+        assertThat(WhatsAppRules.deliveryDay(DayOfWeek.MONDAY, 1)).isEqualTo("Monday");
+        assertThat(WhatsAppRules.deliveryDay(DayOfWeek.FRIDAY, 2)).isEqualTo("Friday (every 2 weeks)");
+        assertThat(WhatsAppRules.local("94771234567")).isEqualTo("077 123 4567");
+    }
+
+    /** Meta refuses a template whose text starts or ends with a parameter, or has two parameters side by side. */
+    @Test
+    void templateBodiesFollowMetaRules() {
+        for (MessageType t : MessageType.values()) {
+            String body = t.body();
+            assertThat(body).as(t.name()).doesNotStartWith("{{").doesNotEndWith("}}").doesNotContain("}}{{");
+            for (int i = 1; i <= t.params().size(); i++) {
+                assertThat(body).as(t.name() + " {{" + i + "}}").contains("{{" + i + "}}");
+            }
+            assertThat(body).as(t.name()).doesNotContain("{{" + (t.params().size() + 1) + "}}");
+            assertThat(t.template()).matches("[a-z0-9_]+").hasSizeLessThanOrEqualTo(60);
+        }
     }
 
     @Test
