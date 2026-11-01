@@ -1,6 +1,8 @@
 package lk.thuhina.water.whatsapp.controller;
 
 import java.time.LocalDate;
+import java.util.Arrays;
+import java.util.List;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -11,10 +13,12 @@ import lk.thuhina.water.whatsapp.dto.WhatsAppDtos.MessageListResponse;
 import lk.thuhina.water.whatsapp.dto.WhatsAppDtos.ReminderRunResult;
 import lk.thuhina.water.whatsapp.dto.WhatsAppDtos.SettingsRequest;
 import lk.thuhina.water.whatsapp.dto.WhatsAppDtos.SettingsView;
+import lk.thuhina.water.whatsapp.dto.WhatsAppDtos.TemplateRow;
 import lk.thuhina.water.whatsapp.dto.WhatsAppDtos.TestRequest;
 import lk.thuhina.water.whatsapp.model.MessageStatus;
 import lk.thuhina.water.whatsapp.model.MessageType;
 import lk.thuhina.water.whatsapp.service.PaymentReminderJob;
+import lk.thuhina.water.whatsapp.service.WhatsAppOutbox;
 import lk.thuhina.water.whatsapp.service.WhatsAppQueryService;
 import lk.thuhina.water.whatsapp.service.WhatsAppSender;
 import lk.thuhina.water.whatsapp.service.WhatsAppSettingsService;
@@ -72,7 +76,7 @@ public class WhatsAppController {
         return sender.verify();
     }
 
-    @Operation(summary = "Queue this week's payment reminders now (the job also runs at the scheduled day and hour)")
+    @Operation(summary = "Queue today's payment due soon / overdue messages now (the job also runs daily at the chosen hour)")
     @PostMapping("/reminders/run")
     public ReminderRunResult runReminders() {
         return reminders.run();
@@ -83,6 +87,16 @@ public class WhatsAppController {
     public ReminderRunResult sendNow() {
         int n = sender.sendDue();
         return new ReminderRunResult(n, 0, n + " message(s) handled.");
+    }
+
+    @Operation(summary = "The Meta templates to create in WhatsApp Manager (name, category, header, body text, parameters)")
+    @GetMapping("/templates")
+    public List<TemplateRow> templates() {
+        WhatsAppSettingsService.Config c = settings.config();
+        return Arrays.stream(MessageType.values()).filter(t -> t != MessageType.TEST)
+                .map(t -> new TemplateRow(t.name(), t.label(), t.template(), "UTILITY", t.document(), t.body(), t.params(),
+                        WhatsAppOutbox.switchedOn(c, t)))
+                .toList();
     }
 
     @Operation(summary = "Message log, newest first, with this month's counts")

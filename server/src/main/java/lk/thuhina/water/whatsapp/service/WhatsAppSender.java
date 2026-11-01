@@ -7,7 +7,9 @@ import java.util.List;
 import lk.thuhina.water.audit.model.AuditAction;
 import lk.thuhina.water.audit.service.AuditService;
 import lk.thuhina.water.common.ValidationException;
+import lk.thuhina.water.printing.BillPrintService;
 import lk.thuhina.water.printing.BillingPrintService;
+import lk.thuhina.water.printing.CustomerQuotationPrintService;
 import lk.thuhina.water.whatsapp.client.FakeWhatsAppClient;
 import lk.thuhina.water.whatsapp.client.MetaWhatsAppClient;
 import lk.thuhina.water.whatsapp.client.WhatsAppClient;
@@ -44,19 +46,24 @@ public class WhatsAppSender {
     private final MetaWhatsAppClient meta;
     private final FakeWhatsAppClient fake;
     private final BillingPrintService billingPrint;
+    private final BillPrintService billPrint;
+    private final CustomerQuotationPrintService quotationPrint;
     private final WhatsAppProperties properties;
     private final AuditService audit;
     private final ObjectMapper json;
     private final Clock clock;
 
     public WhatsAppSender(WhatsAppSettingsService settings, WhatsAppMessageRepository messages, MetaWhatsAppClient meta,
-                          FakeWhatsAppClient fake, BillingPrintService billingPrint, WhatsAppProperties properties, AuditService audit,
-                          ObjectMapper json, Clock clock) {
+                          FakeWhatsAppClient fake, BillingPrintService billingPrint, BillPrintService billPrint,
+                          CustomerQuotationPrintService quotationPrint, WhatsAppProperties properties, AuditService audit, ObjectMapper json,
+                          Clock clock) {
         this.settings = settings;
         this.messages = messages;
         this.meta = meta;
         this.fake = fake;
         this.billingPrint = billingPrint;
+        this.billPrint = billPrint;
+        this.quotationPrint = quotationPrint;
         this.properties = properties;
         this.audit = audit;
         this.json = json;
@@ -122,10 +129,7 @@ public class WhatsAppSender {
         try {
             List<String> params = json.readValue(m.getParams(), new TypeReference<List<String>>() {
             });
-            WhatsAppClient.Document document = null;
-            if (m.getType() == MessageType.MONTHLY_INVOICE && WhatsAppEvents.SOURCE_INVOICE.equals(m.getSourceType()) && m.getSourceId() != null) {
-                document = new WhatsAppClient.Document(billingPrint.invoice(m.getSourceId()), billingPrint.invoiceNo(m.getSourceId()) + ".pdf");
-            }
+            WhatsAppClient.Document document = document(m);
             String language = m.getType() == MessageType.TEST ? TEST_LANGUAGE : c.language();
             String id = client.send(c, m.getToNumber(), m.getTemplate(), language, params, document);
             m.sent(id, client.testMode(), Instant.now(clock));
@@ -136,6 +140,23 @@ public class WhatsAppSender {
             log.warn("WhatsApp message {} ({}) attempt {} failed: {}", m.getId(), m.getType(), attempts, error);
         }
         return messages.save(m);
+    }
+
+    /** The PDF for a template with a Document header: the invoice, the delivery bill or the quotation, made when it is sent. */
+    private WhatsAppClient.Document document(WhatsAppMessage m) {
+        Long id = m.getSourceId();
+        if (!m.getType().document() || id == null) {
+            return null;
+        }
+        return switch (m.getType()) {
+            case MONTHLY_INVOICE -> WhatsAppEvents.SOURCE_INVOICE.equals(m.getSourceType())
+                    ? new WhatsAppClient.Document(billingPrint.invoice(id), billingPrint.invoiceNo(id) + ".pdf") : null;
+            case DELIVERY_BILL -> WhatsAppEvents.SOURCE_BILL.equals(m.getSourceType())
+                    ? new WhatsAppClient.Document(billPrint.bill(id), billPrint.billNo(id) + ".pdf") : null;
+            case QUOTATION -> WhatsAppEvents.SOURCE_QUOTATION.equals(m.getSourceType())
+                    ? new WhatsAppClient.Document(quotationPrint.quotation(id), quotationPrint.cqNo(id) + ".pdf") : null;
+            default -> null;
+        };
     }
 
     private WhatsAppClient client(WhatsAppSettingsService.Config c) {

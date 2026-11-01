@@ -10,6 +10,7 @@ import type {
   CqRequest,
   CqSaved,
   CqView,
+  WhatsAppSendStatus,
 } from "@/lib/api/types";
 
 const KEY = ["quotations"] as const;
@@ -45,7 +46,7 @@ export function useQuoteItems(customerTypeId: number | null, customerId: number 
 }
 
 /** Every change refreshes the quotations, the customers (prices, registration) and the audit log. */
-function useChange<TVars>(fn: (vars: TVars) => Promise<CqSaved>) {
+function useChange<TVars, TResult = CqSaved>(fn: (vars: TVars) => Promise<TResult>) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: fn,
@@ -73,6 +74,20 @@ export type Step = "send" | "accept" | "reject" | "apply-prices";
 export const useQuotationStep = () =>
   useChange(({ id, step, body }: { id: number; step: Step; body: object }) =>
     api<CqSaved>(`/customer-quotations/${id}/${step}`, { method: "POST", body }),
+  );
+
+/** WhatsApp of the quotation: last message and the number it would go to. */
+export function useQuotationWhatsApp(id: number) {
+  return useQuery({
+    queryKey: [...KEY, "whatsapp", id],
+    queryFn: ({ signal }) => api<WhatsAppSendStatus>(`/customer-quotations/${id}/whatsapp`, { signal }),
+  });
+}
+
+/** Sends the quotation PDF on WhatsApp (a draft becomes Sent by WhatsApp). */
+export const useSendQuotationWhatsApp = () =>
+  useChange(({ id, to, agreed }: { id: number; to: string; agreed: boolean }) =>
+    api<WhatsAppSendStatus>(`/customer-quotations/${id}/whatsapp`, { method: "POST", body: { to, agreed } }),
   );
 
 /** Quotation PDF (A4) – opens in a new tab to print. */

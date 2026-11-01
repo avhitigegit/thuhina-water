@@ -244,6 +244,14 @@ function server() {
       if (path === "/api/customer-quotations/items")
         return json(ITEMS(p.get("customerTypeId"), p.get("customerId")));
       if (/^\/api\/customer-quotations\/\d+$/.test(path)) return json(current);
+      if (/^\/api\/customer-quotations\/\d+\/whatsapp$/.test(path))
+        return json({
+          state: "NONE",
+          text: "Not sent on WhatsApp yet.",
+          toNumber: null,
+          canSend: true,
+          messageId: null,
+        });
       if (path === "/api/customer-types")
         return json([
           { id: 1, name: "Household", description: null, active: true, activeCustomers: 1, version: 0 },
@@ -272,6 +280,14 @@ function server() {
         { quotation: view({ id: 6, cqNo: "QT-2026-006" }), message: "QT-2026-006 saved as Draft" },
         201,
       );
+    if (/^\/api\/customer-quotations\/\d+\/whatsapp$/.test(path))
+      return json({
+        state: "QUEUED",
+        text: "WhatsApp quotation is being sent to 077 555 6666.",
+        toNumber: "077 555 6666",
+        canSend: true,
+        messageId: 3,
+      });
     const step = /^\/api\/customer-quotations\/\d+\/(send|accept|reject|apply-prices)$/.exec(path);
     if (step) return json({ quotation: current, message: "Done " + step[1] });
     return json({ code: "NOT_FOUND", message: "Not found " + method + " " + path }, 404);
@@ -415,6 +431,21 @@ describe("Customer Quotations", () => {
     await user.click(within(send).getByRole("button", { name: "Mark as sent" }));
     await waitFor(() => expect(posted(/\/send$/)).toHaveLength(1));
     expect(posted(/\/send$/)[0].body).toEqual({ via: "EMAIL", date: TODAY });
+  }, 15000);
+
+  it("a draft goes on WhatsApp to a new organisation that agreed", async () => {
+    const user = userEvent.setup();
+    search = "id=1";
+    renderPage();
+    const dialog = await screen.findByRole("dialog", { name: "Quotation QT-2026-001" });
+    await user.click(within(dialog).getByRole("button", { name: "Send on WhatsApp" }));
+    const wa = await screen.findByRole("dialog", { name: "Send QT-2026-001 on WhatsApp" });
+    expect(wa).toHaveTextContent("The quotation is marked as sent by WhatsApp.");
+    await user.type(within(wa).getByLabelText("WhatsApp number"), "077 555 6666");
+    await user.click(within(wa).getByLabelText(/agreed to get WhatsApp messages from us/));
+    await user.click(within(wa).getByRole("button", { name: "Send on WhatsApp" }));
+    await waitFor(() => expect(posted(/\/whatsapp$/)).toHaveLength(1));
+    expect(posted(/\/whatsapp$/)[0].body).toEqual({ to: "077 555 6666", agreed: true });
   }, 15000);
 
   it("a sent (expired) quotation is answered: not accepted needs a reason", async () => {

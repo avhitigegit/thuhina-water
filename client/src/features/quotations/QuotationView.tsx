@@ -5,7 +5,8 @@
  * the customer and prices), details, lines with the price now beside a changed price, history; buttons by step and role:
  * Print / PDF, Email (mailto with the server's text), Make a copy, Edit and Next: Mark as sent (draft), Not accepted (reason)
  * and Next: Accepted (sent, also expired), Apply prices to customer (from a date; warns which planned prices it cancels,
- * N-14) and Register as customer (accepted).
+ * N-14) and Register as customer (accepted). Send on WhatsApp (draft or sent): the PDF to the customer's WhatsApp number or
+ * the phone; a new organisation must have agreed.
  */
 import Link from "next/link";
 import { useState } from "react";
@@ -16,12 +17,20 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { StepBar } from "@/components/shared/StepBar";
 import { useCan } from "@/features/auth/access";
 import { useCustomerPrices } from "@/features/customers/api";
+import { ApiError } from "@/lib/api/client";
 import type { CqView } from "@/lib/api/types";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
 import { errorText } from "@/lib/forms";
 import { P } from "@/lib/permissions";
 import { toast } from "@/lib/toast";
-import { quotationPdfUrl, useQuotation, useQuotationStep, type Step } from "./api";
+import {
+  quotationPdfUrl,
+  useQuotation,
+  useQuotationStep,
+  useQuotationWhatsApp,
+  useSendQuotationWhatsApp,
+  type Step,
+} from "./api";
 import { applyWarnings } from "./applyWarnings";
 
 export const SENT_VIA = [
@@ -40,7 +49,7 @@ export function emailHref(q: CqView): string {
   return `mailto:${encodeURIComponent(q.email ?? "")}?subject=${encodeURIComponent(q.emailSubject)}&body=${encodeURIComponent(q.emailBody)}`;
 }
 
-type Sub = "send" | "reject" | "apply" | null;
+type Sub = "send" | "whatsapp" | "reject" | "apply" | null;
 
 export function QuotationView({
   id,
@@ -106,6 +115,11 @@ export function QuotationView({
       {canEdit && (
         <button type="button" className="btn" onClick={() => onCopy(q)}>
           Make a copy
+        </button>
+      )}
+      {canEdit && (q.status === "DRAFT" || q.status === "SENT") && (
+        <button type="button" className="btn" onClick={() => setSub("whatsapp")}>
+          Send on WhatsApp
         </button>
       )}
       {canEdit && q.canEdit && (
@@ -283,6 +297,7 @@ export function QuotationView({
           onSend={(b) => run("send", b)}
         />
       )}
+      {sub === "whatsapp" && <WhatsAppDialog q={q} onClose={() => setSub(null)} />}
       {sub === "reject" && (
         <ReasonDialog
           open
@@ -305,6 +320,77 @@ export function QuotationView({
         />
       )}
     </>
+  );
+}
+
+/** Send on WhatsApp: the number (customer's WhatsApp number or the phone) and, for a new organisation, their agreement. */
+function WhatsAppDialog({ q, onClose }: { q: CqView; onClose: () => void }) {
+  const status = useQuotationWhatsApp(q.id);
+  const send = useSendQuotationWhatsApp();
+  const [to, setTo] = useState<string | null>(null);
+  const [agreed, setAgreed] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const number = to ?? status.data?.toNumber ?? "";
+  return (
+    <FormDialog
+      open
+      onOpenChange={(o) => !o && onClose()}
+      title={`Send ${q.cqNo} on WhatsApp`}
+      submitLabel="Send on WhatsApp"
+      submitting={send.isPending}
+      onSubmit={() => {
+        setErrors({});
+        send.mutate(
+          { id: q.id, to: number, agreed },
+          {
+            onSuccess: (s) => {
+              toast(s.text, "ok");
+              onClose();
+            },
+            onError: (err) => {
+              const fields = err instanceof ApiError ? err.fieldErrors : {};
+              setErrors(fields);
+              if (Object.keys(fields).length === 0) toast(errorText(err), "bad");
+            },
+          },
+        );
+      }}
+    >
+      {status.data && status.data.state !== "NONE" && (
+        <div className="banner info" data-testid="cq-whatsapp-status">
+          {status.data.text}
+        </div>
+      )}
+      {status.data && !status.data.canSend && status.data.state === "NONE" && (
+        <div className="banner warn">{status.data.text}</div>
+      )}
+      <p className="small muted">
+        The quotation PDF goes from the business WhatsApp number.
+        {q.status === "DRAFT" && " The quotation is marked as sent by WhatsApp."}
+      </p>
+      <div className="form-grid" style={{ gridTemplateColumns: "1fr" }}>
+        <div className="field req">
+          <label htmlFor="cq-wa-to">WhatsApp number</label>
+          <input
+            id="cq-wa-to"
+            value={number}
+            placeholder="077 123 4567"
+            onChange={(e) => setTo(e.target.value)}
+            className={errors.to ? "invalid" : undefined}
+          />
+          {errors.to && <span className="error">{errors.to}</span>}
+        </div>
+        {!q.customerId && (
+          <div className="field">
+            <label>
+              <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} />{" "}
+              {q.orgName} agreed to get WhatsApp messages from us
+            </label>
+            {errors.agreed && <span className="error">{errors.agreed}</span>}
+          </div>
+        )}
+      </div>
+    </FormDialog>
   );
 }
 

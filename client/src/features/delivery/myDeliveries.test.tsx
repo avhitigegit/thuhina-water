@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DueCustomer, DueList, MyDay } from "@/lib/api/types";
@@ -109,10 +109,32 @@ beforeEach(() => {
         posts.push({ path, body });
         return new Response(
           JSON.stringify({
-            txn: { billNo: "B000101", amount: 700, paid: body.paid },
+            txn: { id: 55, billNo: "B000101", amount: 700, paid: body.paid },
             schedule: { before: TODAY, after: addDaysIso(TODAY, 7) },
           }),
           { status: 201 },
+        );
+      }
+      if (path === "/api/delivery/mobile/bills/55/whatsapp") {
+        if (init?.method === "POST") posts.push({ path, body });
+        return new Response(
+          JSON.stringify(
+            init?.method === "POST"
+              ? {
+                  state: "QUEUED",
+                  text: "WhatsApp bill is being sent to 077 123 4567.",
+                  toNumber: "077 123 4567",
+                  canSend: true,
+                  messageId: 2,
+                }
+              : {
+                  state: "SENT",
+                  text: "WhatsApp bill sent to 077 123 4567.",
+                  toNumber: "077 123 4567",
+                  canSend: true,
+                  messageId: 1,
+                },
+          ),
         );
       }
       if (path === "/api/delivery/mobile/payments") {
@@ -182,6 +204,11 @@ describe("My Deliveries", () => {
       }),
     });
     expect(await screen.findByTestId("mob-saved")).toHaveTextContent("Bill B000101 saved");
+    const wa = await screen.findByTestId("mob-whatsapp");
+    expect(wa).toHaveTextContent("WhatsApp bill sent to 077 123 4567.");
+    await user.click(within(wa).getByRole("button", { name: "Send again" }));
+    await waitFor(() => expect(posts.map((p) => p.path)).toContain("/api/delivery/mobile/bills/55/whatsapp"));
+    expect(await screen.findByTestId("mob-whatsapp")).toHaveTextContent("is being sent");
   });
 
   it("left at door collects no empties and needs a note", async () => {

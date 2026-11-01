@@ -198,10 +198,7 @@ public class SalesService {
         Posted posted = postAndSave(new Spec(kind, x, null, r.paperBillNo(), paperRequired, calc, r.paid(), r.payMethod(),
                 Texts.blankToNull(r.payReference()), r.note(), Boolean.TRUE.equals(r.phoneConfirmed()), null, null, approveOverLimit,
                 details, true, onPhone));
-        if (kind == SalesKind.LEFT_AT_DOOR) {
-            events.publishEvent(new LeftAtDoorBillSaved(posted.txn().getId(), x.customer().getId(), x.date()));
-        }
-        return result(posted);
+        return result(saved(posted));
     }
 
     /** Money received by bank transfer or cheque needs its reference (as for payments, FR-50). */
@@ -450,6 +447,9 @@ public class SalesService {
             damages.save(d);
         });
         audit.log(AuditAction.REVERSE, t.getKind().label(), t.getBillNo(), "Reversal entry " + rev.getBillNo() + " – " + reason);
+        if (t.getCustomerId() != null) {
+            events.publishEvent(new BillReversed(t.getId(), rev.getId(), t.getCustomerId()));
+        }
         return new SaleResult(queries.detail(rev.getId()), null);
     }
 
@@ -639,7 +639,16 @@ public class SalesService {
     }
 
     private SaleResult post(Spec s) {
-        return result(postAndSave(s));
+        return result(saved(postAndSave(s)));
+    }
+
+    /** A customer's bill entered on its own (not at registration): M13 sends it on WhatsApp. */
+    private Posted saved(Posted p) {
+        SalesTxn t = p.txn();
+        if (t.getCustomerId() != null) {
+            events.publishEvent(new BillSaved(t.getId(), t.getCustomerId(), t.getTxnDate(), t.getKind()));
+        }
+        return p;
     }
 
     private SaleResult result(Posted p) {

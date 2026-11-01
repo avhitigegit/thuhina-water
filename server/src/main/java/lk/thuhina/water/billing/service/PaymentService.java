@@ -22,6 +22,7 @@ import lk.thuhina.water.numbering.service.NumberingService;
 import lk.thuhina.water.numbering.service.SequenceNames;
 import lk.thuhina.water.sales.model.PayMethod;
 import lk.thuhina.water.sales.service.AccountService;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -42,11 +43,12 @@ public class PaymentService {
     private final NumberingService numbering;
     private final AuditService audit;
     private final NamedParameterJdbcTemplate jdbc;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     public PaymentService(CustomerPaymentRepository payments, CustomerRepository customers, AccountService accounts,
                           BillingQueryService query, NumberingService numbering, AuditService audit, NamedParameterJdbcTemplate jdbc,
-                          Clock clock) {
+                          ApplicationEventPublisher events, Clock clock) {
         this.payments = payments;
         this.customers = customers;
         this.accounts = accounts;
@@ -54,6 +56,7 @@ public class PaymentService {
         this.numbering = numbering;
         this.audit = audit;
         this.jdbc = jdbc;
+        this.events = events;
         this.clock = clock;
     }
 
@@ -98,6 +101,7 @@ public class PaymentService {
         boolean advance = PaymentRules.isAdvance(amount, before);
         audit.log(AuditAction.CREATE, "Payment", p.getReceiptNo(), c.getName() + " (" + c.getCode() + "): " + Money.format(amount) + " by "
                 + PaymentRules.how(r.method(), reference) + (part ? " – part payment" : "") + (advance ? " – advance" : ""));
+        events.publishEvent(new PaymentReceived(p.getId(), c.getId()));
         CustomerPaymentRow row = query.payment(p.getId());
         String message = "Payment saved – " + Money.format(amount) + " received from " + c.getName() + ". Balance now "
                 + (after.signum() < 0 ? Money.format(after.negate()) + " in advance (credit balance)." : Money.format(after) + ".");
