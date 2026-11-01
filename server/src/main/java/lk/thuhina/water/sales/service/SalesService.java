@@ -159,7 +159,7 @@ public class SalesService {
 
     @Transactional
     public SaleResult postBill(BillRequest r) {
-        return saveBill(ctx(r.customerId(), r.date()), r, true, r.approveOverLimit());
+        return saveBill(ctx(r.customerId(), r.date()), r, true, r.approveOverLimit(), false);
     }
 
     /**
@@ -173,7 +173,7 @@ public class SalesService {
 
     @Transactional
     public SaleResult postMobileBill(BillRequest r) {
-        return saveBill(ctx(r.customerId(), today()), r, false, false);
+        return saveBill(ctx(r.customerId(), today()), r, false, false, true);
     }
 
     private SalePreview previewBill(Ctx x, BillRequest r, boolean paperRequired) {
@@ -185,7 +185,7 @@ public class SalesService {
         return preview(x, billCalc(x, r), problems, r.paid());
     }
 
-    private SaleResult saveBill(Ctx x, BillRequest r, boolean paperRequired, Boolean approveOverLimit) {
+    private SaleResult saveBill(Ctx x, BillRequest r, boolean paperRequired, Boolean approveOverLimit, boolean onPhone) {
         Problem reference = referenceProblem(r);
         if (reference != null) {
             throw toException(reference);
@@ -197,7 +197,7 @@ public class SalesService {
                 + Money.format(calc.amount());
         Posted posted = postAndSave(new Spec(kind, x, null, r.paperBillNo(), paperRequired, calc, r.paid(), r.payMethod(),
                 Texts.blankToNull(r.payReference()), r.note(), Boolean.TRUE.equals(r.phoneConfirmed()), null, null, approveOverLimit,
-                details, true));
+                details, true, onPhone));
         if (kind == SalesKind.LEFT_AT_DOOR) {
             events.publishEvent(new LeftAtDoorBillSaved(posted.txn().getId(), x.customer().getId(), x.date()));
         }
@@ -624,14 +624,14 @@ public class SalesService {
     private record Spec(SalesKind kind, Ctx x, String walkInName, String paperBillNo, boolean paperRequired, SaleCalc calc,
                         BigDecimal paid, PayMethod payMethod, String payReference, String note, boolean phoneConfirmed,
                         DamageMode damageMode, SettleMethod settleMethod, Boolean approveOverLimit, String auditDetails,
-                        boolean advanceSchedule) {
+                        boolean advanceSchedule, boolean onPhone) {
 
         /** A sale without a payment reference (only delivery bills take one). */
         Spec(SalesKind kind, Ctx x, String walkInName, String paperBillNo, boolean paperRequired, SaleCalc calc, BigDecimal paid,
              PayMethod payMethod, String note, boolean phoneConfirmed, DamageMode damageMode, SettleMethod settleMethod,
              Boolean approveOverLimit, String auditDetails, boolean advanceSchedule) {
             this(kind, x, walkInName, paperBillNo, paperRequired, calc, paid, payMethod, null, note, phoneConfirmed, damageMode,
-                    settleMethod, approveOverLimit, auditDetails, advanceSchedule);
+                    settleMethod, approveOverLimit, auditDetails, advanceSchedule, false);
         }
     }
 
@@ -680,7 +680,8 @@ public class SalesService {
                 .amounts(calc.water(), calc.deposit(), calc.product(), calc.productCost(), paid, method)
                 .details(Texts.blankToNull(s.paperBillNo()), Texts.blankToNull(s.note()), s.phoneConfirmed(), s.damageMode(),
                         s.settleMethod(), overrideBy)
-                .payReference(s.payReference());
+                .payReference(s.payReference())
+                .enteredOnPhone(s.onPhone());
         t = txns.saveAndFlush(t);
         List<SalesTxnLine> lines = new ArrayList<>();
         for (int i = 0; i < calc.lines().size(); i++) {

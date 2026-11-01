@@ -22,6 +22,8 @@ export interface BillFilters {
   kind: string;
   from: string | null;
   to: string | null;
+  /** true = only bills saved on the phone, false = only office bills, null = all. */
+  onPhone: boolean | null;
   page: number;
   size: number;
 }

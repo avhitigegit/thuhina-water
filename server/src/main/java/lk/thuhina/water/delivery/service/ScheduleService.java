@@ -190,11 +190,14 @@ public class ScheduleService {
                 have.computeIfAbsent(rs.getLong(1), k -> new HashMap<>()).put(rs.getString(2),
                         new Have(rs.getInt(3), rs.getInt(4), rs.getInt(5)));
             });
-            jdbc.query("select id, customer_id, bill_no, paper_bill_no, kind from sales_txn where txn_date = :d "
-                    + "and customer_id in (:ids) and reversed_by_id is null and kind in (:kinds) order by id", q, rs -> {
+            jdbc.query("select t.id, t.customer_id, t.bill_no, t.paper_bill_no, t.kind, t.entered_on_phone, "
+                    + "coalesce(u.full_name, t.created_by) as entered_by from sales_txn t left join app_user u on u.username = t.created_by "
+                    + "where t.txn_date = :d and t.customer_id in (:ids) and t.reversed_by_id is null and t.kind in (:kinds) order by t.id",
+                    q, rs -> {
                 SalesKind kind = SalesKind.valueOf(rs.getString("kind"));
                 entered.computeIfAbsent(rs.getLong("customer_id"), k -> new ArrayList<>()).add(new EnteredBill(rs.getLong("id"),
-                        rs.getString("bill_no"), rs.getString("paper_bill_no"), kind.name(), kind.label()));
+                        rs.getString("bill_no"), rs.getString("paper_bill_no"), kind.name(), kind.label(), rs.getBoolean("entered_on_phone"),
+                        rs.getString("entered_by")));
             });
         }
         Map<Long, Map<String, WaterPrice>> prices = Map.of();

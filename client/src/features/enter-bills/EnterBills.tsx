@@ -2,8 +2,10 @@
 
 /*
  * Enter Bills (M07, prototype sales/enter-bills.html, FR-34 – FR-48, NFR-04): the keyboard grid where the Admin types
- * the day's paper bills. Customers due on the bill date are listed with their usual quantities; rows typed by hand
- * are kept when the date changes. Each row shows its live result (TypeScript copy of ExchangeRules); "Save bills"
+ * the day's paper bills. Since M17 the delivery staff enter most visits on the phone, so the grid starts with one empty
+ * row; the info line shows who is entered on the phone / in the office / not yet, and "Fill in the N not entered" lists
+ * the customers still without a bill with their usual quantities (paper-bill days). A row for a customer who already has
+ * a bill that day warns. Rows typed by hand are kept when the date changes. Each row shows its live result (TypeScript copy of ExchangeRules); "Save bills"
  * posts each row on its own – good rows are saved and locked, bad rows show the server's message.
  */
 import { useQueryClient } from "@tanstack/react-query";
@@ -27,7 +29,7 @@ import { useBottleTypes } from "@/features/masterdata/api";
 import { invalidateAfterSale } from "@/features/sales/api";
 import { CustomerCard } from "@/features/sales/CustomerCard";
 import { api, ApiError } from "@/lib/api/client";
-import type { BottlesAfter, CustomerLookupRow, DueList } from "@/lib/api/types";
+import type { BottlesAfter, CustomerLookupRow, DueList, EnteredBill } from "@/lib/api/types";
 import { autoSlashDate, formatDate, formatMoney, parseDmy, todayIso } from "@/lib/format";
 import { P } from "@/lib/permissions";
 import { toast } from "@/lib/toast";
@@ -61,7 +63,14 @@ const NOT_DELETABLE = "Saved bills cannot be deleted. Use Sales & Bills → Reve
 
 type Info = { kind: "day"; list: DueList; listed: number } | { kind: "customer"; name: string } | null;
 
-function DayInfo({ info }: { info: Info }) {
+/** "Kasun Silva 5, Ruwan Jayasena 3" – who saved the phone bills. */
+function byWho(bills: EnteredBill[]): string {
+  const counts = new Map<string, number>();
+  bills.forEach((b) => counts.set(b.enteredBy, (counts.get(b.enteredBy) ?? 0) + 1));
+  return [...counts].map(([who, n]) => `${who} ${n}`).join(", ");
+}
+
+function DayInfo({ info, waiting, onFill }: { info: Info; waiting: number; onFill: () => void }) {
   if (!info) return null;
   if (info.kind === "customer")
     return (
@@ -69,8 +78,12 @@ function DayInfo({ info }: { info: Info }) {
         Entering a bill for <b>{info.name}</b>. Change the bill date to list all customers due that day.
       </>
     );
-  const { list, listed } = info;
+  const { list } = info;
   const entered = list.items.filter((x) => x.entered);
+  const phoneBills = entered.flatMap((x) => x.enteredBills.filter((b) => b.onPhone));
+  const onPhone = entered.filter((x) => x.enteredBills.some((b) => b.onPhone));
+  const inOffice = entered.filter((x) => !x.enteredBills.some((b) => b.onPhone));
+  const notEntered = list.items.filter((x) => x.listed);
   const none = list.items.filter((x) => !x.entered && x.noBottles);
   const late = list.items.filter((x) => x.overdue && !x.entered);
   const names = (xs: typeof entered) => xs.map((x) => x.name).join(", ");
@@ -80,22 +93,39 @@ function DayInfo({ info }: { info: Info }) {
         {list.dayName} {formatDate(list.date)}:
       </b>{" "}
       {list.items.length} customer(s) due
-      {listed > 0 && (
+      {onPhone.length > 0 && (
         <>
-          {" – "}
-          <b>{listed} listed below</b> with their usual quantities
+          {" · "}
+          <b>{onPhone.length} entered on the phone</b> ({byWho(phoneBills)})
         </>
       )}
-      {entered.length > 0 && ` · ${entered.length} already entered (${names(entered)})`}
+      {inOffice.length > 0 && ` · ${inOffice.length} entered in the office (${names(inOffice)})`}
+      {notEntered.length > 0 && (
+        <>
+          {" · "}
+          <b>{notEntered.length} not entered yet</b> ({names(notEntered)})
+        </>
+      )}
       {none.length > 0 &&
         ` · ${none.length} new customer(s) without bottles – use First purchase: ${names(none)}`}
       {late.length > 0 && ` · ${late.length} missed an earlier delivery (${names(late)})`}
       {list.items.length === 0 && " – nobody is due. You can still add rows by hand."}
+      <div className="small" style={{ marginTop: 4 }}>
+        The delivery staff enter their visits on the phone (My Deliveries). Type only the paper bills here.
+        {waiting > 0 && (
+          <>
+            {" "}
+            <button type="button" className="btn sm" onClick={onFill} data-testid="fill-not-entered">
+              Fill in the {waiting} not entered (paper bills)
+            </button>
+          </>
+        )}
+      </div>
     </>
   );
 }
 
-function ResultCell({ row, view }: { row: Row; view: RowView | null }) {
+function ResultCell({ row, view, already }: { row: Row; view: RowView | null; already: string | null }) {
   if (row.status === "saved" && row.result) {
     const [head, ...rest] = savedText(row.result).split(" · ");
     return (
@@ -108,6 +138,7 @@ function ResultCell({ row, view }: { row: Row; view: RowView | null }) {
   }
   if (row.status === "saving") return <span className="muted">Saving…</span>;
   const lines: ReactNode[] = [];
+  if (already) lines.push(<span className="warn">{already}</span>);
   if (row.status === "failed" && row.error) lines.push(<span className="err">{row.error.message}</span>);
   view?.msgs.forEach((m) =>
     lines.push(
@@ -183,7 +214,7 @@ export function EnterBills() {
 
   // ------------------------------------------------------------------ loading rows (C2)
 
-  /** Lists the customers due on the date; drops unsaved automatic or empty rows, keeps rows the user typed. */
+  /** Reads the customers due on the date for the info line; drops unsaved automatic or empty rows, keeps rows the user typed. */
   const loadDate = useCallback(
     async (date: string) => {
       if (!cols.length) return;
@@ -196,14 +227,11 @@ export function EnterBills() {
       const kept = rowsRef.current.filter(
         (r) => r.status === "saved" || (r.source === "typed" && r.customerText.trim()),
       );
-      const inGrid = new Set(kept.map((r) => r.customer?.id));
-      const due = list.items.filter((x) => x.listed && !inGrid.has(x.id));
-      const added = due.map((x) => rowFor(fromDue(x), cols, date, "auto"));
-      const next = [...kept, ...added];
+      const next = [...kept];
       if (!next.some((r) => r.status !== "saved"))
         next.push(emptyRow(date, suggestPaper(next, -1, nextPaper.data?.next ?? null)));
       commit(() => next);
-      setInfo({ kind: "day", list, listed: added.length });
+      setInfo({ kind: "day", list, listed: 0 });
       const first = next.find((r) => r.status !== "saved");
       if (first) {
         setActiveKey(first.key);
@@ -220,6 +248,8 @@ export function EnterBills() {
     if (started.current || !cols.length) return;
     started.current = true;
     if (!custParam) {
+      // loadDate sets state only after the due list has been read (async), not during the effect.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       void loadDate(today);
       return;
     }
@@ -274,6 +304,24 @@ export function EnterBills() {
     const rest = rowsRef.current.filter((x) => x.key !== key);
     if (!rest.length) rest.push(emptyRow(billDate, suggestPaper(rest, -1, nextPaper.data?.next ?? null)));
     commit(() => rest);
+  }
+
+  /** Paper-bill day: list the due customers still without a bill, with their usual quantities (empty rows go). */
+  function fillNotEntered() {
+    if (info?.kind !== "day") return;
+    const inGrid = new Set(rowsRef.current.map((r) => r.customer?.id));
+    const added = info.list.items
+      .filter((x) => x.listed && !inGrid.has(x.id))
+      .map((x) => rowFor(fromDue(x), cols, info.list.date, "auto"));
+    if (!added.length) return;
+    const kept = rowsRef.current.filter(
+      (r) =>
+        r.status === "saved" || r.customer || r.customerText.trim() || (r.paper.trim() && !r.paperSuggested),
+    );
+    commit(() => [...kept, ...added]);
+    setInfo({ ...info, listed: info.listed + added.length });
+    setActiveKey(added[0].key);
+    focus(added[0].key);
   }
 
   // ------------------------------------------------------------------ customers (C3)
@@ -516,6 +564,25 @@ export function EnterBills() {
 
   const active = rows.find((r) => r.key === activeKey) ?? null;
   const sum = totals(rows, cols);
+  // Bills already saved on the info date (phone or office), by customer – a new row for them warns.
+  const enteredOn = info?.kind === "day" ? info.list.date : null;
+  const enteredBy = new Map<number, EnteredBill[]>();
+  if (info?.kind === "day") info.list.items.forEach((x) => x.entered && enteredBy.set(x.id, x.enteredBills));
+  const inGrid = new Set(rows.map((r) => r.customer?.id));
+  const waiting =
+    info?.kind === "day" ? info.list.items.filter((x) => x.listed && !inGrid.has(x.id)).length : 0;
+  const alreadyText = (r: Row): string | null => {
+    if (r.status === "saved" || !r.customer || parseDmy(r.date) !== enteredOn) return null;
+    const bills = enteredBy.get(r.customer.id);
+    if (!bills?.length) return null;
+    return (
+      "Already entered " +
+      bills
+        .map((b) => (b.onPhone ? `on the phone by ${b.enteredBy}` : `by ${b.enteredBy}`) + ` – ${b.billNo}`)
+        .join("; ") +
+      ". Save only if this is another delivery."
+    );
+  };
 
   return (
     <>
@@ -543,7 +610,11 @@ export function EnterBills() {
           </button>
         </div>
         <div className="banner info" style={{ margin: "6px 0" }} data-testid="day-info">
-          {info ? <DayInfo info={info} /> : "Loading the customers due…"}
+          {info ? (
+            <DayInfo info={info} waiting={waiting} onFill={fillNotEntered} />
+          ) : (
+            "Loading the customers due…"
+          )}
         </div>
         <div className="small muted keys">
           <span>
@@ -762,7 +833,7 @@ export function EnterBills() {
                       />
                     </td>
                     <td className="st" data-testid={`result-${i + 1}`}>
-                      <ResultCell row={r} view={view} />
+                      <ResultCell row={r} view={view} already={alreadyText(r)} />
                       {r.status === "failed" && r.error?.creditLimit && canApprove && (
                         <div>
                           <button

@@ -99,7 +99,15 @@ const LIST: DueList = {
       entered: true,
       listed: false,
       enteredBills: [
-        { id: 9, billNo: "B000009", paperBillNo: "41000", kind: "EXCHANGE", kindLabel: "Exchange" },
+        {
+          id: 9,
+          billNo: "B000009",
+          paperBillNo: "41000",
+          kind: "EXCHANGE",
+          kindLabel: "Exchange",
+          onPhone: false,
+          enteredBy: "Nimal Perera",
+        },
       ],
     }),
     due(39, "Anoma Wickramaratne", {}, 0),

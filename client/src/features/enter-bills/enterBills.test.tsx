@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -93,7 +93,15 @@ const LIST: DueList = {
       entered: true,
       listed: false,
       enteredBills: [
-        { id: 9, billNo: "B000009", paperBillNo: "41000", kind: "EXCHANGE", kindLabel: "Exchange" },
+        {
+          id: 9,
+          billNo: "B000009",
+          paperBillNo: "41000",
+          kind: "EXCHANGE",
+          kindLabel: "Exchange",
+          onPhone: true,
+          enteredBy: "Kasun Silva",
+        },
       ],
     }),
     due(39, "Anoma Wickramaratne", {}, 0),
@@ -249,6 +257,12 @@ function renderPage(children: ReactNode = <EnterBills />) {
 
 const rowOf = (n: number) => screen.getByTestId(`result-${n}`).closest("tr") as HTMLElement;
 
+/** Paper-bill day: list the due customers not entered yet (the grid starts with one empty row since M17). */
+async function fillNotEntered() {
+  fireEvent.click(await screen.findByTestId("fill-not-entered"));
+  await screen.findByDisplayValue("C0001 – W.M. Sunil Perera – 077 000 0001");
+}
+
 beforeEach(() => {
   search = "";
   posts = [];
@@ -258,15 +272,24 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Enter Bills", () => {
-  it("lists today's due customers with their usual quantities and the day info line", async () => {
+  it("starts with one empty row; the info line shows phone / not entered; Fill in lists the rest", async () => {
     renderPage();
     const info = await screen.findByTestId("day-info");
     await waitFor(() =>
       expect(info).toHaveTextContent(
-        `${DAY} ${formatDate(TODAY)}: 4 customer(s) due – 2 listed below with their usual quantities · 1 already entered ` +
-          "(Sampath Grocery) · 1 new customer(s) without bottles – use First purchase: Anoma Wickramaratne",
+        `${DAY} ${formatDate(TODAY)}: 4 customer(s) due · 1 entered on the phone (Kasun Silva 1) · 2 not entered yet ` +
+          "(W.M. Sunil Perera, Vertex Software) · 1 new customer(s) without bottles – use First purchase: Anoma Wickramaratne",
       ),
     );
+    expect(info).toHaveTextContent("Type only the paper bills here.");
+    expect(screen.getByLabelText("Customer row 1")).toHaveValue("");
+    expect(screen.queryByLabelText("Customer row 2")).not.toBeInTheDocument();
+    expect(screen.getByTestId("fill-not-entered")).toHaveTextContent(
+      "Fill in the 2 not entered (paper bills)",
+    );
+
+    await fillNotEntered();
+    expect(screen.queryByTestId("fill-not-entered")).not.toBeInTheDocument();
     const r1 = rowOf(1);
     expect(within(r1).getByLabelText("Customer row 1")).toHaveValue(
       "C0001 – W.M. Sunil Perera – 077 000 0001",
@@ -286,6 +309,7 @@ describe("Enter Bills", () => {
   it("keyboard only: paper numbers suggested, Ctrl+S saves each row; over-limit row is approved by the Admin", async () => {
     const user = userEvent.setup();
     renderPage();
+    await fillNotEntered();
     const paper1 = await screen.findByLabelText("Paper bill no. row 1");
     await waitFor(() => expect(paper1).toHaveFocus());
     await waitFor(() => expect(paper1).toHaveValue("1001"));
@@ -321,6 +345,7 @@ describe("Enter Bills", () => {
     const user = userEvent.setup();
     limitOn = false;
     renderPage();
+    await fillNotEntered();
     const paper1 = await screen.findByLabelText("Paper bill no. row 1");
     await waitFor(() => expect(paper1).toHaveValue("1001"));
     for (let i = 0; i < 16; i++) await user.keyboard("{Enter}");
@@ -338,6 +363,7 @@ describe("Enter Bills", () => {
   it("checks paper bill numbers against the database and the grid; left at door; Ctrl+Del", async () => {
     const user = userEvent.setup();
     renderPage();
+    await fillNotEntered();
     const paper1 = await screen.findByLabelText("Paper bill no. row 1");
     // The page opens with row 1's paper bill number focused and the suggestion selected: typing replaces it.
     await waitFor(() => expect(paper1).toHaveFocus());
@@ -388,6 +414,17 @@ describe("Enter Bills", () => {
     );
     expect(screen.getByLabelText("Customer row 1")).toHaveValue("C0001 – W.M. Sunil Perera – 077 000 0001");
     expect(screen.queryByLabelText("Customer row 2")).not.toBeInTheDocument();
+  });
+
+  it("a customer already entered on the phone that day warns in the row", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const cust = await screen.findByLabelText("Customer row 1");
+    await user.type(cust, "3");
+    await waitFor(() => expect(cust).toHaveValue("C0003 – Sampath Grocery – 077 000 0003"));
+    expect(screen.getByTestId("result-1")).toHaveTextContent(
+      "Already entered on the phone by Kasun Silva – B000009. Save only if this is another delivery.",
+    );
   });
 
   it("a customer typed by code fills the usual quantities", async () => {

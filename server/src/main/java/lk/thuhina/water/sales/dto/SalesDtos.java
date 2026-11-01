@@ -215,7 +215,8 @@ public final class SalesDtos {
             BigDecimal amount,
             BigDecimal paid,
             boolean reversed,
-            @Schema(nullable = true) String reversalOfBillNo) {
+            @Schema(nullable = true) String reversalOfBillNo,
+            @Schema(description = "Saved by the delivery staff on the phone (My Deliveries)") boolean enteredOnPhone) {
     }
 
     /** Bill details: everything on the pop-up and the print. */
@@ -241,6 +242,7 @@ public final class SalesDtos {
             BigDecimal paid,
             @Schema(nullable = true) String payMethod,
             @Schema(nullable = true) String payReference,
+            boolean enteredOnPhone,
             @Schema(nullable = true) String note,
             boolean phoneConfirmed,
             @Schema(nullable = true) String damageMode,
