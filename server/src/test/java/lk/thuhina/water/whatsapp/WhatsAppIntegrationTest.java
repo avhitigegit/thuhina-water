@@ -262,10 +262,11 @@ class WhatsAppIntegrationTest extends SalesTestSupport {
         assertThat(messages(c).getFirst()).containsEntry("status", "SENT");
 
         // 3 days before the invoice's due date: payment due soon, the amount still unpaid on it.
-        jdbc.update("update monthly_invoice set due_date = ? where id = ?", today.plusDays(3), ((Number) inv.get("id")).longValue());
-        reminders.run();
+        LocalDate due = jdbc.queryForObject("select due_date from monthly_invoice where id = ?", LocalDate.class,
+                ((Number) inv.get("id")).longValue());
+        reminders.run(due.minusDays(3));
         assertThat(params(messages(c, "PAYMENT_DUE_SOON").getFirst())).containsExactly(params.get(0), "Rs. 700.00",
-                BusinessDates.format(today.plusDays(3)));
+                BusinessDates.format(due));
     }
 
     // ------------------------------------------------------------------ payment due soon / overdue
@@ -356,7 +357,7 @@ class WhatsAppIntegrationTest extends SalesTestSupport {
         long opted = optedIn("WA Phone", "077 888 1234");
         long none = optedIn("WA Phone none", null);
 
-        long txn = mobileBill(mvc.perform(json(post("/delivery/mobile/bills"), staff, map("customerId", opted, "lines",
+        long txn = mobileBill(mvc.perform(json(post("/delivery/mobile/bills"), staff, map("customerId", opted, "date", today.toString(), "lines",
                 List.of(map("bottleTypeCode", bottle, "filled", 2, "empties", 2)), "paid", 0))).andExpect(status().isCreated()).andReturn());
         String url = "/delivery/mobile/bills/" + txn + "/whatsapp";
         Map<String, Object> st = read(mvc.perform(get(url).cookie(staff)).andExpect(status().isOk()).andReturn());
@@ -366,7 +367,7 @@ class WhatsAppIntegrationTest extends SalesTestSupport {
         assertThat(messages(opted, "DELIVERY_BILL")).hasSize(2);
         mvc.perform(get(url).cookie(login(createUser(Role.DELIVERY_STAFF)))).andExpect(status().isNotFound());   // not their bill
 
-        long txn2 = mobileBill(mvc.perform(json(post("/delivery/mobile/bills"), staff, map("customerId", none, "lines",
+        long txn2 = mobileBill(mvc.perform(json(post("/delivery/mobile/bills"), staff, map("customerId", none, "date", today.toString(), "lines",
                 List.of(map("bottleTypeCode", bottle, "filled", 2, "empties", 2)), "paid", 0))).andExpect(status().isCreated()).andReturn());
         Map<String, Object> st2 = read(mvc.perform(get("/delivery/mobile/bills/" + txn2 + "/whatsapp").cookie(staff)).andReturn());
         assertThat(st2).containsEntry("state", "NONE").containsEntry("canSend", false)

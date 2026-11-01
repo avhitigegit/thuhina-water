@@ -75,13 +75,18 @@ public class PaymentReminderJob {
     /** Queues today's messages (also "Send reminders now" in the WhatsApp tab). */
     @Transactional
     public ReminderRunResult run() {
+        return run(BusinessDates.today(clock));
+    }
+
+    /** Queues the messages due on {@code today} (tests use another day; invoices cannot be changed). */
+    @Transactional
+    public ReminderRunResult run(LocalDate today) {
         WhatsAppSettingsService.Config c = settings.config();
         boolean soonOn = outbox.active(MessageType.PAYMENT_DUE_SOON);
         boolean lateOn = outbox.active(MessageType.PAYMENT_OVERDUE);
         if (!soonOn && !lateOn) {
             return new ReminderRunResult(0, 0, "Payment due soon and overdue messages are switched off (or WhatsApp is off).");
         }
-        LocalDate today = BusinessDates.today(clock);
         Instant weekAgo = Instant.now(clock).minus(WhatsAppRules.REMINDER_GAP_DAYS, ChronoUnit.DAYS);
         List<Map<String, Object>> candidates = jdbc.queryForList("""
                 select c.id, c.name, c.pay_type, c.terms_days from customer c join customer_account a on a.customer_id = c.id
