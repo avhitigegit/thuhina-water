@@ -1,6 +1,9 @@
 "use client";
 
-/* WhatsApp tab API hooks (M13, design 9.2): settings, test send, connection check, reminders, message log. Admin only. */
+/*
+ * WhatsApp tab API hooks (M13, design 9.2): settings, test send, connection check, reminders, message log, the Meta
+ * templates to create. Admin only.
+ */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
 import type {
@@ -9,6 +12,7 @@ import type {
   WhatsAppRunResult,
   WhatsAppSettings,
   WhatsAppSettingsRequest,
+  WhatsAppTemplateRow,
 } from "@/lib/api/types";
 
 const SETTINGS_KEY = ["admin", "whatsapp", "settings"] as const;
@@ -21,12 +25,22 @@ export function useWhatsAppSettings() {
   });
 }
 
+export function useWhatsAppTemplates() {
+  return useQuery({
+    queryKey: [...SETTINGS_KEY, "templates"],
+    queryFn: ({ signal }) => api<WhatsAppTemplateRow[]>("/whatsapp/templates", { signal }),
+  });
+}
+
 export function useSaveWhatsAppSettings() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: WhatsAppSettingsRequest) =>
       api<WhatsAppSettings>("/whatsapp/settings", { method: "PUT", body }),
-    onSuccess: (s) => qc.setQueryData(SETTINGS_KEY, s),
+    onSuccess: (s) => {
+      qc.setQueryData(SETTINGS_KEY, s);
+      qc.invalidateQueries({ queryKey: [...SETTINGS_KEY, "templates"] });
+    },
     // The tab shows field errors itself.
     meta: { silent: true },
   });

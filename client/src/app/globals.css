@@ -1553,3 +1553,9 @@
     display: block !important;
   }
 }
+
+/* WhatsApp tab: one Meta template (M13) */
+.wa-template {
+  border-top: 1px solid var(--border);
+  padding: 8px 0;
+}

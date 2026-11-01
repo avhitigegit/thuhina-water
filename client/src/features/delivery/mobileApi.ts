@@ -15,6 +15,7 @@ import type {
   PaymentSaved,
   SalePreview,
   SaleResult,
+  WhatsAppSendStatus,
 } from "@/lib/api/types";
 import { useDebounced } from "@/lib/useDebounced";
 
@@ -68,6 +69,27 @@ export function useSaveMobilePayment() {
       qc.invalidateQueries({ queryKey: ["billing"] });
       qc.invalidateQueries({ queryKey: ["customers"] });
     },
+    meta: { silent: true },
+  });
+}
+
+/** WhatsApp of a bill just saved: checked again every few seconds while it is being sent. */
+export function useBillWhatsApp(txnId: number | null) {
+  return useQuery({
+    queryKey: [...KEY, "whatsapp", txnId],
+    queryFn: ({ signal }) => api<WhatsAppSendStatus>(`/delivery/mobile/bills/${txnId}/whatsapp`, { signal }),
+    enabled: txnId !== null,
+    refetchInterval: (q) => (q.state.data?.state === "QUEUED" ? 5000 : false),
+    meta: { silent: true },
+  });
+}
+
+export function useResendBillWhatsApp() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (txnId: number) =>
+      api<WhatsAppSendStatus>(`/delivery/mobile/bills/${txnId}/whatsapp`, { method: "POST" }),
+    onSuccess: (s, txnId) => qc.setQueryData([...KEY, "whatsapp", txnId], s),
     meta: { silent: true },
   });
 }

@@ -23,4 +23,10 @@ public interface WhatsAppMessageRepository extends JpaRepository<WhatsAppMessage
     /** A message of this type for the customer since {@code since} that was not skipped (once-a-week reminder rule). */
     boolean existsByCustomerIdAndTypeAndCreatedAtAfterAndStatusNot(long customerId, MessageType type, Instant since,
                                                                    MessageStatus status);
+
+    /** A message of this type for the bill / quotation that was not skipped (e.g. "was the bill sent?" before "Bill cancelled"). */
+    boolean existsByTypeAndSourceTypeAndSourceIdAndStatusNot(MessageType type, String sourceType, long sourceId, MessageStatus status);
+
+    /** The latest message of this type for the bill / quotation (My Deliveries "WhatsApp bill sent"). */
+    Optional<WhatsAppMessage> findFirstByTypeAndSourceTypeAndSourceIdOrderByIdDesc(MessageType type, String sourceType, long sourceId);
 }

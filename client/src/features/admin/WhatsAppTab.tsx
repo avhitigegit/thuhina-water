@@ -1,10 +1,11 @@
 "use client";
 
 /*
- * WhatsApp tab (M13 C1, C2 – design 9.2): master switch, message types, weekly reminder time, Meta credentials (write-only:
- * only "saved" is shown, never the value), Verify connection, Test send, "send now" actions and the message log with this
- * month's counts (cost control). Without a phone number ID and access token the server runs in test mode: messages are only
- * written to the log.
+ * WhatsApp tab (M13 C1, C2 – design 9.2, FR-61): master switch, the eight customer messages (each with its own switch), the
+ * daily reminder settings (days before / after the due date, time), Meta credentials (write-only: only "saved" is shown,
+ * never the value), Verify connection, Test send, "send now" actions, the templates to create in Meta and the message log
+ * with this month's counts (cost control). Without a phone number ID and access token the server runs in test mode:
+ * messages are only written to the log.
  */
 import { useState } from "react";
 import { DataTable, type Column } from "@/components/shared/DataTable";
@@ -26,11 +27,64 @@ import {
   useSendQueuedNow,
   useWhatsAppMessages,
   useWhatsAppSettings,
+  useWhatsAppTemplates,
   useWhatsAppTest,
   useWhatsAppVerify,
 } from "./whatsappApi";
 
-const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+/** The customer messages: settings switch, log filter value, label and when it is sent. */
+const MESSAGES = [
+  {
+    key: "welcome",
+    type: "WELCOME",
+    label: "Welcome",
+    when: "when a customer is registered – code, delivery day",
+  },
+  {
+    key: "quotation",
+    type: "QUOTATION",
+    label: "Quotation",
+    when: 'with the quotation PDF, when the office presses "Send on WhatsApp"',
+  },
+  {
+    key: "deliveryBill",
+    type: "DELIVERY_BILL",
+    label: "Delivery bill",
+    when: "with the bill PDF, every bill saved (phone or office) – bottles, money, balance, next delivery",
+  },
+  {
+    key: "billCancelled",
+    type: "BILL_CANCELLED",
+    label: "Bill cancelled",
+    when: "when a bill that went on WhatsApp is reversed",
+  },
+  {
+    key: "paymentReceipt",
+    type: "PAYMENT_RECEIPT",
+    label: "Payment receipt",
+    when: "money paid apart from a bill – amount, receipt number, balance",
+  },
+  {
+    key: "monthlyInvoice",
+    type: "MONTHLY_INVOICE",
+    label: "Monthly invoice",
+    when: "with the invoice PDF, when invoices are generated",
+  },
+  {
+    key: "dueSoon",
+    type: "PAYMENT_DUE_SOON",
+    label: "Payment due soon",
+    when: "Credit / Monthly bill customers, the days set below before the due date",
+  },
+  {
+    key: "overdue",
+    type: "PAYMENT_OVERDUE",
+    label: "Payment overdue",
+    when: "the days set below after the due date if still unpaid (at most once a week)",
+  },
+] as const;
+type MessageKey = (typeof MESSAGES)[number]["key"];
+
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const SECRETS = [
   { key: "accessToken", saved: "accessTokenSaved", label: "Access token (permanent, system user)" },
@@ -48,25 +102,29 @@ const STATUS_KIND: Record<WhatsAppMessageRow["status"], BadgeKind> = {
   SKIPPED: "warn",
 };
 
-interface Form {
+type Form = Record<MessageKey, boolean> & {
   enabled: boolean;
-  leftAtDoor: boolean;
-  paymentReminder: boolean;
-  monthlyInvoice: boolean;
-  reminderDay: number;
+  daysBefore: number;
+  daysAfter: number;
   reminderHour: number;
   phoneNumberId: string;
   businessAccountId: string;
   language: string;
-}
+};
 
 function toForm(s: WhatsAppSettings): Form {
   return {
     enabled: s.enabled,
-    leftAtDoor: s.leftAtDoor,
-    paymentReminder: s.paymentReminder,
+    welcome: s.welcome,
+    quotation: s.quotation,
+    deliveryBill: s.deliveryBill,
+    billCancelled: s.billCancelled,
+    paymentReceipt: s.paymentReceipt,
     monthlyInvoice: s.monthlyInvoice,
-    reminderDay: s.reminderDay,
+    dueSoon: s.dueSoon,
+    overdue: s.overdue,
+    daysBefore: s.daysBefore,
+    daysAfter: s.daysAfter,
     reminderHour: s.reminderHour,
     phoneNumberId: s.phoneNumberId ?? "",
     businessAccountId: s.businessAccountId ?? "",
@@ -85,6 +143,7 @@ export function WhatsAppTab() {
       {/* Remounts with fresh fields whenever the saved settings change. */}
       {settings.data && <SettingsCard key={JSON.stringify(settings.data)} settings={settings.data} />}
       {settings.data && <ActionsCard settings={settings.data} />}
+      <TemplatesCard />
       <MessageLog />
     </>
   );
@@ -154,50 +213,45 @@ function SettingsCard({ settings }: { settings: WhatsAppSettings }) {
           </label>
         </div>
         <div className="field full">
-          <span className="small muted">Messages (only to customers who agreed to WhatsApp messages)</span>
-          <label>
-            <input
-              type="checkbox"
-              checked={form.leftAtDoor}
-              onChange={(e) => set("leftAtDoor", e.target.checked)}
-            />{" "}
-            Left at door – when a bill is saved as &quot;Left at door&quot;
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={form.monthlyInvoice}
-              onChange={(e) => set("monthlyInvoice", e.target.checked)}
-            />{" "}
-            Monthly invoice – with the invoice PDF, when invoices are generated
-          </label>
-          <label>
-            <input
-              type="checkbox"
-              checked={form.paymentReminder}
-              onChange={(e) => set("paymentReminder", e.target.checked)}
-            />{" "}
-            Payment reminder – weekly, to Credit / Monthly bill customers past their terms (at most once a
-            week)
-          </label>
+          <span className="small muted">
+            Messages from the business number – only to customers who agreed to WhatsApp messages and have a
+            mobile number
+          </span>
+          {MESSAGES.map((m) => (
+            <label key={m.key}>
+              <input type="checkbox" checked={form[m.key]} onChange={(e) => set(m.key, e.target.checked)} />{" "}
+              <b>{m.label}</b> – {m.when}
+            </label>
+          ))}
         </div>
         <div className="field">
-          <label htmlFor="wa-day">Reminder day</label>
-          <select
-            id="wa-day"
-            value={form.reminderDay}
-            onChange={(e) => set("reminderDay", Number(e.target.value))}
-          >
-            {DAYS.map((d, i) => (
-              <option key={d} value={i + 1}>
-                {d}
-              </option>
-            ))}
-          </select>
-          {err("reminderDay")}
+          <label htmlFor="wa-before">Due soon: days before the due date</label>
+          <input
+            id="wa-before"
+            type="number"
+            min={1}
+            max={30}
+            value={form.daysBefore}
+            onChange={(e) => set("daysBefore", Number(e.target.value))}
+            className={errors.daysBefore ? "invalid" : undefined}
+          />
+          {err("daysBefore")}
         </div>
         <div className="field">
-          <label htmlFor="wa-hour">Reminder time</label>
+          <label htmlFor="wa-after">Overdue: days after the due date</label>
+          <input
+            id="wa-after"
+            type="number"
+            min={1}
+            max={30}
+            value={form.daysAfter}
+            onChange={(e) => set("daysAfter", Number(e.target.value))}
+            className={errors.daysAfter ? "invalid" : undefined}
+          />
+          {err("daysAfter")}
+        </div>
+        <div className="field">
+          <label htmlFor="wa-hour">Reminder time (every day)</label>
           <select
             id="wa-hour"
             value={form.reminderHour}
@@ -270,9 +324,7 @@ function SettingsCard({ settings }: { settings: WhatsAppSettings }) {
       </div>
       <p className="small muted">
         Webhook address for Meta: <code>https://&lt;this site&gt;{settings.webhookPath}</code> with the verify
-        token above (subscribe to &quot;messages&quot;). Templates to approve in Meta:{" "}
-        <code>left_at_door_v1</code>, <code>payment_reminder_v1</code>, <code>monthly_invoice_v1</code>{" "}
-        (document header).
+        token above (subscribe to &quot;messages&quot;). The templates to create in Meta are listed below.
       </p>
       <div className="form-actions">
         <button
@@ -374,9 +426,38 @@ function ActionsCard({ settings }: { settings: WhatsAppSettings }) {
       </div>
       <p className="small muted">
         Test send uses Meta&apos;s ready-made &quot;hello_world&quot; message. Queued messages also go out by
-        themselves within a minute; reminders run every {DAYS[settings.reminderDay - 1]} at{" "}
+        themselves within a minute; payment due soon / overdue messages are checked every day at{" "}
         {hourText(settings.reminderHour)}.
       </p>
+    </div>
+  );
+}
+
+/** The Meta templates to create in WhatsApp Manager (category Utility); Meta must approve each one. */
+function TemplatesCard() {
+  const q = useWhatsAppTemplates();
+  return (
+    <div className="card">
+      <h2>Templates for Meta</h2>
+      <p className="small muted">
+        Create each one in Meta WhatsApp Manager → Message templates: category <b>Utility</b>, the name and
+        the text exactly as below, language as set above. A message is sent only after Meta approves its
+        template.
+      </p>
+      {q.isError && <div className="banner bad">{q.error.message}</div>}
+      {q.data?.map((t) => (
+        <div key={t.name} className="wa-template" data-testid={`wa-template-${t.name}`}>
+          <div>
+            <b>{t.label}</b> – <code>{t.name}</code> · {t.category}
+            {t.document && " · header: Document (PDF)"}{" "}
+            {t.switchedOn ? <Badge kind="ok">On</Badge> : <Badge>Off</Badge>}
+          </div>
+          <pre className="small" style={{ whiteSpace: "pre-wrap", margin: "4px 0" }}>
+            {t.body}
+          </pre>
+          <div className="small muted">{t.params.map((p, i) => `{{${i + 1}}} ${p}`).join(" · ")}</div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -448,9 +529,11 @@ function MessageLog() {
             }}
           >
             <option value="">All</option>
-            <option value="LEFT_AT_DOOR">Left at door</option>
-            <option value="MONTHLY_INVOICE">Monthly invoice</option>
-            <option value="PAYMENT_REMINDER">Payment reminder</option>
+            {MESSAGES.map((m) => (
+              <option key={m.type} value={m.type}>
+                {m.label}
+              </option>
+            ))}
             <option value="TEST">Test message</option>
           </select>
         </div>

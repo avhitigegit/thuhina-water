@@ -45,6 +45,7 @@ import lk.thuhina.water.sales.dto.SalesDtos.TxnDetail;
 import lk.thuhina.water.sales.service.SalesService;
 import lk.thuhina.water.security.CurrentUser;
 import lk.thuhina.water.security.Permissions;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.access.AccessDeniedException;
@@ -79,12 +80,14 @@ public class CustomerService {
     private final SalesService sales;
     private final CustomerQuotationService quotations;
     private final NamedParameterJdbcTemplate jdbc;
+    private final ApplicationEventPublisher events;
     private final Clock clock;
 
     public CustomerService(CustomerRepository repository, AreaRepository areas, CustomerTypeRepository types,
                            BottleTypeRepository bottleTypes, CustomerPriceService prices, CustomerQueryService queries,
                            PricingService pricing, NumberingService numbering, AuditService audit, SalesService sales,
-                           CustomerQuotationService quotations, NamedParameterJdbcTemplate jdbc, Clock clock) {
+                           CustomerQuotationService quotations, NamedParameterJdbcTemplate jdbc, ApplicationEventPublisher events,
+                           Clock clock) {
         this.repository = repository;
         this.areas = areas;
         this.types = types;
@@ -97,6 +100,7 @@ public class CustomerService {
         this.sales = sales;
         this.quotations = quotations;
         this.jdbc = jdbc;
+        this.events = events;
         this.clock = clock;
     }
 
@@ -142,6 +146,7 @@ public class CustomerService {
             quotations.registered(quotationId, c.getId(), c.getCode(), c.getName(), registeredOn, agreed.size());
         }
         List<TxnDetail> bills = given.any() ? sales.registrationBills(c.getId(), registeredOn, given) : List.of();
+        events.publishEvent(new CustomerRegistered(c.getId(), registeredOn));
         return new CustomerSaved(queries.detail(c.getId()), agreed.size(), bills);
     }
 

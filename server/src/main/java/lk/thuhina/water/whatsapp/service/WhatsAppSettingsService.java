@@ -36,6 +36,8 @@ public class WhatsAppSettingsService {
     private static final Pattern META_ID = Pattern.compile("^\\d{5,30}$");
     private static final Pattern LANGUAGE = Pattern.compile("^[a-z]{2}(_[A-Z]{2})?$");
     private static final int MAX_SECRET = 1000;
+    /** Payment due soon / overdue: how many days before / after the due date (1 – 30). */
+    public static final int MAX_REMINDER_DAYS = 30;
 
     private final AppSettingRepository repository;
     private final SecretCipher cipher;
@@ -56,7 +58,8 @@ public class WhatsAppSettingsService {
 
     /** Settings with the secrets decrypted – for the outbox, the sender and the webhook only, never for a response. */
     public record Config(boolean enabled, String phoneNumberId, String businessAccountId, String accessToken, String appSecret,
-                         String verifyToken, boolean leftAtDoor, boolean paymentReminder, boolean monthlyInvoice, int reminderDay,
+                         String verifyToken, boolean welcome, boolean quotation, boolean deliveryBill, boolean billCancelled,
+                         boolean paymentReceipt, boolean monthlyInvoice, boolean dueSoon, boolean overdue, int daysBefore, int daysAfter,
                          int reminderHour, String language, boolean allowLive) {
 
         /** Real sending: allowed and the phone number id and access token are saved. Otherwise the test sender is used. */
@@ -70,8 +73,9 @@ public class WhatsAppSettingsService {
         ObjectNode s = read();
         return new Config(s.path("enabled").asBoolean(false), text(s, "phoneNumberId"), text(s, "businessAccountId"),
                 cipher.decrypt(text(s, "accessToken")), cipher.decrypt(text(s, "appSecret")), cipher.decrypt(text(s, "verifyToken")),
-                s.path("leftAtDoor").asBoolean(true), s.path("paymentReminder").asBoolean(true), s.path("monthlyInvoice").asBoolean(true),
-                s.path("reminderDay").asInt(1), s.path("reminderHour").asInt(9), s.path("language").asString("en"), properties.allowLive());
+                on(s, "welcome"), on(s, "quotation"), on(s, "deliveryBill"), on(s, "billCancelled"), on(s, "paymentReceipt"),
+                on(s, "monthlyInvoice"), on(s, "dueSoon"), on(s, "overdue"), s.path("daysBefore").asInt(3), s.path("daysAfter").asInt(3),
+                s.path("reminderHour").asInt(9), s.path("language").asString("en"), properties.allowLive());
     }
 
     @Transactional(readOnly = true)
@@ -87,8 +91,11 @@ public class WhatsAppSettingsService {
         checkSecret(errors, "accessToken", r.accessToken());
         checkSecret(errors, "appSecret", r.appSecret());
         checkSecret(errors, "verifyToken", r.verifyToken());
-        if (r.reminderDay() != null && (r.reminderDay() < 1 || r.reminderDay() > 7)) {
-            errors.put("reminderDay", "Choose a day from Monday to Sunday.");
+        if (r.daysBefore() != null && (r.daysBefore() < 1 || r.daysBefore() > MAX_REMINDER_DAYS)) {
+            errors.put("daysBefore", "Enter 1 to " + MAX_REMINDER_DAYS + " days.");
+        }
+        if (r.daysAfter() != null && (r.daysAfter() < 1 || r.daysAfter() > MAX_REMINDER_DAYS)) {
+            errors.put("daysAfter", "Enter 1 to " + MAX_REMINDER_DAYS + " days.");
         }
         if (r.reminderHour() != null && (r.reminderHour() < 0 || r.reminderHour() > 23)) {
             errors.put("reminderHour", "Choose an hour from 0 to 23.");
@@ -109,10 +116,16 @@ public class WhatsAppSettingsService {
         secret(s, changed, "accessToken", "access token", r.accessToken());
         secret(s, changed, "appSecret", "app secret", r.appSecret());
         secret(s, changed, "verifyToken", "webhook verify token", r.verifyToken());
-        bool(s, changed, "leftAtDoor", "Left at door " + onOff(r.leftAtDoor()), r.leftAtDoor());
-        bool(s, changed, "paymentReminder", "Payment reminder " + onOff(r.paymentReminder()), r.paymentReminder());
+        bool(s, changed, "welcome", "Welcome " + onOff(r.welcome()), r.welcome());
+        bool(s, changed, "quotation", "Quotation " + onOff(r.quotation()), r.quotation());
+        bool(s, changed, "deliveryBill", "Delivery bill " + onOff(r.deliveryBill()), r.deliveryBill());
+        bool(s, changed, "billCancelled", "Bill cancelled " + onOff(r.billCancelled()), r.billCancelled());
+        bool(s, changed, "paymentReceipt", "Payment receipt " + onOff(r.paymentReceipt()), r.paymentReceipt());
         bool(s, changed, "monthlyInvoice", "Monthly invoice " + onOff(r.monthlyInvoice()), r.monthlyInvoice());
-        number(s, changed, "reminderDay", "reminder day", r.reminderDay());
+        bool(s, changed, "dueSoon", "Payment due soon " + onOff(r.dueSoon()), r.dueSoon());
+        bool(s, changed, "overdue", "Payment overdue " + onOff(r.overdue()), r.overdue());
+        number(s, changed, "daysBefore", "days before the due date", r.daysBefore());
+        number(s, changed, "daysAfter", "days after the due date", r.daysAfter());
         number(s, changed, "reminderHour", "reminder hour", r.reminderHour());
         plain(s, changed, "language", "language", r.language());
         if (!changed.isEmpty()) {
@@ -124,15 +137,14 @@ public class WhatsAppSettingsService {
     }
 
     private SettingsView view(ObjectNode s) {
-        Config c = new Config(s.path("enabled").asBoolean(false), text(s, "phoneNumberId"), null,
-                text(s, "accessToken") == null ? null : "saved", null, null, false, false, false, 1, 9, "en", properties.allowLive());
-        boolean live = c.live();
+        boolean live = properties.allowLive() && text(s, "phoneNumberId") != null && text(s, "accessToken") != null;
         String modeText = live
                 ? "Live – messages are sent through WhatsApp Business (Meta)."
                 : "Test mode – messages are only written to the log below (no phone number ID / access token saved).";
-        return new SettingsView(c.enabled(), text(s, "phoneNumberId"), text(s, "businessAccountId"), text(s, "accessToken") != null,
-                text(s, "appSecret") != null, text(s, "verifyToken") != null, s.path("leftAtDoor").asBoolean(true),
-                s.path("paymentReminder").asBoolean(true), s.path("monthlyInvoice").asBoolean(true), s.path("reminderDay").asInt(1),
+        return new SettingsView(s.path("enabled").asBoolean(false), text(s, "phoneNumberId"), text(s, "businessAccountId"),
+                text(s, "accessToken") != null, text(s, "appSecret") != null, text(s, "verifyToken") != null, on(s, "welcome"),
+                on(s, "quotation"), on(s, "deliveryBill"), on(s, "billCancelled"), on(s, "paymentReceipt"), on(s, "monthlyInvoice"),
+                on(s, "dueSoon"), on(s, "overdue"), s.path("daysBefore").asInt(3), s.path("daysAfter").asInt(3),
                 s.path("reminderHour").asInt(9), s.path("language").asString("en"), live ? "LIVE" : "TEST", modeText, cipher.available(),
                 WEBHOOK_PATH);
     }
@@ -194,6 +206,11 @@ public class WhatsAppSettingsService {
         }
         s.put(key, cipher.encrypt(v));
         changed.add(label + " saved");
+    }
+
+    /** A message type switch; on unless switched off. */
+    private static boolean on(JsonNode s, String key) {
+        return s.path(key).asBoolean(true);
     }
 
     private static String onOff(Boolean value) {
