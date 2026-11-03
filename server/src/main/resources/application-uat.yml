@@ -1,8 +1,10 @@
-# UAT (AWS test server, demo data only). Seed data is loaded; Swagger UI is available for testing.
+# UAT (AWS test server, test data only). Only the setup data is loaded (db/setup: users, bottle types, prices,
+# products, suppliers, factories, opening stock) – no demo customers or transactions, so the client can try the
+# system from a clean start. Swagger UI is available for testing.
 
 spring:
   flyway:
-    locations: classpath:db/migration,classpath:db/seed
+    locations: classpath:db/migration,classpath:db/setup
 
 springdoc:
   api-docs:
@@ -12,5 +14,5 @@ springdoc:
 
 app:
   demo-data:
-    # Demo-data generator (M12) on – never in production.
-    enabled: true
+    # Demo-data generator (M12) off – the client enters their own test transactions.
+    enabled: false

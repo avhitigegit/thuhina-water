@@ -1,9 +1,9 @@
 # Local development (developer laptop, Docker Compose or the IDE).
-# Seed data from the prototype is loaded; the login cookie works on plain http://localhost.
+# Setup data (db/setup) and the demo transactions (db/seed) from the prototype are loaded; the login cookie works on plain http://localhost.
 
 spring:
   flyway:
-    locations: classpath:db/migration,classpath:db/seed
+    locations: classpath:db/migration,classpath:db/setup,classpath:db/seed
 
 springdoc:
   api-docs:
