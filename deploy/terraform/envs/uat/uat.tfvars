@@ -3,9 +3,8 @@
 project    = "thuhina"
 aws_region = "ap-southeast-2" # Sydney – the only region of the Free-plan project (D-U10)
 
-# Fixed IPs that may open UAT (e.g. the client's office, "x.x.x.x/32").
-# Your own changing IP is added with deploy/scripts/allow-my-ip.ps1, not here.
-allowed_cidrs = []
+# Fixed IPs that may open UAT (the client's computers) are in the git-ignored account.auto.tfvars – the repository
+# is public. Your own changing IP is added with deploy/scripts/allow-my-ip.ps1.
 
 alert_email        = "amritha.hitige@gmail.com"
 monthly_budget_usd = 30

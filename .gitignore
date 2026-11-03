@@ -33,6 +33,13 @@ Thumbs.db
 # Project documents – kept only on this computer from M01 on (not in the repository)
 /doc/
 
+# Facebook marketing pack – kept only on this computer
+/fb/
+/fb boost/
+
+# Local real-data import (loads doc/import/flyway into the local database only)
+deploy/docker-compose.override.yml
+
 # Terraform – state and plans hold secrets and stay out of Git (the lock file IS committed)
 **/.terraform/
 *.tfstate
