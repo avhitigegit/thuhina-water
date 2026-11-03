@@ -12,7 +12,9 @@ variable "aws_account_id" {
 }
 
 variable "allowed_cidrs" {
-  type = list(string)
+  description = "Fixed IPs that may open the site over HTTPS (set in the git-ignored account.auto.tfvars)."
+  type        = list(string)
+  default     = []
 }
 
 variable "alert_email" {

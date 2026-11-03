@@ -1,3 +1,7 @@
 # Copy to account.auto.tfvars (not committed) – Terraform loads *.auto.tfvars by itself.
 # The only AWS account UAT may be applied to (AWS project "Hello World").
 aws_account_id = "<aws account id>"
+
+# Fixed IPs that may open UAT – one "x.x.x.x/32" per computer (the client's office, staff homes). Kept here, not in
+# uat.tfvars, so the addresses stay out of the public repository.
+allowed_cidrs = []
