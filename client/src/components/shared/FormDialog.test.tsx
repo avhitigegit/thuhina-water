@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { DateField } from "./DateField";
 import { FormDialog } from "./FormDialog";
@@ -33,6 +34,28 @@ describe("FormDialog", () => {
     expect(onOpenChange).not.toHaveBeenCalled();
     await user.keyboard("{Escape}");
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("a day in the calendar can be clicked inside a pop-up, and the pop-up stays open", async () => {
+    // A modal pop-up sets pointer-events: none on the body, and the calendar is rendered on the body.
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    function Form() {
+      const [date, setDate] = useState<string | null>("2026-11-05");
+      return (
+        <FormDialog open onOpenChange={onOpenChange} title="New customer" onSubmit={vi.fn()}>
+          <label htmlFor="d">Registration date</label>
+          <DateField id="d" value={date} onChange={setDate} today="2026-11-05" />
+        </FormDialog>
+      );
+    }
+    render(<Form />);
+    await user.click(screen.getByLabelText("Registration date"));
+    await user.click(screen.getByRole("button", { name: "Previous month" }));
+    expect(screen.getByText("October 2026")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "29/10/2026" }));
+    expect(screen.getByLabelText("Registration date")).toHaveValue("29/10/2026");
+    expect(onOpenChange).not.toHaveBeenCalled();
   });
 
   it("Enter moves to the next field and does not save", async () => {

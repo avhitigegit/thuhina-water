@@ -252,7 +252,8 @@ function Calendar({
       className="dp"
       role="dialog"
       aria-label="Choose a date"
-      style={style}
+      // The calendar sits on the body, and a modal pop-up turns off clicks on the body (pointer-events: none).
+      style={{ ...style, pointerEvents: "auto" }}
       // Keep the focus in the field while clicking the calendar.
       onMouseDown={(e) => e.preventDefault()}
     >
