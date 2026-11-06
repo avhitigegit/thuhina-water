@@ -513,9 +513,10 @@ describe("Registration with bottles", () => {
     expect(summary).toHaveTextContent(
       "3 × 20L: water Rs. 1,050.00 + deposit 2 × Rs. 1,000.00 (1 old bottle – no deposit)",
     );
-    expect(summary).toHaveTextContent("Total Rs. 3,050.00 · paid Rs. 3,050.00");
-    // Cash customer: the total is paid unless changed.
-    expect(within(dialog).getByLabelText("Cash paid now (Rs.)")).toHaveValue(3050);
+    // Cash customer: nothing is filled in, the amount received must be typed.
+    expect(within(dialog).getByLabelText("Cash paid now (Rs.)")).toHaveValue(null);
+    await user.type(within(dialog).getByLabelText("Cash paid now (Rs.)"), "3050");
+    await vi.waitFor(() => expect(summary).toHaveTextContent("Total Rs. 3,050.00 · paid Rs. 3,050.00"));
 
     await user.type(within(dialog).getByLabelText("Name"), "Nimali Silva");
     await user.type(within(dialog).getByLabelText("Phone"), "075 882 1043");

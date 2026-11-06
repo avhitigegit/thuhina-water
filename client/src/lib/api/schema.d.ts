@@ -2709,6 +2709,9 @@ export interface components {
             approveOverLimit?: boolean;
             /** Format: int64 */
             fromQuotationId?: number;
+            /** Format: date */
+            inactiveFrom?: string;
+            inactiveReason?: string;
         };
         BillLink: {
             /** Format: int64 */

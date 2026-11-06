@@ -6,7 +6,7 @@
  * after the registration date, editable) · Water price (agreed prices for a new customer; price now + "Change
  * prices…" when editing) · Payment · Bottles given on the registration date (new customer, FR-08 + FR-32: filled per
  * bottle type, old bottles, cash paid, live calculation from /customers/register/preview) · WhatsApp · Notes · Status
- * (edit). A phone already in use asks "Save anyway?"; over the credit limit asks for Admin approval. A new customer
+ * (Active or Inactive, also for a new customer). A phone already in use asks "Save anyway?"; over the credit limit asks for Admin approval. A new customer
  * and the first-purchase bills are saved together; the "Customer registered" pop-up lists the bills to print.
  * Register as customer from an accepted customer quotation (M16) opens it pre-filled (name, phone, address, area, type,
  * notes and the quoted water prices as agreed prices) and links the new customer to the quotation.
@@ -48,7 +48,14 @@ import {
   PAY_TYPES,
 } from "./labels";
 import { PriceText } from "./PriceText";
-import { customerSchema, statusReason, type CustomerValues } from "./schemas";
+import {
+  cashPaidProblem,
+  customerSchema,
+  inactiveProblem,
+  MSG_FIX_FIELDS,
+  statusReason,
+  type CustomerValues,
+} from "./schemas";
 import { OpenItems } from "./StatusDialog";
 
 const SERVER_FIELDS = [
@@ -140,8 +147,9 @@ function CustomerForm({
   const [registered, setRegistered] = useState<CustomerSaved | null>(null);
   // "Save anyway" for a duplicate phone is kept when the Admin then approves the credit limit.
   const [allowDup, setAllowDup] = useState(false);
-  // Cash paid on the registration bills: the total for Cash customers (0 otherwise) until typed in.
+  // Cash paid on the registration bills. Nothing is filled in: the user types what was really received.
   const [paidText, setPaidText] = useState<string | null>(null);
+  const [paidError, setPaidError] = useState("");
   // Old-bottle brand chosen when more than one is accepted for the size ("" = the first, N-03).
   const [oldBrand, setOldBrand] = useState("");
   const brands = useOldBottleBrands();
@@ -217,7 +225,9 @@ function CustomerForm({
 
   const whole = (v: string | undefined) => (/^\d+$/.test((v ?? "").trim()) ? Number(v) : 0);
   const givenNumbers = Object.fromEntries(bottles.map((b) => [b.code, whole(given?.[b.code])]));
-  const anyGiven = canSell && Object.values(givenNumbers).some((q) => q > 0);
+  // An inactive customer gets no bottles, so the bottles section is left out.
+  const inactiveNew = isNew && status.value === "INACTIVE";
+  const anyGiven = canSell && !inactiveNew && Object.values(givenNumbers).some((q) => q > 0);
   const agreedNumbers = Object.fromEntries(
     Object.entries(agreedPrices ?? {})
       .filter(([, p]) => Number(p) > 0)
@@ -239,7 +249,7 @@ function CustomerForm({
       : null,
   );
   const rp = anyGiven ? regPreview.data : undefined;
-  const paidValue = paidText ?? (rp ? String(payType === "CASH" ? Number(rp.amount) : 0) : "");
+  const paidValue = paidText ?? "";
   const paidNumber = Number(paidValue) || 0;
   const oldBrands = (brands.data ?? []).filter((b) => b.active && b.bottleTypeCode === mainBottle);
   const oldBrandId = oldBrands.find((b) => String(b.id) === oldBrand)?.id ?? oldBrands[0]?.id;
@@ -303,14 +313,21 @@ function CustomerForm({
                 .map(([k, p]) => [k, Number(p)]),
             ),
             agreedReason: v.agreedReason,
-            bottlesGiven: canSell
-              ? Object.fromEntries(bottles.map((b) => [b.code, whole(v.bottlesGiven[b.code])]))
-              : {},
-            oldBottles: canSell ? whole(v.oldBottles) : 0,
-            oldBrandId: canSell && whole(v.oldBottles) > 0 ? oldBrandId : undefined,
+            bottlesGiven:
+              canSell && !inactiveNew
+                ? Object.fromEntries(bottles.map((b) => [b.code, whole(v.bottlesGiven[b.code])]))
+                : {},
+            oldBottles: canSell && !inactiveNew ? whole(v.oldBottles) : 0,
+            oldBrandId: canSell && !inactiveNew && whole(v.oldBottles) > 0 ? oldBrandId : undefined,
             paid: anyGiven ? paidNumber : 0,
             approveOverLimit,
             fromQuotationId: prefill?.quotationId,
+            ...(inactiveNew
+              ? {
+                  inactiveFrom: status.date as string,
+                  inactiveReason: statusReason(status.reason, status.details.trim()),
+                }
+              : {}),
           }
         : { version: customer.version }),
     };
@@ -369,19 +386,25 @@ function CustomerForm({
     );
   }
 
-  const submit = handleSubmit((v) => {
-    if (!isNew && status.value === "INACTIVE" && customer.status !== "INACTIVE") {
-      if (!status.reason || (status.reason === "Other" && !status.details.trim())) {
-        setError('Select the reason (and enter details for "Other") to make the customer inactive.');
-        return;
-      }
-      if (!status.date || status.date > today) {
-        setError("Enter the inactive-from date (not in the future).");
-        return;
-      }
-    }
-    send(v, false);
-  });
+  /** All fields are checked together, so one Save shows everything that is missing. */
+  function submit() {
+    const paidProblem = anyGiven
+      ? cashPaidProblem(payType, paidValue, rp ? Number(rp.amount) : undefined)
+      : "";
+    setPaidError(paidProblem);
+    const makingInactive = status.value === "INACTIVE" && customer?.status !== "INACTIVE";
+    const statusProblem = makingInactive
+      ? inactiveProblem(status, today, isNew ? getValues("registeredOn") : null)
+      : "";
+    void handleSubmit(
+      (v) => {
+        if (paidProblem) setError(MSG_FIX_FIELDS);
+        else if (statusProblem) setError(statusProblem);
+        else send(v, false);
+      },
+      () => setError(statusProblem || MSG_FIX_FIELDS),
+    )();
+  }
 
   const field = (name: (typeof SERVER_FIELDS)[number]) => ({
     id: `cu-${name}`,
@@ -400,7 +423,7 @@ function CustomerForm({
         wide
         onOpenChange={(o) => !o && onClose()}
         title={isNew ? "New customer" : `Edit ${customer.name}`}
-        onSubmit={() => void submit()}
+        onSubmit={submit}
         submitting={save.isPending || deactivate.isPending || reactivate.isPending || !!creditError}
       >
         {error && <div className="banner bad">{error}</div>}
@@ -536,7 +559,11 @@ function CustomerForm({
                 className={errors.usualQty?.[b.code] ? "invalid num" : "num"}
                 {...register(`usualQty.${b.code}`)}
               />
-              {errors.usualQty?.[b.code] && <span className="error">{errors.usualQty[b.code]?.message}</span>}
+              {errors.usualQty?.[b.code] ? (
+                <span className="error">{errors.usualQty[b.code]?.message}</span>
+              ) : (
+                b.code === mainBottle && <span className="help">Needed for at least one bottle size</span>
+              )}
             </div>
           ))}
 
@@ -643,7 +670,10 @@ function CustomerForm({
               </div>
             </>
           )}
-          {isNew && canSell && (
+          {inactiveNew && canSell && (
+            <p className="full small muted">An inactive customer gets no bottles on the registration date.</p>
+          )}
+          {isNew && canSell && !inactiveNew && (
             <>
               <div className="section-title full">Bottles given on the registration date</div>
               {bottles.map((b) => (
@@ -692,17 +722,21 @@ function CustomerForm({
                 />
                 {errors.oldBottles && <span className="error">{errors.oldBottles.message}</span>}
               </div>
-              <div className="field">
+              <div className={payType === "CASH" && anyGiven ? "field req" : "field"}>
                 <label htmlFor="cu-paid">Cash paid now (Rs.)</label>
                 <input
                   id="cu-paid"
                   type="number"
                   min="0"
-                  className="num"
+                  className={paidError ? "invalid num" : "num"}
                   value={paidValue}
                   disabled={!anyGiven}
-                  onChange={(e) => setPaidText(e.target.value)}
+                  onChange={(e) => {
+                    setPaidText(e.target.value);
+                    setPaidError("");
+                  }}
                 />
+                {paidError && <span className="error">{paidError}</span>}
               </div>
               <div className="full">
                 <RegistrationSummary preview={rp} paid={paidNumber} anyGiven={anyGiven} />
@@ -724,73 +758,60 @@ function CustomerForm({
           </div>
 
           <div className="section-title full">Status</div>
-          {isNew ? (
-            <>
-              <div className="field">
-                <label htmlFor="cu-status">Status</label>
-                <input id="cu-status" value="Active" readOnly />
-              </div>
-              <div className="field span2 small muted" style={{ alignSelf: "end" }}>
-                New customers start as Active. Deactivate later from this pop-up or the list when they stop
-                buying.
-              </div>
-            </>
-          ) : (
+          <div className="field req">
+            <label htmlFor="cu-st">Status</label>
+            <select
+              id="cu-st"
+              value={status.value}
+              onChange={(e) => setStatus({ ...status, value: e.target.value })}
+            >
+              <option value="ACTIVE">Active</option>
+              <option value="INACTIVE">Inactive</option>
+            </select>
+          </div>
+          {status.value === "INACTIVE" && customer?.status !== "INACTIVE" && (
             <>
               <div className="field req">
-                <label htmlFor="cu-st">Status</label>
+                <label htmlFor="cu-st-date">Inactive from</label>
+                <DateField
+                  id="cu-st-date"
+                  value={status.date}
+                  onChange={(d) => setStatus({ ...status, date: d })}
+                />
+              </div>
+              <div className="field req">
+                <label htmlFor="cu-st-reason">Reason</label>
                 <select
-                  id="cu-st"
-                  value={status.value}
-                  onChange={(e) => setStatus({ ...status, value: e.target.value })}
+                  id="cu-st-reason"
+                  value={status.reason}
+                  onChange={(e) => setStatus({ ...status, reason: e.target.value })}
                 >
-                  <option value="ACTIVE">Active</option>
-                  <option value="INACTIVE">Inactive</option>
+                  <option value="">Select</option>
+                  {DEACT_REASONS.map((r) => (
+                    <option key={r}>{r}</option>
+                  ))}
                 </select>
               </div>
-              {status.value === "INACTIVE" && customer.status === "ACTIVE" && (
-                <>
-                  <div className="field req">
-                    <label htmlFor="cu-st-date">Inactive from</label>
-                    <DateField
-                      id="cu-st-date"
-                      value={status.date}
-                      onChange={(d) => setStatus({ ...status, date: d })}
-                    />
-                  </div>
-                  <div className="field req">
-                    <label htmlFor="cu-st-reason">Reason</label>
-                    <select
-                      id="cu-st-reason"
-                      value={status.reason}
-                      onChange={(e) => setStatus({ ...status, reason: e.target.value })}
-                    >
-                      <option value="">Select</option>
-                      {DEACT_REASONS.map((r) => (
-                        <option key={r}>{r}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="field span2">
-                    <label htmlFor="cu-st-details">Details</label>
-                    <input
-                      id="cu-st-details"
-                      value={status.details}
-                      placeholder="e.g. Moved to Kandy"
-                      onChange={(e) => setStatus({ ...status, details: e.target.value })}
-                    />
-                  </div>
-                  <div className="full">
-                    <OpenItems customer={customer} />
-                  </div>
-                </>
-              )}
-              {customer.status === "INACTIVE" && customer.statusReason && (
-                <div className="field span2 small muted" style={{ alignSelf: "end" }}>
-                  Inactive since {formatDate(customer.statusDate)} – {customer.statusReason}
+              <div className="field span2">
+                <label htmlFor="cu-st-details">Details</label>
+                <input
+                  id="cu-st-details"
+                  value={status.details}
+                  placeholder="e.g. Moved to Kandy"
+                  onChange={(e) => setStatus({ ...status, details: e.target.value })}
+                />
+              </div>
+              {customer && (
+                <div className="full">
+                  <OpenItems customer={customer} />
                 </div>
               )}
             </>
+          )}
+          {customer?.status === "INACTIVE" && customer.statusReason && (
+            <div className="field span2 small muted" style={{ alignSelf: "end" }}>
+              Inactive since {formatDate(customer.statusDate)} – {customer.statusReason}
+            </div>
           )}
           <div className="full small muted">
             Standard water price for {typeName || "this type"}:{" "}
@@ -929,12 +950,18 @@ function RegisteredDialog({ saved, onClose }: { saved: CustomerSaved; onClose: (
       ) : (
         <p>No bottles given yet.</p>
       )}
-      <p>
-        Next delivery:{" "}
-        <b>
-          {dayName(isoWeekday(c.nextDeliveryDate))} {formatDate(c.nextDeliveryDate)}
-        </b>
-      </p>
+      {c.status === "INACTIVE" ? (
+        <p>
+          Status: <b>Inactive</b> from {formatDate(c.statusDate)} – {c.statusReason}
+        </p>
+      ) : (
+        <p>
+          Next delivery:{" "}
+          <b>
+            {dayName(isoWeekday(c.nextDeliveryDate))} {formatDate(c.nextDeliveryDate)}
+          </b>
+        </p>
+      )}
     </FormDialog>
   );
 }
