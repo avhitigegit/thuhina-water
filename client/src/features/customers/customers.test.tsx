@@ -10,7 +10,15 @@ import { P } from "@/lib/permissions";
 import { CustomerDialog } from "./CustomerDialog";
 import { CustomerPanel } from "./CustomerPanel";
 import { isoWeekday, nextDeliveryAfter } from "./labels";
-import { customerSchema, MSG_PHONE, MSG_REQUIRED } from "./schemas";
+import {
+  cashPaidProblem,
+  customerSchema,
+  inactiveProblem,
+  MSG_CASH_PAID,
+  MSG_FIX_FIELDS,
+  MSG_NAME,
+  MSG_PHONE,
+} from "./schemas";
 
 const C0008: CustomerDetail = {
   id: 8,
@@ -126,9 +134,21 @@ describe("customer form rules", () => {
 
   it("uses the prototype messages", () => {
     expect(msgs({ ...base, name: " ", areaId: "" })).toMatchObject({
-      name: MSG_REQUIRED,
-      areaId: MSG_REQUIRED,
+      name: "Enter the name.",
+      areaId: "Select the area.",
     });
+    expect(msgs({ ...base, name: "12345" })).toMatchObject({ name: MSG_NAME });
+    expect(msgs({ ...base, phone: "" })).toMatchObject({ phone: "Enter the phone number." });
+    expect(msgs({ ...base, address: "" })).toMatchObject({ address: "Enter the address." });
+    expect(msgs({ ...base, customerTypeId: "" })).toMatchObject({
+      customerTypeId: "Select the customer type.",
+    });
+    expect(msgs({ ...base, phone: "011 285 4471", whatsappOptIn: true })).toMatchObject({
+      whatsappNumber: "Enter the WhatsApp number (a mobile number).",
+    });
+    expect(
+      msgs({ ...base, phone: "011 285 4471", whatsappOptIn: true, whatsappNumber: "077 123 4567" }),
+    ).toEqual({});
     expect(msgs({ ...base, phone: "77 123 4567" })).toMatchObject({ phone: MSG_PHONE });
     expect(msgs({ ...base, nextDeliveryDate: "2026-10-13" })).toMatchObject({
       nextDeliveryDate: "Next delivery date 13/10/2026 is a Tuesday, but the delivery day is Monday.",
@@ -143,6 +163,31 @@ describe("customer form rules", () => {
     expect(msgs({ ...base, agreedPrices: { B20: "270" } })).toMatchObject({
       agreedReason: "Enter the reason for the agreed price (e.g. about 3,500 bottles a month).",
     });
+  });
+});
+
+describe("cash paid and inactive rules", () => {
+  it("a Cash customer must enter what was paid; others may leave it empty", () => {
+    expect(cashPaidProblem("CASH", "", 2700)).toBe(MSG_CASH_PAID);
+    expect(cashPaidProblem("CASH", "0", 2700)).toBe(MSG_CASH_PAID);
+    expect(cashPaidProblem("CASH", "-5", 2700)).toBe("Cash paid cannot be negative.");
+    expect(cashPaidProblem("CASH", "2701", 2700)).toBe(
+      "Cash paid cannot be more than the total (Rs. 2,700.00).",
+    );
+    expect(cashPaidProblem("CASH", "2700", 2700)).toBe("");
+    expect(cashPaidProblem("CASH", "1000", undefined)).toBe("");
+    expect(cashPaidProblem("CREDIT", "", 2700)).toBe("");
+  });
+
+  it("inactive needs a reason and a date between registration and today", () => {
+    const ok = { date: "2026-11-02", reason: "Moved away", details: "" };
+    expect(inactiveProblem(ok, "2026-11-06", "2026-11-01")).toBe("");
+    expect(inactiveProblem({ ...ok, reason: "" }, "2026-11-06", null)).toMatch(/Select the reason/);
+    expect(inactiveProblem({ ...ok, reason: "Other" }, "2026-11-06", null)).toMatch(/details/);
+    expect(inactiveProblem({ ...ok, date: "2026-11-07" }, "2026-11-06", null)).toMatch(/not in the future/);
+    expect(inactiveProblem(ok, "2026-11-06", "2026-11-03")).toBe(
+      "Inactive from cannot be before the registration date.",
+    );
   });
 });
 
@@ -454,6 +499,19 @@ describe("CustomerDialog", () => {
     await user.selectOptions(within(dialog).getByLabelText("Old bottle brand"), "2");
     await user.clear(within(dialog).getByLabelText("Old bottles handed in"));
     await user.type(within(dialog).getByLabelText("Old bottles handed in"), "1");
+
+    // Cash customer given bottles: nothing is saved until the cash paid is typed in.
+    const posted = () =>
+      fetch.mock.calls.some(
+        ([u, i]) => u.split("?")[0] === "/api/customers/register" && i?.method === "POST",
+      );
+    expect(within(dialog).getByLabelText("Cash paid now (Rs.)")).toHaveValue(null);
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(await within(dialog).findByText(MSG_CASH_PAID)).toBeInTheDocument();
+    expect(within(dialog).getByText(MSG_FIX_FIELDS)).toBeInTheDocument();
+    expect(posted()).toBe(false);
+    await user.type(within(dialog).getByLabelText("Cash paid now (Rs.)"), "1700");
+
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
     await vi.waitFor(() =>
       expect(
@@ -469,7 +527,93 @@ describe("CustomerDialog", () => {
         )![1]!.body,
       ),
     );
-    expect(body).toMatchObject({ oldBottles: 1, oldBrandId: 2 });
+    expect(body).toMatchObject({ oldBottles: 1, oldBrandId: 2, paid: 1700 });
+  });
+
+  it("registers a customer as Inactive with a reason and no bottles", async () => {
+    const user = userEvent.setup();
+    const { fetch, wrap } = setup(
+      [P.CUSTOMERS_VIEW, P.CUSTOMERS_EDIT, P.MASTERDATA_VIEW, P.SALES_EDIT],
+      (url, init) => {
+        if (url === "/api/areas")
+          return {
+            status: 200,
+            body: [{ id: 1, name: "Nugegoda", active: true, activeCustomers: 3, version: 0 }],
+          };
+        if (url === "/api/customer-types")
+          return {
+            status: 200,
+            body: [
+              { id: 1, name: "Household", description: null, active: true, activeCustomers: 3, version: 0 },
+            ],
+          };
+        if (url === "/api/bottle-types")
+          return {
+            status: 200,
+            body: [
+              {
+                code: "B20",
+                name: "20L Bottle",
+                litres: 20,
+                active: true,
+                deposit: 1000,
+                inCirculation: null,
+                version: 0,
+              },
+            ],
+          };
+        if (url === "/api/prices/current")
+          return {
+            status: 200,
+            body: { date: todayIso(), bottleTypes: [], customerTypes: [], deposits: [], water: [] },
+          };
+        if (url === "/api/customers/register/preview")
+          return {
+            status: 200,
+            body: {
+              lines: [],
+              water: 700,
+              deposit: 2000,
+              amount: 2700,
+              paid: 0,
+              credit: { balance: 0, after: 0, limit: 0, exceeds: false },
+              problems: [],
+            },
+          };
+        if (url === "/api/customers/register" && init?.method === "POST")
+          return { status: 201, body: { customer: { ...C0008, id: 41, code: "C0041" }, agreedPricesSet: 0 } };
+        return { status: 200, body: [] };
+      },
+    );
+    render(wrap(<CustomerDialog customerId={null} onClose={vi.fn()} />));
+    const dialog = await screen.findByRole("dialog", { name: "New customer" });
+    await within(dialog).findByRole("option", { name: "Nugegoda" });
+    await within(dialog).findByLabelText("Filled 20L bottles given");
+
+    await user.type(within(dialog).getByLabelText("Name"), "Nimali Silva");
+    await user.type(within(dialog).getByLabelText("Phone"), "075 882 1043");
+    await user.type(within(dialog).getByLabelText("Address"), "5, Lake Road");
+    await user.selectOptions(within(dialog).getByLabelText("Area"), "1");
+    await user.type(within(dialog).getByLabelText("Usual 20L per delivery"), "2");
+
+    await user.selectOptions(within(dialog).getByLabelText("Status"), "INACTIVE");
+    expect(within(dialog).queryByLabelText("Filled 20L bottles given")).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(await within(dialog).findByText(/Select the reason/)).toBeInTheDocument();
+    await user.selectOptions(within(dialog).getByLabelText("Reason"), "Moved away");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+
+    const isRegister = ([u, i]: (typeof fetch.mock.calls)[number]) =>
+      u.split("?")[0] === "/api/customers/register" && i?.method === "POST";
+    await vi.waitFor(() => expect(fetch.mock.calls.some(isRegister)).toBe(true));
+    const body = JSON.parse(String(fetch.mock.calls.find(isRegister)![1]!.body));
+    expect(body).toMatchObject({
+      inactiveFrom: todayIso(),
+      inactiveReason: "Moved away",
+      bottlesGiven: {},
+      oldBottles: 0,
+      paid: 0,
+    });
   });
 
   it("registers from an accepted quotation with its details and quoted price, linked to it (M16)", async () => {

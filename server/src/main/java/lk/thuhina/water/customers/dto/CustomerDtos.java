@@ -55,7 +55,9 @@ public final class CustomerDtos {
             Long oldBrandId,
             BigDecimal paid,
             Boolean approveOverLimit,
-            Long fromQuotationId) {
+            Long fromQuotationId,
+            LocalDate inactiveFrom,
+            @Size(max = 250, message = "Reason: at most 250 characters.") String inactiveReason) {
     }
 
     /** Bottles of one type with the customer: held, empties to collect, owed. */
