@@ -13,6 +13,7 @@ import java.util.Map;
 
 import com.lowagie.text.pdf.PdfReader;
 import com.lowagie.text.pdf.parser.PdfTextExtractor;
+import lk.thuhina.water.customers.service.CustomerService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.web.servlet.MvcResult;
 
@@ -117,6 +118,65 @@ class RegistrationWithBottlesTest extends SalesTestSupport {
         assertThat(((Number) bill.get("amount")).doubleValue()).isEqualTo(2 * 300 + 2 * 1000.0);
         Map<String, Object> line = ((List<Map<String, Object>>) bill.get("lines")).getFirst();
         assertThat(line).containsEntry("unitPrice", 300.0).containsEntry("agreedPrice", true);
+    }
+
+    @Test
+    void aCashCustomerGivenBottlesMustPayAndOneGivenNoneNeedNot() throws Exception {
+        Map<String, Object> req = customer("Cash " + System.nanoTime());
+        req.put("bottlesGiven", Map.of(bottle, 1));
+        send("/customers/register", req).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fields.paid").value(CustomerService.MSG_CASH_PAID));
+        req.put("paid", 0);
+        send("/customers/register", req).andExpect(jsonPath("$.details.fields.paid").value(CustomerService.MSG_CASH_PAID));
+        assertThat(jdbc.queryForObject("select count(*) from customer where name = ?", Integer.class, req.get("name"))).isZero();
+        req.put("paid", 1350);
+        assertThat(balance(register(req))).isEqualByComparingTo("0");
+
+        register(customer("Cash no bottles " + System.nanoTime()));
+    }
+
+    @Test
+    void aCustomerCanBeRegisteredAsInactiveWithAReasonAndNoBottles() throws Exception {
+        LocalDate past = LocalDate.parse((String) customer("x").get("nextDeliveryDate")).minusDays(7);
+        Map<String, Object> req = customer("Inactive " + System.nanoTime());
+        req.put("registeredOn", past.minusDays(3).toString());
+        req.put("inactiveFrom", past.minusDays(3).toString());
+        send("/customers/register", req).andExpect(jsonPath("$.details.fields.inactiveReason")
+                .value("Enter the reason for deactivating."));
+        req.put("inactiveReason", "Moved away");
+        req.put("inactiveFrom", past.minusDays(4).toString());
+        send("/customers/register", req).andExpect(jsonPath("$.details.fields.inactiveFrom")
+                .value("Inactive from cannot be before the registration date."));
+        req.put("inactiveFrom", past.minusDays(3).toString());
+        req.put("bottlesGiven", Map.of(bottle, 1));
+        req.put("paid", 1350);
+        send("/customers/register", req).andExpect(jsonPath("$.details.fields.bottlesGiven")
+                .value("An inactive customer cannot be given bottles."));
+        assertThat(jdbc.queryForObject("select count(*) from customer where name = ?", Integer.class, req.get("name"))).isZero();
+
+        req.remove("bottlesGiven");
+        req.remove("paid");
+        long c = register(req);
+        assertThat(jdbc.queryForObject("select status from customer where id = ?", String.class, c)).isEqualTo("INACTIVE");
+        assertThat(jdbc.queryForObject("select status_reason from customer where id = ?", String.class, c)).isEqualTo("Moved away");
+    }
+
+    @Test
+    void otherRegistrationChecks() throws Exception {
+        Map<String, Object> req = customer("Dates " + System.nanoTime());
+        req.put("registeredOn", today.toString());
+        req.put("nextDeliveryDate", LocalDate.parse((String) req.get("nextDeliveryDate")).minusDays(14).toString());
+        send("/customers/register", req).andExpect(jsonPath("$.details.fields.nextDeliveryDate")
+                .value("Next delivery cannot be before the registration date."));
+
+        req = customer("12345");
+        send("/customers/register", req).andExpect(jsonPath("$.details.fields.name").value(CustomerService.MSG_NAME));
+
+        req = customer("Land line " + System.nanoTime());
+        req.put("whatsappOptIn", true);
+        req.put("whatsappNumber", "011 285 4471");
+        send("/customers/register", req).andExpect(jsonPath("$.details.fields.whatsappNumber")
+                .value("Enter the WhatsApp number (a mobile number)."));
     }
 
     @Test

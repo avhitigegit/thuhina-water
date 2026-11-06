@@ -4,21 +4,59 @@
  */
 import { z } from "zod";
 import { isoWeekday, dayName } from "./labels";
-import { formatDate } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 
 export const MSG_REQUIRED = "Name, address, phone, customer type and area are required.";
 export const MSG_PHONE = "Phone must be a Sri Lankan number, e.g. 077 123 4567 or 011 285 4471.";
 export const PHONE_RE = /^0\d{2} ?\d{3} ?\d{4}$/;
+export const MSG_NAME = "Enter a name with letters, not only numbers.";
+export const MSG_CASH_PAID = "Enter the cash paid. A Cash customer pays when the bottles are given.";
+export const MSG_FIX_FIELDS = "Please fill in the fields marked in red.";
+
+/**
+ * Cash paid on the registration bills. Cash customers must pay something for the bottles given; others may leave it
+ * empty. `total` is the live total, when it has loaded. Returns the message, or "" when it is fine.
+ */
+export function cashPaidProblem(payType: string, text: string, total: number | undefined): string {
+  const paid = Number(text);
+  if (text.trim() !== "" && (Number.isNaN(paid) || paid < 0)) return "Cash paid cannot be negative.";
+  if (payType === "CASH" && !(paid > 0)) return MSG_CASH_PAID;
+  if (total !== undefined && paid > total)
+    return `Cash paid cannot be more than the total (${formatMoney(total)}).`;
+  return "";
+}
+
+/** Making a customer inactive: date (from `earliest` to today) and a reason; "Other" needs details. */
+export function inactiveProblem(
+  s: { date: string | null; reason: string; details: string },
+  today: string,
+  earliest: string | null,
+): string {
+  if (!s.reason || (s.reason === "Other" && !s.details.trim()))
+    return 'Select the reason (and enter details for "Other") to make the customer inactive.';
+  if (!s.date || s.date > today) return "Enter the inactive-from date (not in the future).";
+  if (earliest && s.date < earliest) return "Inactive from cannot be before the registration date.";
+  return "";
+}
 
 /** Customer form. `isNew` adds the registration date and agreed prices; `today` = business date. */
 export function customerSchema(isNew: boolean, today: string, bottleCodes: string[]) {
   return z
     .object({
-      name: z.string().trim().min(1, MSG_REQUIRED).max(120, "Name: at most 120 characters."),
-      phone: z.string().trim().min(1, MSG_REQUIRED).regex(PHONE_RE, MSG_PHONE),
-      address: z.string().trim().min(1, MSG_REQUIRED).max(250, "Address: at most 250 characters."),
-      areaId: z.string().min(1, MSG_REQUIRED),
-      customerTypeId: z.string().min(1, MSG_REQUIRED),
+      name: z
+        .string()
+        .trim()
+        .min(1, "Enter the name.")
+        .max(120, "Name: at most 120 characters.")
+        .regex(/^$|\p{L}/u, MSG_NAME),
+      phone: z
+        .string()
+        .trim()
+        .min(1, "Enter the phone number.")
+        .regex(/^$|^0\d{2} ?\d{3} ?\d{4}$/, MSG_PHONE),
+      address: z.string().trim().min(1, "Enter the address.").max(250, "Address: at most 250 characters."),
+      areaId: z.string().min(1, "Select the area."),
+      customerTypeId: z.string().min(1, "Select the customer type."),
       registeredOn: z.string().nullable(),
       deliveryDay: z.string(),
       cycleWeeks: z.string(),
@@ -51,6 +89,12 @@ export function customerSchema(isNew: boolean, today: string, bottleCodes: strin
           code: "custom",
           path: ["nextDeliveryDate"],
           message: "Enter the next delivery date.",
+        });
+      } else if (isNew && v.registeredOn && v.nextDeliveryDate < v.registeredOn) {
+        ctx.addIssue({
+          code: "custom",
+          path: ["nextDeliveryDate"],
+          message: "Next delivery cannot be before the registration date.",
         });
       } else if (isoWeekday(v.nextDeliveryDate) !== Number(v.deliveryDay)) {
         ctx.addIssue({
@@ -116,6 +160,12 @@ export function customerSchema(isNew: boolean, today: string, bottleCodes: strin
       }
       if (v.whatsappNumber && !PHONE_RE.test(v.whatsappNumber))
         ctx.addIssue({ code: "custom", path: ["whatsappNumber"], message: MSG_PHONE });
+      else if (v.whatsappOptIn && !(v.whatsappNumber || v.phone).startsWith("07"))
+        ctx.addIssue({
+          code: "custom",
+          path: ["whatsappNumber"],
+          message: "Enter the WhatsApp number (a mobile number).",
+        });
     });
 }
 export type CustomerValues = z.input<ReturnType<typeof customerSchema>>;

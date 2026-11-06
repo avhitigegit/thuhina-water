@@ -62,6 +62,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class CustomerService {
 
     public static final String DUP_PHONE = "DUP_PHONE";
+    public static final String MSG_CASH_PAID = "Enter the cash paid. A Cash customer pays when the bottles are given.";
+    public static final String MSG_NAME = "Enter a name with letters, not only numbers.";
     static final String ENTITY = "Customer";
     public static final String MSG_PHONE = "Phone must be a Sri Lankan number, e.g. 077 123 4567 or 011 285 4471.";
     public static final String MSG_USUAL = "Enter the usual quantity for at least one bottle type.";
@@ -115,11 +117,18 @@ public class CustomerService {
         if (registeredOn.isAfter(today)) {
             throw new ValidationException("registeredOn", "Registration date cannot be in the future.");
         }
+        if (r.nextDeliveryDate().isBefore(registeredOn)) {
+            throw new ValidationException("nextDeliveryDate", "Next delivery cannot be before the registration date.");
+        }
         Checked v = check(r, null);
         Map<String, BigDecimal> agreed = agreedPrices(r, v.type(), registeredOn);
         // Registered from an accepted customer quotation (M16): checked before anything is saved.
         Long quotationId = r.fromQuotationId() == null ? null : quotations.registrable(r.fromQuotationId()).getId();
         SalesService.GivenBottles given = given(r);
+        String inactiveReason = checkInactive(r, registeredOn, today, given);
+        if (r.payType() == PayType.CASH && given.any() && !Money.isPositive(r.paid())) {
+            throw new ValidationException("paid", MSG_CASH_PAID);
+        }
         if (given.any() || given.oldBottles() != 0 || given.paid().signum() != 0) {
             if (!CurrentUser.get().map(u -> u.permissions().contains(Permissions.SALES_EDIT)).orElse(false)) {
                 throw new AccessDeniedException("Bottles given need the right to enter sales");
@@ -146,7 +155,15 @@ public class CustomerService {
             quotations.registered(quotationId, c.getId(), c.getCode(), c.getName(), registeredOn, agreed.size());
         }
         List<TxnDetail> bills = given.any() ? sales.registrationBills(c.getId(), registeredOn, given) : List.of();
-        events.publishEvent(new CustomerRegistered(c.getId(), registeredOn));
+        if (inactiveReason != null) {
+            // Saved as inactive: no bottles, no delivery and no welcome message.
+            c.deactivate(r.inactiveFrom(), inactiveReason);
+            repository.saveAndFlush(c);
+            audit.log(AuditAction.UPDATE, ENTITY, c.getCode(), "Registered as inactive from " + BusinessDates.format(r.inactiveFrom())
+                    + " – " + inactiveReason + ".");
+        } else {
+            events.publishEvent(new CustomerRegistered(c.getId(), registeredOn));
+        }
         return new CustomerSaved(queries.detail(c.getId()), agreed.size(), bills);
     }
 
@@ -163,6 +180,27 @@ public class CustomerService {
         PayType pay = r.payType() == null ? PayType.CASH : r.payType();
         return sales.previewRegistration(r.name(), r.customerTypeId(), pay, pay == PayType.CASH ? Money.ZERO : r.creditLimit(), date,
                 r.agreedPrices(), given(r));
+    }
+
+    /** Registering as inactive: a date from the registration date to today, a reason, and no bottles or cash. Null = active. */
+    private static String checkInactive(CustomerRequest r, LocalDate registeredOn, LocalDate today, SalesService.GivenBottles given) {
+        if (r.inactiveFrom() == null) {
+            return null;
+        }
+        if (r.inactiveFrom().isAfter(today)) {
+            throw new ValidationException("inactiveFrom", "The status date cannot be in the future.");
+        }
+        if (r.inactiveFrom().isBefore(registeredOn)) {
+            throw new ValidationException("inactiveFrom", "Inactive from cannot be before the registration date.");
+        }
+        String reason = Texts.blankToNull(r.inactiveReason());
+        if (reason == null) {
+            throw new ValidationException("inactiveReason", "Enter the reason for deactivating.");
+        }
+        if (given.any() || given.oldBottles() != 0 || given.paid().signum() != 0) {
+            throw new ValidationException("bottlesGiven", "An inactive customer cannot be given bottles.");
+        }
+        return reason.trim();
     }
 
     private static SalesService.GivenBottles given(CustomerRequest r) {
@@ -225,6 +263,9 @@ public class CustomerService {
 
     /** All FR-08 – FR-10 checks; {@code existing} = null for a new customer. */
     private Checked check(CustomerRequest r, Customer existing) {
+        if (r.name().codePoints().noneMatch(Character::isLetter)) {
+            throw new ValidationException("name", MSG_NAME);
+        }
         String phone = r.phone().trim();
         if (!PHONE.matcher(phone).matches()) {
             throw new ValidationException("phone", MSG_PHONE);
@@ -285,7 +326,7 @@ public class CustomerService {
         if (wa != null && !PHONE.matcher(wa).matches()) {
             throw new ValidationException("whatsappNumber", MSG_PHONE);
         }
-        if (optIn && wa == null) {
+        if (optIn && (wa == null || !wa.startsWith("07"))) {
             throw new ValidationException("whatsappNumber", "Enter the WhatsApp number (a mobile number).");
         }
         if (!Boolean.TRUE.equals(r.allowDuplicatePhone())) {
