@@ -9,6 +9,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState, type FormEvent } from "react";
 import { afterLoginPath } from "@/features/auth/landing";
 import { useLogin } from "@/features/auth/api";
+import { BrandLogo, useCompanyName } from "@/components/shared/BrandLogo";
 import { ApiError } from "@/lib/api/client";
 
 function LoginForm() {
@@ -82,11 +83,12 @@ function LoginForm() {
 }
 
 export default function LoginPage() {
+  const companyName = useCompanyName();
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="logo">T</div>
-        <h1 style={{ marginBottom: 2 }}>Thuhina Water</h1>
+        <BrandLogo />
+        <h1 style={{ marginBottom: 2 }}>{companyName}</h1>
         <p className="muted">Inventory &amp; Sales Management System</p>
         <Suspense>
           <LoginForm />

@@ -28,7 +28,8 @@ import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Settings groups (company, business, features) and the company logo. The company group also returns
- * {@code logoUrl} – the address of the logo image, or null when there is none.
+ * {@code logoUrl} – the address of the logo image, or null when there is none. {@code /settings/branding} and the
+ * logo image are open (no login), so the login page can show them.
  */
 @Tag(name = "Settings")
 @RestController
@@ -74,9 +75,18 @@ public class SettingsController {
         return withLogoUrl(SettingsGroup.COMPANY.key(), logo.remove(), request);
     }
 
-    @Operation(summary = "The company logo image (any logged-in user – it appears on printed documents)")
+    @Operation(summary = "Company name and logo address for the login page and the menu (no login needed)")
+    @GetMapping("/branding")
+    public JsonNode branding(HttpServletRequest request) {
+        ObjectNode company = withLogoUrl(SettingsGroup.COMPANY.key(), settings.get(SettingsGroup.COMPANY.key()), request);
+        ObjectNode out = company.objectNode();
+        out.set("name", company.get("name"));
+        out.set("logoUrl", company.get("logoUrl"));
+        return out;
+    }
+
+    @Operation(summary = "The company logo image (no login needed – it appears on the login page and printed documents)")
     @GetMapping(LOGO_PATH)
-    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<byte[]> logoImage() {
         return logo.current()
                 .map(l -> ResponseEntity.ok()

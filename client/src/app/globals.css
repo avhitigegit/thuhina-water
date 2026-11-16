@@ -218,6 +218,13 @@
     color: #fff;
     font-weight: 700;
   }
+  .brandbar .logo.img {
+    border-radius: 8px;
+    background: #fff;
+    object-fit: contain;
+    padding: 2px;
+    flex: none;
+  }
   .brandbar b {
     color: #fff;
     display: block;
@@ -1189,6 +1196,14 @@
     font-weight: 700;
     font-size: 20px;
     margin-bottom: 12px;
+  }
+
+  .login-card .logo.img {
+    width: 84px;
+    height: 84px;
+    border-radius: 0;
+    background: none;
+    object-fit: contain;
   }
 
   .no-access {
