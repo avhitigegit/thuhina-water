@@ -4,7 +4,7 @@
  * Delivery Planning (M08, prototype delivery/delivery-planning.html, FR-58, FR-45): the Admin's evening page. Pick a
  * date (tomorrow by default), a route (area) and due / all customers: KPIs, a ready check per bottle type (needed vs
  * filled in store, minus what is needed before then) and the customers grouped by route with last / this date / next /
- * week after. "Print load sheet" opens the PDF for the drivers.
+ * week after. "Print load sheet" opens the PDF for the drivers. Below: the upcoming bottle requirement (FR-45, next 14 days).
  */
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -18,6 +18,7 @@ import type { PlanRow, ReadyCheck } from "@/lib/api/types";
 import { addDaysIso, formatDate, formatMoney, isValidIso, todayIso } from "@/lib/format";
 import { loadSheetUrl, usePlanning } from "./api";
 import { cycleText, qtyText } from "./labels";
+import { UpcomingNeed } from "./UpcomingNeed";
 
 type Show = "due" | "all";
 
@@ -164,6 +165,7 @@ export function Planning({ today = todayIso() }: { today?: string }) {
           </table>
         </div>
       </div>
+      <UpcomingNeed />
     </>
   );
 }

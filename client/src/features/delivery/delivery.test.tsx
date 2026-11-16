@@ -17,6 +17,7 @@ import { addDaysIso, formatDate, todayIso } from "@/lib/format";
 import { P } from "@/lib/permissions";
 import { DailyList } from "./DailyList";
 import { Planning } from "./Planning";
+import { UpcomingNeed } from "./UpcomingNeed";
 
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams("") }));
 
@@ -318,7 +319,7 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe("Daily Delivery List", () => {
-  it("shows today's customers with KPIs, balances and status; the Admin can enter bills", async () => {
+  it("shows today's customers with KPIs, balances and status – view and print only, also for the Admin", async () => {
     renderPage(<DailyList today={TODAY} />);
     expect(await screen.findByText(`Monday ${formatDate(TODAY)} – 4 customers`)).toBeInTheDocument();
     expect(screen.getByText("Load 20L filled").nextSibling).toHaveTextContent("8");
@@ -329,10 +330,8 @@ describe("Daily Delivery List", () => {
     expect(sunil).toHaveTextContent("1, Temple Road, Nugegoda");
     expect(sunil).toHaveTextContent("Ring the bell twice");
     expect(sunil).toHaveTextContent("Rs. 1,400.00");
-    expect(within(sunil).getByRole("link", { name: "Enter bill" })).toHaveAttribute(
-      "href",
-      "/sales/enter-bills?cust=C0001",
-    );
+    // Bills are typed on Enter Bills (one place), not from this list.
+    expect(within(sunil).queryByRole("link", { name: "Enter bill" })).toBeNull();
     expect(rowOf("Late Lanka")).toHaveTextContent(`Missed ${formatDate(addDaysIso(TODAY, -3))}`);
     expect(rowOf("Late Lanka")).toHaveClass("row-bad");
     const entered = rowOf("Sampath Grocery");
@@ -340,11 +339,13 @@ describe("Daily Delivery List", () => {
     expect(entered).toHaveTextContent(`bill B000009 · next ${formatDate(TODAY)}`);
     expect(within(entered).queryByRole("link", { name: "Enter bill" })).toBeNull();
     expect(rowOf("Anoma Wickramaratne")).toHaveTextContent("New – deposit");
-    expect(screen.getByRole("link", { name: "Enter bills" })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Upcoming bottle requirement" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Enter bills" })).toBeNull();
+    // The upcoming bottle requirement is on Delivery Planning only.
+    expect(screen.queryByRole("tab")).toBeNull();
+    expect(calls.some((c) => c.includes("/api/delivery/requirement"))).toBe(false);
   });
 
-  it("moves day by day; no Enter bill for a future date; prints the sheet for the date and area", async () => {
+  it("moves day by day; prints the sheet for the date and area", async () => {
     const user = userEvent.setup();
     renderPage(<DailyList today={TODAY} />);
     await screen.findByText(`Monday ${formatDate(TODAY)} – 4 customers`);
@@ -370,10 +371,8 @@ describe("Daily Delivery List", () => {
     expect(calls.some((c) => c.includes("/api/delivery/requirement"))).toBe(false);
   });
 
-  it("the requirement tab shows when filled bottles run out", async () => {
-    const user = userEvent.setup();
-    renderPage(<DailyList today={TODAY} />);
-    await user.click(await screen.findByRole("tab", { name: "Upcoming bottle requirement" }));
+  it("the upcoming bottle requirement (Delivery Planning) shows when filled bottles run out", async () => {
+    renderPage(<UpcomingNeed />);
     expect(
       await screen.findByText(
         (_, el) =>
