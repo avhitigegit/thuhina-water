@@ -18,7 +18,7 @@ export function afterLoginPath(me: MeResponse, next: string | null): string {
   if (me.mustChangePassword) return "/change-password";
   if (next && next.startsWith("/") && !next.startsWith("//")) {
     const pathname = next.split(/[?#]/)[0];
-    if (findMenuItem(me, pathname) || (pathname === "/ui-check" && me.permissions.includes("admin.manage"))) {
+    if (findMenuItem(me, pathname)) {
       return next;
     }
   }

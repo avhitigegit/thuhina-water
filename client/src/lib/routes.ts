@@ -98,14 +98,14 @@ export const ROUTES: RouteInfo[] = [
     module: "Delivery Schedule",
     title: "Delivery Planning",
     description:
-      "Pick a date (normally tomorrow) to see who is due by route, the bottles needed and whether they are ready",
+      "Pick a date (normally tomorrow) to see who is due by route, the bottles needed and whether they are ready, and the bottles needed for the next 14 days",
     buildModule: "M08",
   },
   {
     path: "/delivery/daily-list",
     module: "Delivery Schedule",
     title: "Daily Delivery List",
-    description: "Who to deliver to each day, and bottles needed for coming days",
+    description: "Who to deliver to each day – view and print the delivery sheet",
     buildModule: "M08",
   },
   {

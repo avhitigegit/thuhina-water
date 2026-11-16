@@ -189,35 +189,16 @@ describe("AdjustmentDialog", () => {
 });
 
 describe("DamageDialog", () => {
-  it("Customer damage needs the right to enter sales; it asks for the customer instead of the place", async () => {
-    const user = userEvent.setup();
+  it("records company damage only; customer damage is pointed to Sales & Bills", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response("[]", { status: 200 })),
     );
-    const { unmount } = render(wrap(<DamageDialog stock={STOCK} onClose={vi.fn()} />));
-    let dialog = screen.getByRole("dialog", { name: "Record damaged bottles" });
-    expect(within(dialog).getByRole("radio", { name: /Customer/ })).toBeDisabled();
-    unmount();
-
-    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-    render(
-      <QueryClientProvider client={qc}>
-        <AccessProvider
-          value={{ me: { ...ME, permissions: [...ME.permissions, P.SALES_EDIT] }, viewOnly: false }}
-        >
-          <DamageDialog stock={STOCK} onClose={vi.fn()} />
-        </AccessProvider>
-      </QueryClientProvider>,
-    );
-    dialog = screen.getByRole("dialog", { name: "Record damaged bottles" });
+    render(wrap(<DamageDialog stock={STOCK} onClose={vi.fn()} />));
+    const dialog = screen.getByRole("dialog", { name: "Record damaged bottles" });
+    expect(within(dialog).queryByRole("radio")).toBeNull();
+    expect(within(dialog).queryByLabelText("Customer")).toBeNull();
     expect(within(dialog).getByLabelText("Where")).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("radio", { name: /Customer/ }));
-    expect(within(dialog).queryByLabelText("Where")).not.toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Customer")).toBeInTheDocument();
-    expect(within(dialog).getByLabelText("Paid now (Rs.)")).toBeInTheDocument();
-    await user.type(within(dialog).getByLabelText("Reason"), "Cracked");
-    await user.click(within(dialog).getByRole("button", { name: "Save" }));
-    expect(await within(dialog).findByText("Select a customer.")).toBeInTheDocument();
+    expect(within(dialog).getByText(/Sales & Bills → \+ New → Customer-damaged/)).toBeInTheDocument();
   });
 });

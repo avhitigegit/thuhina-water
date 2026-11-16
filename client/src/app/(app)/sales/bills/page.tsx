@@ -7,7 +7,6 @@
  * Customer-damaged bottle and Settle bottles owed. ?bill=B000275 searches (and opens) a bill; ?new=first&cust=C0012
  * opens a new entry for that customer (links from the customer panel).
  */
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { PageActions } from "@/components/layout/PageActions";
@@ -182,9 +181,6 @@ function SalesBillsPage() {
     <>
       <Can permission={P.SALES_EDIT}>
         <PageActions>
-          <Link className="btn" href="/sales/enter-bills">
-            Enter daily bills
-          </Link>
           <MenuButton
             items={NEW_ENTRIES.map((e) => ({
               label: e.label,

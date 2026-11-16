@@ -11,21 +11,11 @@ import { AccessProvider } from "@/features/auth/access";
 import { useMe } from "@/features/auth/api";
 import { findMenuItem } from "@/features/auth/landing";
 import { isRedirectError } from "@/lib/api/client";
-import { P } from "@/lib/permissions";
 import { findRoute } from "@/lib/routes";
 import { NoAccess } from "@/components/shared/NoAccess";
 import { PageActionsSlotContext } from "./PageActions";
 import { Sidebar } from "./Sidebar";
 import { TopBar } from "./TopBar";
-
-/** Pages inside the shell that are not in the menu: the shared-components check page (Admin only). */
-const EXTRA_PAGES: Record<string, { title: string; description: string; permission: string }> = {
-  "/ui-check": {
-    title: "UI components check",
-    description: "Shared components used by every screen – for checking during development and UAT",
-    permission: P.ADMIN_MANAGE,
-  },
-};
 
 function Loading() {
   return <div className="loading-page">Loading…</div>;
@@ -60,16 +50,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const user = me.data;
   const item = findMenuItem(user, pathname);
   const route = findRoute(pathname);
-  const extra = EXTRA_PAGES[pathname];
-  const allowed = item ? true : extra ? user.permissions.includes(extra.permission) : false;
-  const title = item?.title ?? extra?.title ?? route?.title ?? "Page";
-  const description = route?.description ?? extra?.description ?? "";
+  const allowed = !!item;
+  const title = item?.title ?? route?.title ?? "Page";
+  const description = route?.description ?? "";
   const viewOnly = item?.view ?? false;
   const crumbs = item
     ? item.module.group
       ? `${item.module.module} › ${item.title}`
       : item.module.module
-    : (extra?.title ?? "");
+    : "";
 
   return (
     <AccessProvider value={{ me: user, viewOnly }}>
