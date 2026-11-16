@@ -10,6 +10,7 @@ import lk.thuhina.water.security.service.JwtService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -46,6 +47,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/auth/login", "/auth/logout").permitAll()
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        // Company name and logo for the login page and the menu (also before the first password change).
+                        .requestMatchers(HttpMethod.GET, "/settings/branding", "/settings/company/logo").permitAll()
                         // Meta's WhatsApp webhook: no login – checked by the verify token / X-Hub-Signature-256 (design 9.2).
                         .requestMatchers("/whatsapp/webhook").permitAll()
                         // Only reachable when springdoc is switched on (local and UAT profiles).

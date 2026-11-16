@@ -62,7 +62,13 @@ class CompanySettingsIntegrationTest extends IntegrationTest {
                 .andExpect(content().contentType(MediaType.IMAGE_PNG))
                 .andExpect(header().string("Cache-Control", "max-age=86400, private"))
                 .andExpect(content().bytes(PNG));
-        mvc.perform(get("/settings/company/logo")).andExpect(status().isUnauthorized());
+        // Open without a login – the login page shows it, with the company name.
+        mvc.perform(get("/settings/company/logo")).andExpect(status().isOk()).andExpect(content().bytes(PNG));
+        mvc.perform(get("/settings/branding"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").isNotEmpty())
+                .andExpect(jsonPath("$.logoUrl").value(logoUrl(r)))
+                .andExpect(jsonPath("$.email").doesNotExist());
 
         assertThat(auditLog.findByEntityAndRefOrderByIdAsc("Setting", "company"))
                 .anyMatch(a -> a.getDetails().equals("Company logo uploaded (PNG, 1 KB)"));

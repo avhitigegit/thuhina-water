@@ -17,6 +17,7 @@ import type {
 const USERS_KEY = ["admin", "users"] as const;
 const AUDIT_KEY = ["admin", "audit"] as const;
 const COMPANY_KEY = ["admin", "company"] as const;
+const BRANDING_KEY = ["branding"] as const;
 
 export function useUsers() {
   return useQuery({
@@ -96,6 +97,21 @@ export function useAuditFilters() {
   });
 }
 
+/** Company name and logo address for the login page and the menu (open, no login). */
+export interface Branding {
+  name: string;
+  logoUrl: string | null;
+}
+
+export function useBranding() {
+  return useQuery({
+    queryKey: BRANDING_KEY,
+    queryFn: ({ signal }) => api<Branding>("/settings/branding", { signal }),
+    staleTime: 5 * 60 * 1000,
+    meta: { silent: true },
+  });
+}
+
 export function useCompany() {
   return useQuery({
     queryKey: COMPANY_KEY,
@@ -109,6 +125,7 @@ function useCompanyMutation<TVars>(fn: (vars: TVars) => Promise<CompanySettings>
     mutationFn: fn,
     onSuccess: (company) => {
       qc.setQueryData(COMPANY_KEY, company);
+      qc.setQueryData(BRANDING_KEY, { name: company.name, logoUrl: company.logoUrl ?? null });
       qc.invalidateQueries({ queryKey: AUDIT_KEY });
     },
     meta: { silent: true },

@@ -27,12 +27,14 @@ import tools.jackson.databind.ObjectMapper;
  * <b>and</b> the user is still active <b>and</b> the token version matches – so deactivation or a password
  * reset logs the user out at once.
  * <p>
- * While {@code must_change_password} is set, only the "me", change-password and logout calls are allowed.
+ * While {@code must_change_password} is set, only the "me", change-password and logout calls (and the company name
+ * and logo shown on that screen) are allowed.
  */
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     public static final String PASSWORD_CHANGE_REQUIRED = "PASSWORD_CHANGE_REQUIRED";
-    private static final Set<String> ALLOWED_BEFORE_PASSWORD_CHANGE = Set.of("/auth/me", "/auth/change-password", "/auth/logout");
+    private static final Set<String> ALLOWED_BEFORE_PASSWORD_CHANGE = Set.of("/auth/me", "/auth/change-password", "/auth/logout",
+            "/settings/branding", "/settings/company/logo");
 
     private final JwtService jwt;
     private final AuthCookies cookies;

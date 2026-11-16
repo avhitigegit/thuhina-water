@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { BrandLogo } from "@/components/shared/BrandLogo";
 import { useChangePassword, useLogout, useMe } from "@/features/auth/api";
 import { ApiError } from "@/lib/api/client";
 import { toast } from "@/lib/toast";
@@ -76,7 +77,7 @@ export default function ChangePasswordPage() {
   return (
     <div className="login-page">
       <div className="login-card">
-        <div className="logo">T</div>
+        <BrandLogo />
         <h1 style={{ marginBottom: 2 }}>Change password</h1>
         {me.data && (
           <p className="muted">
