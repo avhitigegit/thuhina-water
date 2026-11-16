@@ -8,6 +8,7 @@
  */
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { BrandLogo, useCompanyName } from "@/components/shared/BrandLogo";
 import type { MenuModule } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 import { Icon } from "./icons";
@@ -51,13 +52,14 @@ export function Sidebar({ menu, pathname }: { menu: MenuModule[]; pathname: stri
   }
 
   const viewTag = <span className="view-tag">view</span>;
+  const companyName = useCompanyName();
 
   return (
     <aside className={cn("sidebar no-print", open && "open")}>
       <div className="brandbar">
-        <div className="logo">T</div>
+        <BrandLogo />
         <div>
-          <b>Thuhina Water</b>
+          <b>{companyName}</b>
           <span>Inventory &amp; Sales</span>
         </div>
         <button
