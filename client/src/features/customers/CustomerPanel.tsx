@@ -38,7 +38,6 @@ import { useCustomer, useCustomerHistory, useCustomerPrices } from "./api";
 import { CustomerPriceDialog } from "./CustomerPriceDialog";
 import { deliveryText, payLabel, STATE_BADGE } from "./labels";
 import { PriceText } from "./PriceText";
-import { StatusDialog } from "./StatusDialog";
 
 type PanelTab = "hist" | "pay" | "inv" | "price";
 
@@ -207,7 +206,7 @@ function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDeta
   const canSeePrices = useCan(P.CUSTOMER_PRICES_VIEW);
   const canSetPrices = useCan(P.CUSTOMER_PRICES_EDIT);
   const [tab, setTab] = useState<PanelTab>("hist");
-  const [dialog, setDialog] = useState<"prices" | "status" | null>(null);
+  const [dialog, setDialog] = useState<"prices" | null>(null);
   const [sale, setSale] = useState<SaleKind | null>(null);
   const history = useCustomerHistory(c.id);
   const prices = useCustomerPrices(c.id, canSeePrices && tab === "price");
@@ -295,15 +294,6 @@ function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDeta
           {canSetPrices && (
             <button className="btn" type="button" onClick={() => setDialog("prices")}>
               Prices
-            </button>
-          )}
-          {canEdit && (
-            <button
-              className={active ? "btn danger" : "btn"}
-              type="button"
-              onClick={() => setDialog("status")}
-            >
-              {active ? "Deactivate" : "Reactivate"}
             </button>
           )}
         </div>
@@ -432,7 +422,6 @@ function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDeta
       </div>
 
       {dialog === "prices" && <CustomerPriceDialog customer={c} onClose={() => setDialog(null)} />}
-      {dialog === "status" && <StatusDialog customer={c} onClose={() => setDialog(null)} />}
       {sale && (
         <NewSaleDialog
           kind={sale}

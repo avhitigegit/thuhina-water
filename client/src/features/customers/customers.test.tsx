@@ -496,6 +496,8 @@ describe("CustomerDialog", () => {
     await user.type(within(dialog).getByLabelText("Address"), "5, Lake Road");
     await user.selectOptions(within(dialog).getByLabelText("Area"), "1");
     await user.type(within(dialog).getByLabelText("Usual 20L per delivery"), "2");
+    // Bottles given start empty: the user types what was really given.
+    await user.type(within(dialog).getByLabelText("Filled 20L bottles given"), "2");
     await user.selectOptions(within(dialog).getByLabelText("Old bottle brand"), "2");
     await user.clear(within(dialog).getByLabelText("Old bottles handed in"));
     await user.type(within(dialog).getByLabelText("Old bottles handed in"), "1");

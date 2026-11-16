@@ -501,10 +501,9 @@ describe("Registration with bottles", () => {
     render(wrap(<CustomerDialog customerId={null} onClose={vi.fn()} onSaved={onSaved} />));
     const dialog = await screen.findByRole("dialog", { name: "New customer" });
     await within(dialog).findByRole("option", { name: "Nugegoda" });
-    // 2 × 20L by default (prototype); give 3 and 1 old American Water bottle.
+    // Nothing is given by default (the user types what was really given); give 3 and 1 old American Water bottle.
     const given = await within(dialog).findByLabelText("Filled 20L bottles given");
-    expect(given).toHaveValue(2);
-    await user.clear(given);
+    expect(given).toHaveValue(null);
     await user.type(given, "3");
     await user.clear(await within(dialog).findByLabelText("Old American Water bottles handed in"));
     await user.type(within(dialog).getByLabelText("Old American Water bottles handed in"), "1");

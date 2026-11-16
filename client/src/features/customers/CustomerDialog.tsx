@@ -36,7 +36,6 @@ import {
   useRegistrationPreview,
   useSaveCustomer,
 } from "./api";
-import { CustomerPriceDialog } from "./CustomerPriceDialog";
 import {
   CREDIT_TERMS,
   CYCLES,
@@ -142,7 +141,6 @@ function CustomerForm({
   const bottles = (bottleTypes.data ?? []).filter((b) => b.active);
   const [error, setError] = useState("");
   const [dupMessage, setDupMessage] = useState<string | null>(null);
-  const [pricesOpen, setPricesOpen] = useState(false);
   const [creditError, setCreditError] = useState<ApiError | null>(null);
   const [registered, setRegistered] = useState<CustomerSaved | null>(null);
   // "Save anyway" for a duplicate phone is kept when the Admin then approves the credit limit.
@@ -216,12 +214,9 @@ function CustomerForm({
     name: ["bottlesGiven", "oldBottles", "registeredOn", "creditLimit", "name"],
   });
 
-  // Bottles given on the registration date start as 2 of the main bottle type (prototype), once the types load.
+  // Bottles given on the registration date start empty: the user types what was really given (a pre-filled number
+  // made Cash paid required for bottles that were never given).
   const mainBottle = bottles[0]?.code;
-  useEffect(() => {
-    if (isNew && canSell && mainBottle && !getValues(`bottlesGiven.${mainBottle}`))
-      setValue(`bottlesGiven.${mainBottle}`, "2");
-  }, [isNew, canSell, mainBottle, getValues, setValue]);
 
   const whole = (v: string | undefined) => (/^\d+$/.test((v ?? "").trim()) ? Number(v) : 0);
   const givenNumbers = Object.fromEntries(bottles.map((b) => [b.code, whole(given?.[b.code])]));
@@ -386,6 +381,15 @@ function CustomerForm({
     );
   }
 
+  /** Brings the first field marked in red into view (the form is long; the message is at the top). */
+  function showFirstProblem() {
+    setTimeout(() => {
+      const el = document.querySelector<HTMLElement>("[role=dialog] .invalid");
+      el?.scrollIntoView?.({ block: "center" });
+      el?.focus({ preventScroll: true });
+    }, 0);
+  }
+
   /** All fields are checked together, so one Save shows everything that is missing. */
   function submit() {
     const paidProblem = anyGiven
@@ -398,11 +402,16 @@ function CustomerForm({
       : "";
     void handleSubmit(
       (v) => {
-        if (paidProblem) setError(MSG_FIX_FIELDS);
-        else if (statusProblem) setError(statusProblem);
+        if (paidProblem) {
+          setError(MSG_FIX_FIELDS);
+          showFirstProblem();
+        } else if (statusProblem) setError(statusProblem);
         else send(v, false);
       },
-      () => setError(statusProblem || MSG_FIX_FIELDS),
+      () => {
+        setError(statusProblem || MSG_FIX_FIELDS);
+        showFirstProblem();
+      },
     )();
   }
 
@@ -629,13 +638,9 @@ function CustomerForm({
                   ))}
                 </div>
               </div>
-              {canPrices && (
-                <div className="field" style={{ alignSelf: "end" }}>
-                  <button type="button" className="btn" onClick={() => setPricesOpen(true)}>
-                    Change prices…
-                  </button>
-                </div>
-              )}
+              <div className="field span2 small muted" style={{ alignSelf: "end" }}>
+                Agreed prices are changed with the Prices button on the customer&apos;s details.
+              </div>
             </>
           )}
 
@@ -840,9 +845,6 @@ function CustomerForm({
           <p>{dupMessage}</p>
           <p>Save anyway?</p>
         </ConfirmDialog>
-      )}
-      {pricesOpen && customer && (
-        <CustomerPriceDialog customer={customer} onClose={() => setPricesOpen(false)} />
       )}
       {creditError && (
         <CreditApprovalDialog
