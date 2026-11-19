@@ -8,10 +8,9 @@
  */
 import { useState } from "react";
 import { useBottleTypes, useOldBottleBrands, useProducts } from "@/features/masterdata/api";
-import type { CustomerDetail, CustomerLookupRow, PayMethod, SaleResult } from "@/lib/api/types";
+import type { CustomerDetail, CustomerLookupRow, SaleResult } from "@/lib/api/types";
 import { formatMoney } from "@/lib/format";
 import type { SaleKind } from "./labels";
-import { PAY_METHODS } from "./labels";
 import { CalcRows, SaleDialog, type SaleContext } from "./SaleDialog";
 
 export interface NewSaleProps {
@@ -307,7 +306,6 @@ export function ProductSaleDialog(props: NewSaleProps) {
   const [walkIn, setWalkIn] = useState("");
   const [qty, setQty] = useState("1");
   const [price, setPrice] = useState<{ code: string; text: string } | null>(null);
-  const [method, setMethod] = useState<PayMethod>("CASH");
   const product = products.find((p) => p.code === code) ?? products[0];
   // The unit price starts as the selling price of the chosen product.
   const priceText = price && price.code === product?.code ? price.text : String(product?.sellingPrice ?? "");
@@ -318,7 +316,7 @@ export function ProductSaleDialog(props: NewSaleProps) {
       title="Product sale"
       okMessage="Product sale saved"
       customerOptional
-      fieldNames={["walkInName", "items", "payMethod"]}
+      fieldNames={["walkInName", "items"]}
       afterCustomer={(ctx) => (
         <div className="field span2">
           <label htmlFor="sale-walkin">…or walk-in name</label>
@@ -343,7 +341,6 @@ export function ProductSaleDialog(props: NewSaleProps) {
                   unitPrice: priceText.trim() === "" ? undefined : Number(priceText),
                 },
               ],
-              payMethod: method,
             }
           : null
       }
@@ -388,18 +385,6 @@ export function ProductSaleDialog(props: NewSaleProps) {
           </div>
         </>
       )}
-      afterPaid={
-        <div className="field">
-          <label htmlFor="sale-method">Paid by</label>
-          <select id="sale-method" value={method} onChange={(e) => setMethod(e.target.value as PayMethod)}>
-            {PAY_METHODS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      }
       calc={(p) => (
         <CalcRows
           rows={[

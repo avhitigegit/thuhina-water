@@ -11,14 +11,6 @@ export const PO_STATUSES = [
   { value: "CANCELLED", label: "Cancelled" },
 ] as const;
 
-export const PAY_METHODS = [
-  { value: "CASH", label: "Cash" },
-  { value: "BANK_TRANSFER", label: "Bank transfer" },
-  { value: "CHEQUE", label: "Cheque" },
-] as const;
-
-export type PayMethod = (typeof PAY_METHODS)[number]["value"];
-
 /** PO step bar (FR-19): 1. Draft 2. Approved 3. Sent 4. Received – "Partly received" while goods are still due. */
 export function poSteps(status: string): { steps: string[]; current: string } {
   const last = status === "PARTLY_RECEIVED" ? "4. Partly received" : "4. Received";

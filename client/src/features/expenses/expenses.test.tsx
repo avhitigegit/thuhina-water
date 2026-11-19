@@ -145,7 +145,7 @@ function server() {
           {
             code: "VALIDATION",
             message: "Please check the highlighted fields.",
-            details: { fields: { reference: "Enter the cheque number or bank reference." } },
+            details: { fields: { reference: "Enter the cheque number." } },
           },
           400,
         );
@@ -245,14 +245,14 @@ describe("Expenses", () => {
     await user.selectOptions(within(dialog).getByLabelText("Expense type"), "1");
     await user.type(within(dialog).getByLabelText("Description"), "Late meter fee");
     await user.type(within(dialog).getByLabelText("Amount (Rs.)"), "1250");
-    expect(within(dialog).queryByLabelText("Cheque no. / bank ref.")).not.toBeInTheDocument();
+    expect(within(dialog).queryByLabelText("Cheque number")).not.toBeInTheDocument();
     await user.selectOptions(within(dialog).getByLabelText("Paid by"), "CHEQUE");
 
     refuseNext = true;
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
-    expect(await within(dialog).findByText("Enter the cheque number or bank reference.")).toBeInTheDocument();
+    expect(await within(dialog).findByText("Enter the cheque number.")).toBeInTheDocument();
 
-    await user.type(within(dialog).getByLabelText("Cheque no. / bank ref."), "Cheque 330200");
+    await user.type(within(dialog).getByLabelText("Cheque number"), "Cheque 330200");
     await user.click(within(dialog).getByRole("button", { name: "Save & add another" }));
     await waitFor(() => expect(sent("POST")).toHaveLength(2));
     expect(sent("POST")[1].body).toEqual({

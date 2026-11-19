@@ -246,7 +246,7 @@ public class SalesService {
     public SaleResult firstPurchase(FirstPurchaseRequest r) {
         Ctx x = ctx(r.customerId(), r.date());
         SaleCalc calc = firstCalc(x, r);
-        return post(new Spec(SalesKind.FIRST_PURCHASE, x, null, r.paperBillNo(), false, calc, r.paid(), null, r.note(), false, null, null,
+        return post(new Spec(SalesKind.FIRST_PURCHASE, x, null, r.paperBillNo(), false, calc, r.paid(), r.payMethod(), r.payReference(), r.note(), false, null, null,
                 r.approveOverLimit(), firstDetails(x.customer(), calc), true));
     }
 
@@ -277,7 +277,7 @@ public class SalesService {
         SaleLine l = calc.lines().getFirst();
         String details = "Extra order for " + x.customer().getName() + ": " + l.getFilled() + " × " + l.getLabel() + ", new bottles "
                 + l.getNewBottles() + ", deposits " + l.getDepositCount() + ", " + Money.format(calc.amount());
-        return post(new Spec(SalesKind.EXTRA_ORDER, x, null, r.paperBillNo(), false, calc, r.paid(), null, r.note(), false, null, null,
+        return post(new Spec(SalesKind.EXTRA_ORDER, x, null, r.paperBillNo(), false, calc, r.paid(), r.payMethod(), r.payReference(), r.note(), false, null, null,
                 r.approveOverLimit(), details, false));
     }
 
@@ -302,7 +302,7 @@ public class SalesService {
         BottleInfo b = bottle(r.bottleTypeCode());
         SaleCalc calc = ExchangeRules.collect(x.view(), b, n(r.qty()));
         String details = "Collected " + n(r.qty()) + " × " + b.label() + " empties from " + x.customer().getName();
-        return post(new Spec(SalesKind.COLLECT_EMPTIES, x, null, r.paperBillNo(), false, calc, null, null, r.note(), false, null, null,
+        return post(new Spec(SalesKind.COLLECT_EMPTIES, x, null, r.paperBillNo(), false, calc, null, null, null, r.note(), false, null, null,
                 false, details, false));
     }
 
@@ -325,7 +325,7 @@ public class SalesService {
                 + (mode == DamageMode.REDUCE ? ", holding reduced" : ", new bottle charged " + Money.format(calc.amount()));
         String reason = Texts.blankToNull(r.reason());
         String note = reason == null ? null : reason + (Texts.blankToNull(r.note()) == null ? "" : " – " + r.note().trim());
-        Posted p = postAndSave(new Spec(SalesKind.CUSTOMER_DAMAGE, x, null, r.paperBillNo(), false, calc, r.paid(), null, note, false,
+        Posted p = postAndSave(new Spec(SalesKind.CUSTOMER_DAMAGE, x, null, r.paperBillNo(), false, calc, r.paid(), r.payMethod(), r.payReference(), note, false,
                 mode, null, r.approveOverLimit(), details, false));
         DamageRecord d = damages.save(DamageRecord.customer(numbering.next(SequenceNames.DAMAGE), x.date(), l.getBottleTypeCode(),
                 l.getDamaged(), reason, Texts.blankToNull(r.note()), x.customer().getId(), p.txn().getId()));
@@ -356,7 +356,7 @@ public class SalesService {
         SaleLine l = calc.lines().getFirst();
         String details = "Bottles owed settled – " + x.customer().getName() + ": " + l.getOwedCleared() + " × " + l.getLabel()
                 + (method == SettleMethod.DEPOSIT ? " by deposit " + Money.format(calc.amount()) : " returned");
-        return post(new Spec(SalesKind.OWED_SETTLEMENT, x, null, r.paperBillNo(), false, calc, r.paid(), null, r.note(), false, null,
+        return post(new Spec(SalesKind.OWED_SETTLEMENT, x, null, r.paperBillNo(), false, calc, r.paid(), r.payMethod(), r.payReference(), r.note(), false, null,
                 method, r.approveOverLimit(), details, false));
     }
 
@@ -381,8 +381,8 @@ public class SalesService {
         String party = x.customer() == null ? Texts.blankToNull(r.walkInName()) : x.customer().getName();
         String details = "Product sale " + party + ": " + String.join(", ", calc.lines().stream()
                 .map(l -> l.getQty() + " × " + l.getLabel()).toList()) + ", " + Money.format(calc.amount());
-        PayMethod method = Money.isPositive(r.paid()) ? (r.payMethod() == null ? PayMethod.CASH : r.payMethod()) : null;
-        return post(new Spec(SalesKind.PRODUCT_SALE, x, party, r.paperBillNo(), false, calc, r.paid(), method, r.note(), false, null,
+        return post(new Spec(SalesKind.PRODUCT_SALE, x, party, r.paperBillNo(), false, calc, r.paid(), r.payMethod(), r.payReference(),
+                r.note(), false, null,
                 null, r.approveOverLimit(), details, false));
     }
 
@@ -455,8 +455,9 @@ public class SalesService {
 
     // ================================================================== registration with bottles (FR-08 + FR-32)
 
-    /** Bottles given on the registration date: filled per bottle type, old bottles handed in (one brand), cash paid. */
-    public record GivenBottles(Map<String, Integer> qty, int oldBottles, Long oldBrandId, BigDecimal paid, boolean approveOverLimit) {
+    /** Bottles given on the registration date: filled per bottle type, old bottles handed in (one brand), money paid and how. */
+    public record GivenBottles(Map<String, Integer> qty, int oldBottles, Long oldBrandId, BigDecimal paid, PayMethod payMethod,
+                               String payReference, boolean approveOverLimit) {
 
         public boolean any() {
             return qty != null && qty.values().stream().anyMatch(q -> q != null && q > 0);
@@ -519,8 +520,8 @@ public class SalesService {
                     deposit(p.bottle().code(), date));
             BigDecimal pay = left.min(calc.amount());
             left = left.subtract(pay);
-            Posted posted = postAndSave(new Spec(SalesKind.FIRST_PURCHASE, x, null, null, false, calc, pay, null,
-                    "Bottles given at registration", false, null, null, given.approveOverLimit(), firstDetails(x.customer(), calc), false));
+            Posted posted = postAndSave(new Spec(SalesKind.FIRST_PURCHASE, x, null, null, false, calc, pay, given.payMethod(),
+                    given.payReference(), "Bottles given at registration", false, null, null, given.approveOverLimit(), firstDetails(x.customer(), calc), false));
             out.add(queries.detail(posted.txn().getId()));
         }
         if (left.signum() > 0) {
@@ -626,11 +627,11 @@ public class SalesService {
                         DamageMode damageMode, SettleMethod settleMethod, Boolean approveOverLimit, String auditDetails,
                         boolean advanceSchedule, boolean onPhone) {
 
-        /** A sale without a payment reference (only delivery bills take one). */
+        /** A sale entered in the office. */
         Spec(SalesKind kind, Ctx x, String walkInName, String paperBillNo, boolean paperRequired, SaleCalc calc, BigDecimal paid,
-             PayMethod payMethod, String note, boolean phoneConfirmed, DamageMode damageMode, SettleMethod settleMethod,
-             Boolean approveOverLimit, String auditDetails, boolean advanceSchedule) {
-            this(kind, x, walkInName, paperBillNo, paperRequired, calc, paid, payMethod, null, note, phoneConfirmed, damageMode,
+             PayMethod payMethod, String payReference, String note, boolean phoneConfirmed, DamageMode damageMode,
+             SettleMethod settleMethod, Boolean approveOverLimit, String auditDetails, boolean advanceSchedule) {
+            this(kind, x, walkInName, paperBillNo, paperRequired, calc, paid, payMethod, payReference, note, phoneConfirmed, damageMode,
                     settleMethod, approveOverLimit, auditDetails, advanceSchedule, false);
         }
     }
@@ -683,13 +684,18 @@ public class SalesService {
             }
         }
 
-        PayMethod method = s.payMethod() != null ? s.payMethod() : paid.signum() > 0 ? PayMethod.CASH : null;
+        // Money paid on any bill: Cash by default; a cheque or bank transfer needs its reference (the payment rule).
+        PayMethod method = paid.signum() > 0 ? (s.payMethod() != null ? s.payMethod() : PayMethod.CASH) : null;
+        String payReference = method == null || method == PayMethod.CASH ? null : Texts.blankToNull(s.payReference());
+        if (method != null && method.referenceProblem(payReference) != null) {
+            throw new ValidationException("payReference", method.referenceProblem(payReference));
+        }
         SalesTxn t = new SalesTxn(numbering.next(SequenceNames.BILL), s.kind(), x.date(), c == null ? null : c.getId(),
                 c == null ? s.walkInName() : null)
                 .amounts(calc.water(), calc.deposit(), calc.product(), calc.productCost(), paid, method)
                 .details(Texts.blankToNull(s.paperBillNo()), Texts.blankToNull(s.note()), s.phoneConfirmed(), s.damageMode(),
                         s.settleMethod(), overrideBy)
-                .payReference(s.payReference())
+                .payReference(payReference)
                 .enteredOnPhone(s.onPhone());
         t = txns.saveAndFlush(t);
         List<SalesTxnLine> lines = new ArrayList<>();

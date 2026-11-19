@@ -80,9 +80,10 @@ class PurchasingRulesTest {
 
     @Test
     void referenceRequiredUnlessCash() {
-        assertThat(PurchasingRules.referenceMissing(PayMethod.CASH, null)).isFalse();
-        assertThat(PurchasingRules.referenceMissing(PayMethod.BANK_TRANSFER, " ")).isTrue();
-        assertThat(PurchasingRules.referenceMissing(PayMethod.CHEQUE, null)).isTrue();
-        assertThat(PurchasingRules.referenceMissing(PayMethod.CHEQUE, "Cheque 004512")).isFalse();
+        // The one payment rule (customers, bills, suppliers, factories, expenses).
+        assertThat(PayMethod.CASH.referenceProblem(null)).isNull();
+        assertThat(PayMethod.BANK_TRANSFER.referenceProblem(" ")).isEqualTo("Enter the bank reference.");
+        assertThat(PayMethod.CHEQUE.referenceProblem(null)).isEqualTo("Enter the cheque number.");
+        assertThat(PayMethod.CHEQUE.referenceProblem("Cheque 004512")).isNull();
     }
 }

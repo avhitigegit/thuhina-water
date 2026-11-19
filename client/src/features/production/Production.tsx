@@ -223,7 +223,6 @@ function PaymentsTab({ onPay }: { onPay: () => void }) {
     { key: "ref", header: "Ref", cell: (p) => <span className="mono">{p.fpNo}</span> },
     { key: "date", header: "Date", cell: (p) => formatDate(p.date) },
     { key: "factory", header: "Factory", cell: (p) => p.factory.name },
-    { key: "for", header: "For", cell: (p) => p.periodLabel },
     {
       key: "method",
       header: "Method",
@@ -243,7 +242,7 @@ function PaymentsTab({ onPay }: { onPay: () => void }) {
           <h2>Filling cost by month</h2>
           <Can permission={P.PRODUCTION_EDIT}>
             <button className="btn primary" type="button" disabled={!balances.data} onClick={onPay}>
-              + Record payment
+              Pay factory
             </button>
           </Can>
         </div>
@@ -277,13 +276,9 @@ function PaymentsTab({ onPay }: { onPay: () => void }) {
   );
 }
 
-/** The payment pop-up needs the unpaid months (oldest first, as in the prototype). */
+/** The payment pop-up lists the factories with what is owed to each. */
 function PayDialogLoader({ today, onClose }: { today: string; onClose: () => void }) {
-  const balances = useFactoryBalances();
-  if (!balances.data) return null;
-  const unpaid = balances.data
-    .filter((m) => m.status !== "PAID")
-    .slice()
-    .reverse();
-  return <FactoryPaymentDialog unpaid={unpaid} today={today} onClose={onClose} />;
+  const summary = useProductionSummary();
+  if (!summary.data) return null;
+  return <FactoryPaymentDialog factories={summary.data.factories} today={today} onClose={onClose} />;
 }

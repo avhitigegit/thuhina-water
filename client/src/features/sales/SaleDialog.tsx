@@ -2,7 +2,7 @@
 
 /*
  * Sale pop-up framework (prototype sales-bills.html saleModal): two columns – the form (customer, bill no.
- * "Generated on save", date, the sale's own fields, cash paid) and the live calculation from the server's
+ * "Generated on save", date, the sale's own fields, paid now with Paid by) and the live calculation from the server's
  * …/preview endpoint (debounced) with the customer card "after this bill". Paid is filled with the amount for Cash
  * customers (0 for Credit / Monthly bill) until the user types in it. Saving: field messages go under their field,
  * other messages in the banner; CREDIT_LIMIT opens the credit approval pop-up (Admin: "Approve and save").
@@ -10,6 +10,7 @@
 import { useState, type ReactNode } from "react";
 import { DateField } from "@/components/shared/DateField";
 import { FormDialog } from "@/components/shared/FormDialog";
+import { PaidByFields, payFields, type PayMethod } from "@/components/shared/PaidBy";
 import { useCustomer } from "@/features/customers/api";
 import { CustomerPicker } from "@/features/customers/CustomerPicker";
 import { ApiError } from "@/lib/api/client";
@@ -41,7 +42,6 @@ export function SaleDialog({
   build,
   calc,
   showPaid = true,
-  afterPaid,
   onClose,
   onSaved,
 }: {
@@ -60,13 +60,14 @@ export function SaleDialog({
   build: (ctx: SaleContext) => object | null;
   calc: (preview: SalePreview, ctx: SaleContext) => ReactNode;
   showPaid?: boolean;
-  afterPaid?: ReactNode;
   onClose: () => void;
   onSaved?: (result: SaleResult) => void;
 }) {
   const [picked, setPicked] = useState<CustomerLookupRow | null>(initialCustomer ?? null);
   const [date, setDate] = useState<string | null>(todayIso());
   const [paidText, setPaidText] = useState<string | null>(null);
+  const [method, setMethod] = useState<PayMethod>("CASH");
+  const [reference, setReference] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [banner, setBanner] = useState("");
   const [creditError, setCreditError] = useState<ApiError | null>(null);
@@ -74,7 +75,7 @@ export function SaleDialog({
   const customer = picked && detail.data?.id === picked.id ? detail.data : null;
   const save = useSaveSale(kind);
 
-  const known = new Set(["customerId", "date", "paid", ...fieldNames]);
+  const known = new Set(["customerId", "date", "paid", "payReference", ...fieldNames]);
   const ctx: SaleContext = {
     customer,
     err: (f) => (errors[f] ? <span className="error">{errors[f]}</span> : null),
@@ -107,7 +108,15 @@ export function SaleDialog({
     }
     setErrors({});
     setBanner("");
-    const body = { ...base, paid: showPaid ? Number(paidValue) || 0 : undefined, approveOverLimit };
+    const paid = showPaid ? Number(paidValue) || 0 : undefined;
+    // How it was paid goes with any money paid on the bill (the same rule as Receive payment).
+    const how = paid && paid > 0 ? payFields(method, reference) : null;
+    const body = {
+      ...base,
+      paid,
+      ...(how ? { payMethod: how.method, payReference: how.reference } : {}),
+      approveOverLimit,
+    };
     save.mutate(body, {
       onSuccess: (r) => {
         setCreditError(null);
@@ -182,7 +191,7 @@ export function SaleDialog({
             {fields(ctx)}
             {showPaid && (
               <div className="field">
-                <label htmlFor="sale-paid">Cash paid (Rs.)</label>
+                <label htmlFor="sale-paid">Paid now (Rs.)</label>
                 <input
                   id="sale-paid"
                   type="number"
@@ -194,7 +203,16 @@ export function SaleDialog({
                 {ctx.err("paid")}
               </div>
             )}
-            {afterPaid}
+            {showPaid && (Number(paidValue) || 0) > 0 && (
+              <PaidByFields
+                id="sale-pay"
+                method={method}
+                reference={reference}
+                onMethod={setMethod}
+                onReference={setReference}
+                error={errors.payReference}
+              />
+            )}
           </div>
           <div>
             {!customer && !(customerOptional && !picked) ? (

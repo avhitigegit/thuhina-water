@@ -298,12 +298,10 @@ class BillingIntegrationTest extends SalesTestSupport {
         Map<String, Object> now = getJson("/statements/" + c + "?from=" + month.minusMonths(1).atDay(1));
         assertThat(money(now.get("closing"))).isEqualByComparingTo(balance(c));
 
-        // Paying against the invoice; another customer's invoice is refused.
-        Map<String, Object> linked = map("customerId", c, "date", today.toString(), "amount", 1300, "method", "CASH", "invoiceId", invoiceId);
-        Map<String, Object> paid = (Map<String, Object>) read(send("/payments", linked).andExpect(status().isCreated()).andReturn()).get("payment");
-        assertThat(paid.get("invoiceNo")).isEqualTo(inv.get("invoiceNo"));
-        linked.put("customerId", idle);
-        send("/payments", linked).andExpect(status().isBadRequest()).andExpect(jsonPath("$.details.fields.invoiceId").exists());
+        // A payment has no invoice to choose: it clears the oldest amount first.
+        Map<String, Object> paid = (Map<String, Object>) read(send("/payments", map("customerId", c, "date", today.toString(),
+                "amount", 1300, "method", "CASH")).andExpect(status().isCreated()).andReturn()).get("payment");
+        assertThat(paid.get("invoiceNo")).isNull();
 
         // PDFs.
         String pdf = pdfText("/print/invoice/" + invoiceId);

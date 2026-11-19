@@ -62,8 +62,7 @@ public class BillingQueryService {
 
     private static final String INVOICES = "select i.id, i.invoice_no, i.customer_id, c.code, c.name, i.period, i.invoice_date, i.due_date, "
             + "i.opening_balance, i.charges, i.paid_on_bills, i.payments, i.amount, i.total_due, i.period_from, i.period_to, i.created_by, "
-            + "(select count(*) from invoice_txn x where x.invoice_id = i.id) as deliveries, "
-            + "(select coalesce(sum(p.amount), 0) from customer_payment p where p.invoice_id = i.id) as paid "
+            + "(select count(*) from invoice_txn x where x.invoice_id = i.id) as deliveries "
             + "from monthly_invoice i join customer c on c.id = i.customer_id ";
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -238,7 +237,7 @@ public class BillingQueryService {
         return new InvoiceView(r.id(), r.invoiceNo(), customerInfo(r.customer().id()), r.period(), r.periodLabel(),
                 ((java.sql.Date) dates.get("period_from")).toLocalDate(), ((java.sql.Date) dates.get("period_to")).toLocalDate(),
                 r.invoiceDate(), r.dueDate(), r.deliveries(), r.opening(), Money.of(charges), paidOnBills, r.payments(), r.amount(),
-                r.totalDue(), r.paid(), invoiceLines(id), r.createdByName());
+                r.totalDue(), invoiceLines(id), r.createdByName());
     }
 
     /** The lines of an invoice's bills; any part of a bill not covered by a line is shown as "Other charges". */
@@ -414,12 +413,12 @@ public class BillingQueryService {
                 InvoiceRules.periodLabel(rs.getString("period")), rs.getObject("invoice_date", LocalDate.class),
                 rs.getObject("due_date", LocalDate.class), rs.getInt("deliveries"), Money.of(rs.getBigDecimal("opening_balance")),
                 Money.of(rs.getBigDecimal("payments")), Money.of(rs.getBigDecimal("amount")), Money.of(rs.getBigDecimal("total_due")),
-                Money.of(rs.getBigDecimal("paid")), null), rs.getString("created_by")});
+                null), rs.getString("created_by")});
         Map<String, String> names = userNames(raw.stream().map(r -> (String) r[1]).toList());
         return raw.stream().map(r -> {
             InvoiceRow x = (InvoiceRow) r[0];
             return new InvoiceRow(x.id(), x.invoiceNo(), x.customer(), x.period(), x.periodLabel(), x.invoiceDate(), x.dueDate(),
-                    x.deliveries(), x.opening(), x.payments(), x.amount(), x.totalDue(), x.paid(), names.get((String) r[1]));
+                    x.deliveries(), x.opening(), x.payments(), x.amount(), x.totalDue(), names.get((String) r[1]));
         }).toList();
     }
 

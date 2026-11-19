@@ -305,7 +305,7 @@ describe("First purchase", () => {
     expect(held).toHaveTextContent("+3 (was 0)");
     expect(within(dialog).getByTestId("bal-outstanding")).toHaveTextContent("Rs. 3,050.00");
     // Credit customer: nothing paid unless typed.
-    expect(within(dialog).getByLabelText("Cash paid (Rs.)")).toHaveValue(0);
+    expect(within(dialog).getByLabelText("Paid now (Rs.)")).toHaveValue(0);
 
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
     const approve = await screen.findByRole("dialog", { name: "Credit limit exceeded" });
@@ -378,6 +378,36 @@ describe("First purchase", () => {
       await within(dialog).findByText("Old bottles handed in cannot be more than the bottles given."),
     ).toHaveClass("error");
     expect(within(dialog).getByLabelText("Old bottles handed in")).toHaveClass("invalid");
+  });
+});
+
+describe("Paid by on a bill", () => {
+  it("money paid by cheque on any bill asks for the cheque number and sends it", async () => {
+    const user = userEvent.setup();
+    const { wrap, posts } = setup(ADMIN, (url, init) => {
+      if (url === "/api/sales/first-purchase/preview") return { status: 200, body: PREVIEW };
+      if (url === "/api/sales/first-purchase" && init?.method === "POST")
+        return { status: 201, body: { txn: bill({}), schedule: null } };
+    });
+    render(wrap(<FirstPurchaseDialog initialCustomer={LOOKUP} onClose={vi.fn()} />));
+    const dialog = await screen.findByRole("dialog", { name: "First purchase" });
+    await within(dialog).findByText("Water 3 × Rs. 350.00");
+    // Nothing paid: no Paid by.
+    expect(within(dialog).queryByLabelText("Paid by")).not.toBeInTheDocument();
+    const paid = within(dialog).getByLabelText("Paid now (Rs.)");
+    await user.clear(paid);
+    await user.type(paid, "1000");
+    expect(within(dialog).getByLabelText("Paid by")).toHaveValue("CASH");
+    expect(within(dialog).queryByLabelText("Cheque number")).not.toBeInTheDocument();
+    await user.selectOptions(within(dialog).getByLabelText("Paid by"), "CHEQUE");
+    await user.type(within(dialog).getByLabelText("Cheque number"), "100245");
+    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    await vi.waitFor(() => expect(posts("/api/sales/first-purchase")).toHaveLength(1));
+    expect(posts("/api/sales/first-purchase")[0]).toMatchObject({
+      paid: 1000,
+      payMethod: "CHEQUE",
+      payReference: "100245",
+    });
   });
 });
 
@@ -513,8 +543,8 @@ describe("Registration with bottles", () => {
       "3 × 20L: water Rs. 1,050.00 + deposit 2 × Rs. 1,000.00 (1 old bottle – no deposit)",
     );
     // Cash customer: nothing is filled in, the amount received must be typed.
-    expect(within(dialog).getByLabelText("Cash paid now (Rs.)")).toHaveValue(null);
-    await user.type(within(dialog).getByLabelText("Cash paid now (Rs.)"), "3050");
+    expect(within(dialog).getByLabelText("Paid now (Rs.)")).toHaveValue(null);
+    await user.type(within(dialog).getByLabelText("Paid now (Rs.)"), "3050");
     await vi.waitFor(() => expect(summary).toHaveTextContent("Total Rs. 3,050.00 · paid Rs. 3,050.00"));
 
     await user.type(within(dialog).getByLabelText("Name"), "Nimali Silva");

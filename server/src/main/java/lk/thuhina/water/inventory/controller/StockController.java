@@ -99,7 +99,7 @@ public class StockController {
         }
         SaleResult bill = sales.customerDamage(new CustomerDamageRequest(request.customerId(), request.date(), null,
                 request.bottleTypeCode(), request.qty(), request.mode(), request.giveFilled(), request.reason(), request.note(),
-                request.paid(), request.approveOverLimit()));
+                request.paid(), null, null, request.approveOverLimit()));
         return queries.damageRowForBill(bill.txn().id());
     }
 

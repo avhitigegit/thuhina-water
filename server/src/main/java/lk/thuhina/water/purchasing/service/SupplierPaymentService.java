@@ -22,11 +22,10 @@ import lk.thuhina.water.partners.model.Supplier;
 import lk.thuhina.water.purchasing.dto.PurchasingDtos.PaymentRequest;
 import lk.thuhina.water.purchasing.dto.PurchasingDtos.PaymentRow;
 import lk.thuhina.water.purchasing.dto.PurchasingDtos.SupplierBalance;
-import lk.thuhina.water.purchasing.model.PurchaseOrder;
 import lk.thuhina.water.purchasing.model.SupplierPayment;
 import lk.thuhina.water.purchasing.repository.PurchaseOrderRepository;
 import lk.thuhina.water.purchasing.repository.SupplierPaymentRepository;
-import lk.thuhina.water.purchasing.rules.PurchasingRules;
+import lk.thuhina.water.sales.model.PayMethod;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -131,22 +130,17 @@ public class SupplierPaymentService {
             throw new ValidationException("method", "Select the payment method.");
         }
         String reference = Texts.blankToNull(r.reference());
-        if (PurchasingRules.referenceMissing(r.method(), reference)) {
-            throw new ValidationException("reference", PurchasingRules.MSG_REFERENCE);
+        String refProblem = r.method().referenceProblem(reference);
+        if (refProblem != null) {
+            throw new ValidationException("reference", refProblem);
         }
-        PurchaseOrder po = null;
-        if (r.poId() != null) {
-            po = orders.findById(r.poId()).orElseThrow(() -> new ValidationException("poId", "Select a purchase order of this supplier."));
-            if (!po.getSupplierId().equals(s.getId())) {
-                throw new ValidationException("poId", po.getPoNo() + " is not from " + s.getName() + ".");
-            }
-        }
+        // Paid against what is owed, oldest receipt first – no purchase order to choose (old payments keep theirs).
         BigDecimal amount = Money.of(r.amount());
         SupplierPayment p = payments.saveAndFlush(new SupplierPayment(numbering.next(SequenceNames.SUPPLIER_PAYMENT), s.getId(),
-                po == null ? null : po.getId(), r.date(), amount, r.method(), reference, Texts.blankToNull(r.note())));
+                null, r.date(), amount, r.method(), r.method() == PayMethod.CASH ? null : reference, Texts.blankToNull(r.note())));
         audit.log(AuditAction.CREATE, ENTITY, p.getSpNo(), s.getName() + ": " + Money.format(amount) + " by " + r.method().label()
-                + (reference == null ? "" : " (" + reference + ")") + (po == null ? "" : " for " + po.getPoNo()));
-        return row(p, s, po == null ? null : po.getPoNo(), lookups.userNames(List.of(p.getCreatedBy())));
+                + (p.getReference() == null ? "" : " (" + p.getReference() + ")"));
+        return row(p, s, null, lookups.userNames(List.of(p.getCreatedBy())));
     }
 
     private static PaymentRow row(SupplierPayment p, Supplier s, String poNo, Map<String, String> names) {

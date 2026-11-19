@@ -168,9 +168,9 @@ class ExpenseIntegrationTest extends IntegrationTest {
     @Test
     void validationUsesThePrototypeMessages() throws Exception {
         assertThat(fieldError(call(post("/expenses"), admin, expense("method", "CHEQUE"), 400)))
-                .isEqualTo("reference: Enter the cheque number or bank reference.");
+                .isEqualTo("reference: Enter the cheque number.");
         assertThat(fieldError(call(post("/expenses"), admin, expense("method", "BANK_TRANSFER", "reference", " "), 400)))
-                .isEqualTo("reference: Enter the cheque number or bank reference.");
+                .isEqualTo("reference: Enter the bank reference.");
         assertThat(fieldError(call(post("/expenses"), admin, expense("paidDate", today.plusDays(1).toString()), 400)))
                 .isEqualTo("paidDate: Date cannot be after today (" + BusinessDates.format(today) + ").");
         assertThat(fieldError(call(post("/expenses"), admin, expense("forMonth", thisMonth.plusMonths(1).toString()), 400)))

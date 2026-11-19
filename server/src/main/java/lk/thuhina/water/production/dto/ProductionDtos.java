@@ -125,14 +125,17 @@ public final class ProductionDtos {
     public record ProductionSummary(List<FactoryBottleStock> bottles, List<FactoryOwed> factories) {
     }
 
-    /** Filling cost of one factory in one month (by return date): status PAID / PART_PAID / UNPAID. */
+    /**
+     * Filling cost of one factory in one month (by return date); {@code paid} = the factory's payments spread over its
+     * months oldest first. Status PAID / PART_PAID / UNPAID.
+     */
     public record FactoryMonth(long factoryId, String factoryName, String period, String periodLabel, int filled, int rejected,
                                BigDecimal cost, BigDecimal paid, BigDecimal due, String status, String statusLabel) {
     }
 
+    /** A payment to a factory: it clears the oldest filling cost first. */
     public record FactoryPaymentRequest(
             Long factoryId,
-            String period,
             @NotNull(message = "Enter the date.") LocalDate date,
             BigDecimal amount,
             PayMethod method,
@@ -140,7 +143,9 @@ public final class ProductionDtos {
             @Size(max = 200, message = "Note: at most 200 characters.") String note) {
     }
 
-    public record FactoryPaymentRow(long id, String fpNo, LocalDate date, FactoryLink factory, String period, String periodLabel,
+    /** {@code period} only on payments recorded for one month (before payments cleared the oldest cost first). */
+    public record FactoryPaymentRow(long id, String fpNo, LocalDate date, FactoryLink factory, @Schema(nullable = true) String period,
+                                    @Schema(nullable = true) String periodLabel,
                                     String method, String methodLabel, @Schema(nullable = true) String reference, BigDecimal amount,
                                     @Schema(nullable = true) String note, String createdByName) {
     }

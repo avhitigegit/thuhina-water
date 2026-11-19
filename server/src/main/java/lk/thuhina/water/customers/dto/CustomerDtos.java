@@ -1,5 +1,6 @@
 package lk.thuhina.water.customers.dto;
 
+import lk.thuhina.water.sales.model.PayMethod;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -54,6 +55,9 @@ public final class CustomerDtos {
             Integer oldBottles,
             Long oldBrandId,
             BigDecimal paid,
+            @Schema(description = "How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE") PayMethod payMethod,
+            @Schema(description = "Cheque number or bank reference (needed for those methods)")
+            @Size(max = 100, message = "Reference: at most 100 characters.") String payReference,
             Boolean approveOverLimit,
             Long fromQuotationId,
             LocalDate inactiveFrom,

@@ -179,7 +179,6 @@ const INVOICE: InvoiceView = {
   payments: 1000,
   amount: 2100,
   totalDue: 2100,
-  paid: 0,
   lines: [
     {
       date: "2026-09-02",
@@ -444,7 +443,7 @@ describe("Billing & Payments", () => {
     expect(within(dialog).getByTestId("pay-after")).toHaveTextContent("Rs. 5,900.00");
     expect(within(dialog).getByText("Part payment")).toBeInTheDocument();
 
-    await user.selectOptions(within(dialog).getByLabelText("How paid"), "CHEQUE");
+    await user.selectOptions(within(dialog).getByLabelText("Paid by"), "CHEQUE");
     await user.click(within(dialog).getByRole("button", { name: "Save payment" }));
     expect(within(dialog).getByText("Enter the cheque number.")).toBeInTheDocument();
     expect(posted("/api/payments")).toHaveLength(0);
@@ -470,7 +469,7 @@ describe("Billing & Payments", () => {
     expect(opened).toEqual(["/api/print/receipt/16"]);
   });
 
-  it("links a Monthly bill payment to the latest invoice and shows an advance", async () => {
+  it("a Monthly bill payment has no invoice to choose (oldest first) and shows an advance", async () => {
     const user = userEvent.setup();
     renderPage();
     const row = (await screen.findByRole("button", { name: "Ceyknit Garments" })).closest(
@@ -478,7 +477,8 @@ describe("Billing & Payments", () => {
     ) as HTMLElement;
     await user.click(within(row).getByRole("button", { name: "Receive" }));
     const dialog = await screen.findByRole("dialog", { name: "Receive payment" });
-    await waitFor(() => expect(within(dialog).getByLabelText("Against invoice")).toHaveValue("40"));
+    await waitFor(() => expect(within(dialog).getByTestId("pay-balance")).toHaveTextContent("Rs. 6,760.00"));
+    expect(within(dialog).queryByLabelText("Against invoice")).not.toBeInTheDocument();
     const amount = within(dialog).getByLabelText("Amount (Rs.)");
     await user.clear(amount);
     await user.type(amount, "7000");
@@ -489,8 +489,8 @@ describe("Billing & Payments", () => {
       customerId: 8,
       amount: 7000,
       method: "CASH",
-      invoiceId: 40,
     });
+    expect(posted("/api/payments")[0].body).not.toHaveProperty("invoiceId");
   });
 
   it("opens Receive payment for the customer in the link (?pay=C0012)", async () => {

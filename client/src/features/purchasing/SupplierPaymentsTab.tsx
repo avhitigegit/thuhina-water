@@ -2,13 +2,15 @@
 
 /*
  * Supplier payments tab (FR-21, prototype purchasing/purchasing.html): amounts owed to suppliers (goods received, paid,
- * owed in red, terms, oldest unpaid receipt, Pay) and the payments made. Record payment pop-up: supplier, date, amount,
- * method, cheque no. / bank reference (required unless cash), PO (optional), note. Admin full; Accountant view only.
+ * owed in red, terms, oldest unpaid receipt, Pay) and the payments made. Pay supplier pop-up: supplier, date, amount
+ * (default = owed), Paid by with the cheque number / bank reference, note. It clears the oldest receipt first – no purchase
+ * order to choose. Admin full; Accountant view only.
  */
 import { useState } from "react";
 import { DataTable, type Column } from "@/components/shared/DataTable";
 import { DateField } from "@/components/shared/DateField";
 import { FormDialog } from "@/components/shared/FormDialog";
+import { PaidByFields, payFields, type PayMethod } from "@/components/shared/PaidBy";
 import { MoneyText } from "@/components/shared/MoneyText";
 import { Badge } from "@/components/shared/StatusBadge";
 import { Can } from "@/features/auth/access";
@@ -17,8 +19,8 @@ import type { PaymentRow, SupplierBalance } from "@/lib/api/types";
 import { formatDate, formatMoney, todayIso } from "@/lib/format";
 import { P } from "@/lib/permissions";
 import { toast } from "@/lib/toast";
-import { usePurchaseOrders, useRecordPayment, useSupplierBalances, useSupplierPayments } from "./api";
-import { errorText, PAY_METHODS, type PayMethod } from "./labels";
+import { useRecordPayment, useSupplierBalances, useSupplierPayments } from "./api";
+import { errorText } from "./labels";
 
 export function SupplierPaymentsTab({ today = todayIso() }: { today?: string }) {
   const balances = useSupplierBalances();
@@ -162,7 +164,6 @@ function PaymentDialog({
   onClose: () => void;
 }) {
   const suppliers = useSuppliers();
-  const orders = usePurchaseOrders("");
   const pay = useRecordPayment();
   const owedOf = (id: number) => Number(balances.find((b) => b.supplierId === id)?.owed ?? 0);
   const firstOwed = balances.find((b) => Number(b.owed) > 0)?.supplierId;
@@ -173,12 +174,10 @@ function PaymentDialog({
   const [amount, setAmount] = useState(start === null ? "" : String(Math.max(0, owedOf(start))));
   const [method, setMethod] = useState<PayMethod>("BANK_TRANSFER");
   const [reference, setReference] = useState("");
-  const [poId, setPoId] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const list = (suppliers.data ?? []).filter((s) => s.active || owedOf(s.id) !== 0);
   const sid = supplier || (list[0] ? String(list[0].id) : "");
-  const pos = (orders.data ?? []).filter((p) => String(p.supplier.id) === sid && p.status !== "CANCELLED");
 
   function submit() {
     setError("");
@@ -191,9 +190,7 @@ function PaymentDialog({
         supplierId: sid ? Number(sid) : undefined,
         date,
         amount: amount.trim() === "" ? undefined : Number(amount),
-        method,
-        reference,
-        poId: poId ? Number(poId) : undefined,
+        ...payFields(method, reference),
         note,
       },
       {
@@ -210,7 +207,7 @@ function PaymentDialog({
     <FormDialog
       open
       onOpenChange={(o) => !o && onClose()}
-      title="Record supplier payment"
+      title="Pay supplier"
       onSubmit={submit}
       submitLabel="Save payment"
       submitting={pay.isPending}
@@ -224,7 +221,6 @@ function PaymentDialog({
             value={sid}
             onChange={(e) => {
               setSupplier(e.target.value);
-              setPoId("");
               setAmount(String(Math.max(0, owedOf(Number(e.target.value)))));
             }}
           >
@@ -250,31 +246,13 @@ function PaymentDialog({
             onChange={(e) => setAmount(e.target.value)}
           />
         </div>
-        <div className="field req">
-          <label htmlFor="sp-method">Method</label>
-          <select id="sp-method" value={method} onChange={(e) => setMethod(e.target.value as PayMethod)}>
-            {PAY_METHODS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className={method === "CASH" ? "field" : "field req"}>
-          <label htmlFor="sp-ref">Cheque no. / bank ref.</label>
-          <input id="sp-ref" value={reference} onChange={(e) => setReference(e.target.value)} />
-        </div>
-        <div className="field">
-          <label htmlFor="sp-po">Purchase order</label>
-          <select id="sp-po" value={poId} onChange={(e) => setPoId(e.target.value)}>
-            <option value="">–</option>
-            {pos.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.poNo} – {formatMoney(p.total)}
-              </option>
-            ))}
-          </select>
-        </div>
+        <PaidByFields
+          id="sp"
+          method={method}
+          reference={reference}
+          onMethod={setMethod}
+          onReference={setReference}
+        />
         <div className="field">
           <label htmlFor="sp-note">Note</label>
           <input id="sp-note" value={note} onChange={(e) => setNote(e.target.value)} />

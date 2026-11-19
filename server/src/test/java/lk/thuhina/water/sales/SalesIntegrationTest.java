@@ -148,6 +148,14 @@ class SalesIntegrationTest extends SalesTestSupport {
         assertThat(((Number) extra.get("amount")).doubleValue()).isEqualTo(4 * 350 + 2 * 1000.0);
         assertThat(bottles(c)).containsExactly(5, 0, 0);
         assertThat(stock("FILLED")).isEqualTo(filled - 4);
+        // Paid by cheque on the bill: the cheque number is needed (the same rule as Receive payment), then it is kept.
+        send("/sales/extra-order", map("customerId", c, "date", today.toString(), "bottleTypeCode", bottle, "filled", 1, "empties", 1,
+                "paid", 350, "payMethod", "CHEQUE"))
+                .andExpect(jsonPath("$.details.fields.payReference").value("Enter the cheque number."));
+        Map<String, Object> byCheque = sale("/sales/extra-order", map("customerId", c, "date", today.toString(), "bottleTypeCode", bottle,
+                "filled", 1, "empties", 1, "paid", 350, "payMethod", "CHEQUE", "payReference", "100245"));
+        assertThat(byCheque).containsEntry("payMethod", "CHEQUE").containsEntry("payReference", "100245");
+        filled -= 1;
         send("/sales/extra-order", map("customerId", c, "date", today.toString(), "bottleTypeCode", bottle, "filled", 2, "empties", 3))
                 .andExpect(jsonPath("$.details.fields.empties")
                         .value("Empties returned are more than filled bottles. Use Bill entry or Collect empties for returns."));

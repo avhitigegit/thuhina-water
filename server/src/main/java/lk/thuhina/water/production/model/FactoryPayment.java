@@ -19,7 +19,10 @@ import org.springframework.data.annotation.CreatedBy;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
-/** Money paid to a filling factory for the filling cost of one month ({@code period} = YYYY-MM) (FR-26). Insert-only. */
+/**
+ * Money paid to a filling factory (FR-26). It clears the oldest filling cost first; {@code period} (YYYY-MM) is only set on
+ * payments made before that rule (they were for one month). Insert-only.
+ */
 @Entity
 @Immutable
 @Table(name = "factory_payment")
@@ -36,7 +39,7 @@ public class FactoryPayment {
     @Column(name = "factory_id", nullable = false)
     private Long factoryId;
 
-    @Column(nullable = false, length = 7)
+    @Column(length = 7)
     private String period;
 
     @Column(name = "pay_date", nullable = false)

@@ -507,12 +507,12 @@ describe("CustomerDialog", () => {
       fetch.mock.calls.some(
         ([u, i]) => u.split("?")[0] === "/api/customers/register" && i?.method === "POST",
       );
-    expect(within(dialog).getByLabelText("Cash paid now (Rs.)")).toHaveValue(null);
+    expect(within(dialog).getByLabelText("Paid now (Rs.)")).toHaveValue(null);
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
     expect(await within(dialog).findByText(MSG_CASH_PAID)).toBeInTheDocument();
     expect(within(dialog).getByText(MSG_FIX_FIELDS)).toBeInTheDocument();
     expect(posted()).toBe(false);
-    await user.type(within(dialog).getByLabelText("Cash paid now (Rs.)"), "1700");
+    await user.type(within(dialog).getByLabelText("Paid now (Rs.)"), "1700");
 
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
     await vi.waitFor(() =>

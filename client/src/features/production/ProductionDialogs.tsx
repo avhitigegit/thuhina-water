@@ -7,14 +7,15 @@
  *   Dispatch sent – the batches made and Print dispatch note;
  *   Receive filled – factory, bottle, date, filled (default all still at the factory), rejected + reason; the load is
  *     split over the open batches oldest first (bottles kept back come with a later load), shown before saving;
- *   Record factory payment – factory and month from the unpaid list, amount (default = due), method, reference.
+ *   Pay factory – factory, amount (default = owed), Paid by + reference; it clears the oldest filling cost first.
  */
 import { useState } from "react";
 import { DateField } from "@/components/shared/DateField";
 import { FormDialog } from "@/components/shared/FormDialog";
+import { PaidByFields, payFields, type PayMethod } from "@/components/shared/PaidBy";
 import { useFactories } from "@/features/partners/api";
 import { ApiError } from "@/lib/api/client";
-import type { BatchView, DispatchView, FactoryBottleStock, FactoryMonth } from "@/lib/api/types";
+import type { BatchView, DispatchView, FactoryBottleStock, FactoryOwed } from "@/lib/api/types";
 import { formatDate, formatMoney } from "@/lib/format";
 import { toast } from "@/lib/toast";
 import { allocate, dispatchNoteUrl, usePayFactory, useReceiveFilled, useSendEmpties } from "./api";
@@ -480,49 +481,39 @@ export function ReceiveFilledDialog({
 
 // ------------------------------------------------------------------ factory payment (FR-26)
 
-const METHODS = [
-  { value: "CASH", label: "Cash" },
-  { value: "BANK_TRANSFER", label: "Bank transfer" },
-  { value: "CHEQUE", label: "Cheque" },
-] as const;
-
+/** Pay a factory: like paying a supplier, the payment clears its oldest filling cost first – no month to choose. */
 export function FactoryPaymentDialog({
-  unpaid,
+  factories,
   today,
   onClose,
 }: {
-  unpaid: FactoryMonth[];
+  factories: FactoryOwed[];
   today: string;
   onClose: () => void;
 }) {
   const pay = usePayFactory();
-  const [pick, setPick] = useState("0");
-  const sel = unpaid[Number(pick)];
+  const start = factories.find((f) => Number(f.owed) > 0) ?? factories[0];
+  const [factoryId, setFactoryId] = useState(String(start?.id ?? ""));
+  const owedOf = (id: string) => Math.max(0, Number(factories.find((f) => String(f.id) === id)?.owed ?? 0));
   const [date, setDate] = useState<string | null>(today);
-  const [amount, setAmount] = useState(sel ? String(sel.due) : "");
-  const [method, setMethod] = useState<(typeof METHODS)[number]["value"]>("BANK_TRANSFER");
+  const [amount, setAmount] = useState(start ? String(owedOf(String(start.id))) : "");
+  const [method, setMethod] = useState<PayMethod>("BANK_TRANSFER");
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
 
   function submit() {
     setError("");
-    if (!sel) {
-      setError("Nothing is owed to the factories.");
-      return;
-    }
     if (!date) {
       setError("Enter the date.");
       return;
     }
     pay.mutate(
       {
-        factoryId: sel.factoryId,
-        period: sel.period,
+        factoryId: factoryId ? Number(factoryId) : undefined,
         date,
         amount: amount.trim() === "" ? undefined : Number(amount),
-        method,
-        reference,
+        ...payFields(method, reference),
         note,
       },
       {
@@ -539,27 +530,26 @@ export function FactoryPaymentDialog({
     <FormDialog
       open
       onOpenChange={(o) => !o && onClose()}
-      title="Record factory payment"
+      title="Pay factory"
       onSubmit={submit}
-      submitLabel="Save"
+      submitLabel="Save payment"
       submitting={pay.isPending}
     >
       {error && <div className="banner bad">{error}</div>}
       <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
         <div className="field req full">
-          <label htmlFor="fp-month">Factory and month</label>
+          <label htmlFor="fp-factory">Factory</label>
           <select
-            id="fp-month"
-            value={pick}
+            id="fp-factory"
+            value={factoryId}
             onChange={(e) => {
-              setPick(e.target.value);
-              const m = unpaid[Number(e.target.value)];
-              setAmount(m ? String(m.due) : "");
+              setFactoryId(e.target.value);
+              setAmount(String(owedOf(e.target.value)));
             }}
           >
-            {unpaid.map((m, i) => (
-              <option key={`${m.factoryId}-${m.period}`} value={i}>
-                {m.factoryName} – {m.periodLabel} – {formatMoney(m.due)} due
+            {factories.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.name} – owed {formatMoney(f.owed)}
               </option>
             ))}
           </select>
@@ -579,29 +569,19 @@ export function FactoryPaymentDialog({
             onChange={(e) => setAmount(e.target.value)}
           />
         </div>
-        <div className="field req">
-          <label htmlFor="fp-method">Method</label>
-          <select
-            id="fp-method"
-            value={method}
-            onChange={(e) => setMethod(e.target.value as (typeof METHODS)[number]["value"])}
-          >
-            {METHODS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className={method === "CASH" ? "field" : "field req"}>
-          <label htmlFor="fp-ref">Cheque no. / ref.</label>
-          <input id="fp-ref" value={reference} onChange={(e) => setReference(e.target.value)} />
-        </div>
+        <PaidByFields
+          id="fp"
+          method={method}
+          reference={reference}
+          onMethod={setMethod}
+          onReference={setReference}
+        />
         <div className="field full">
           <label htmlFor="fp-note">Note</label>
           <input id="fp-note" value={note} onChange={(e) => setNote(e.target.value)} />
         </div>
       </div>
+      <p className="small muted">The payment clears the oldest filling cost first.</p>
     </FormDialog>
   );
 }

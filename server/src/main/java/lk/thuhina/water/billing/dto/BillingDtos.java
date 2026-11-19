@@ -74,7 +74,6 @@ public final class BillingDtos {
             @Size(max = 100, message = "Reference: at most 100 characters.") String reference,
             @Size(max = 100, message = "Bank: at most 100 characters.") String bank,
             LocalDate chequeDate,
-            Long invoiceId,
             @Size(max = 200, message = "Note: at most 200 characters.") String note) {
     }
 
@@ -171,7 +170,6 @@ public final class BillingDtos {
             BigDecimal payments,
             BigDecimal amount,
             BigDecimal totalDue,
-            BigDecimal paid,
             String createdByName) {
     }
 
@@ -201,7 +199,6 @@ public final class BillingDtos {
             BigDecimal payments,
             BigDecimal amount,
             BigDecimal totalDue,
-            BigDecimal paid,
             List<InvoiceLine> lines,
             String createdByName) {
     }
