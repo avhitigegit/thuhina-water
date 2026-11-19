@@ -8,6 +8,7 @@
  * a bill that day warns. Rows typed by hand are kept when the date changes. Each row shows its live result (TypeScript copy of ExchangeRules); "Save bills"
  * posts each row on its own – good rows are saved and locked, bad rows show the server's message.
  */
+import { PAY_METHODS, referenceLabel, type PayMethod } from "@/components/shared/PaidBy";
 import { useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import {
@@ -496,8 +497,11 @@ export function EnterBills() {
     if (e.key !== "Enter" || target.tagName === "BUTTON") return;
     e.preventDefault();
     if (target.dataset.f === "cust") await resolveNow(r);
+    // "Paid by" (Cash by default) is skipped so cash bills stay quick; Tab or a click reaches it.
     const fields = Array.from(
-      tr.querySelectorAll<HTMLInputElement>("input:not(:disabled), select:not(:disabled)"),
+      tr.querySelectorAll<HTMLInputElement>(
+        'input:not(:disabled), select:not(:disabled):not([data-f="method"])',
+      ),
     );
     const i = fields.indexOf(target as HTMLInputElement);
     if (i >= 0 && i < fields.length - 1) {
@@ -659,7 +663,7 @@ export function EnterBills() {
                   </th>
                 ))}
                 <th rowSpan={2} className="bl">
-                  Cash paid
+                  Paid
                 </th>
                 <th rowSpan={2} title="Left at door – customer agreed by phone">
                   Phone ✓
@@ -809,6 +813,37 @@ export function EnterBills() {
                           edit(r.key, (x) => ({ ...x, paid: e.target.value, paidTouched: true }))
                         }
                       />
+                      {r.status !== "saved" && paidNumber(r, view?.calc ?? null) > 0 && (
+                        <div className="paid-by">
+                          <select
+                            data-f="method"
+                            aria-label={`Paid by row ${i + 1}`}
+                            value={r.method}
+                            disabled={locked}
+                            onChange={(e) =>
+                              edit(r.key, (x) => ({ ...x, method: e.target.value as PayMethod }))
+                            }
+                          >
+                            {PAY_METHODS.map((m) => (
+                              <option key={m.value} value={m.value}>
+                                {m.label}
+                              </option>
+                            ))}
+                          </select>
+                          {r.method !== "CASH" && (
+                            <input
+                              data-f="reference"
+                              className="w-paid"
+                              aria-label={`${referenceLabel(r.method)} row ${i + 1}`}
+                              placeholder={referenceLabel(r.method)}
+                              maxLength={100}
+                              value={r.reference}
+                              disabled={locked}
+                              onChange={(e) => edit(r.key, (x) => ({ ...x, reference: e.target.value }))}
+                            />
+                          )}
+                        </div>
+                      )}
                     </td>
                     <td className="center">
                       <input

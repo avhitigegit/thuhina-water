@@ -67,7 +67,7 @@ import org.springframework.transaction.annotation.Transactional;
  *       bottles kept back last time come with a later load;</li>
  *   <li>receive filled – partial returns; FACTORY −(filled + rejected), FILLED +filled, WRITTEN_OFF +rejected; rejects become a
  *       company damage record "At factory"; cost = filled × batch charge;</li>
- *   <li>pay a factory for a month.</li>
+ *   <li>pay a factory – the payment clears its oldest filling cost first.</li>
  * </ul>
  */
 @Service
@@ -284,9 +284,6 @@ public class ProductionService {
         if (factory == null) {
             throw new ValidationException("factoryId", "Select the factory.");
         }
-        if (!ProductionRules.isPeriod(r.period())) {
-            throw new ValidationException("period", "Select the month.");
-        }
         checkNotFuture(r.date());
         if (r.amount() == null || Money.of(r.amount()).signum() <= 0) {
             throw new ValidationException("amount", "Enter the amount paid.");
@@ -294,15 +291,16 @@ public class ProductionService {
         if (r.method() == null) {
             throw new ValidationException("method", "Select the payment method.");
         }
-        String reference = Texts.blankToNull(r.reference());
-        if (r.method() != PayMethod.CASH && reference == null) {
-            throw new ValidationException("reference", "Enter the cheque number or bank reference.");
+        String reference = r.method() == PayMethod.CASH ? null : Texts.blankToNull(r.reference());
+        String refProblem = r.method().referenceProblem(reference);
+        if (refProblem != null) {
+            throw new ValidationException("reference", refProblem);
         }
         BigDecimal amount = Money.of(r.amount());
         FactoryPayment p = payments.saveAndFlush(new FactoryPayment(numbering.next(SequenceNames.FACTORY_PAYMENT), factory.getId(),
-                r.period(), r.date(), amount, r.method(), reference, Texts.blankToNull(r.note())));
+                null, r.date(), amount, r.method(), reference, Texts.blankToNull(r.note())));
         audit.log(AuditAction.CREATE, "Factory payment", p.getFpNo(), factory.getName() + ": " + Money.format(amount) + " by "
-                + r.method().label() + (reference == null ? "" : " (" + reference + ")") + " for " + ProductionRules.periodLabel(r.period()));
+                + r.method().label() + (reference == null ? "" : " (" + reference + ")"));
         return query.payment(p.getId());
     }
 

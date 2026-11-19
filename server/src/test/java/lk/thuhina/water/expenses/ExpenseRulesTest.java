@@ -47,7 +47,7 @@ class ExpenseRulesTest {
     void chequeAndBankTransferNeedTheReference() {
         for (PayMethod m : new PayMethod[] {PayMethod.CHEQUE, PayMethod.BANK_TRANSFER}) {
             assertThat(message(new Input(TODAY, OK.forMonth(), true, OK.amount(), m, " ")))
-                    .isEqualTo("reference: Enter the cheque number or bank reference.");
+                    .isEqualTo("reference: " + m.referenceProblem(null));
             assertThat(message(new Input(TODAY, OK.forMonth(), true, OK.amount(), m, "Cheque 330145"))).isNull();
         }
     }

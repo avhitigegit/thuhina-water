@@ -63,6 +63,9 @@ public final class SalesDtos {
             Integer oldBottles,
             Long oldBrandId,
             BigDecimal paid,
+            @Schema(description = "How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE") PayMethod payMethod,
+            @Schema(description = "Cheque number or bank reference (needed for those methods)")
+            @Size(max = 100, message = "Reference: at most 100 characters.") String payReference,
             @Size(max = 500, message = MSG_NOTE) String note,
             Boolean approveOverLimit) {
     }
@@ -78,6 +81,9 @@ public final class SalesDtos {
             Integer oldBottles,
             Long oldBrandId,
             BigDecimal paid,
+            @Schema(description = "How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE") PayMethod payMethod,
+            @Schema(description = "Cheque number or bank reference (needed for those methods)")
+            @Size(max = 100, message = "Reference: at most 100 characters.") String payReference,
             @Size(max = 500, message = MSG_NOTE) String note,
             Boolean approveOverLimit) {
     }
@@ -104,6 +110,9 @@ public final class SalesDtos {
             @Size(max = 200, message = "Reason: at most 200 characters.") String reason,
             @Size(max = 300, message = "Note: at most 300 characters.") String note,
             BigDecimal paid,
+            @Schema(description = "How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE") PayMethod payMethod,
+            @Schema(description = "Cheque number or bank reference (needed for those methods)")
+            @Size(max = 100, message = "Reference: at most 100 characters.") String payReference,
             Boolean approveOverLimit) {
     }
 
@@ -116,6 +125,9 @@ public final class SalesDtos {
             Integer qty,
             SettleMethod method,
             BigDecimal paid,
+            @Schema(description = "How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE") PayMethod payMethod,
+            @Schema(description = "Cheque number or bank reference (needed for those methods)")
+            @Size(max = 100, message = "Reference: at most 100 characters.") String payReference,
             @Size(max = 500, message = MSG_NOTE) String note,
             Boolean approveOverLimit) {
     }
@@ -133,6 +145,7 @@ public final class SalesDtos {
             List<ProductItemRequest> items,
             BigDecimal paid,
             PayMethod payMethod,
+            @Size(max = 100, message = "Reference: at most 100 characters.") String payReference,
             @Size(max = 500, message = MSG_NOTE) String note,
             Boolean approveOverLimit) {
     }

@@ -17,8 +17,6 @@ import lk.thuhina.water.sales.model.PayMethod;
  */
 public final class PurchasingRules {
 
-    public static final String MSG_REFERENCE = "Enter the cheque number or bank reference.";
-
     /** Allowed moves: Draft → Approved → Sent → Partly received / Received; Cancelled only from Draft or Approved. */
     private static final Map<PoStatus, Set<PoStatus>> ALLOWED = Map.of(
             PoStatus.DRAFT, EnumSet.of(PoStatus.APPROVED, PoStatus.CANCELLED),
@@ -103,8 +101,4 @@ public final class PurchasingRules {
         return full ? PoStatus.RECEIVED : PoStatus.PARTLY_RECEIVED;
     }
 
-    /** A reference (cheque number or bank reference) is required unless the payment is in cash. */
-    public static boolean referenceMissing(PayMethod method, String reference) {
-        return method != PayMethod.CASH && (reference == null || reference.isBlank());
-    }
 }

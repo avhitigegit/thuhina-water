@@ -188,7 +188,7 @@ describe("My Deliveries", () => {
     await waitFor(() => expect(screen.getByTestId("mob-sum")).toHaveTextContent("Rs. 1,050.00"));
     await user.click(screen.getByRole("button", { name: /This bill Rs. 1,050.00/ }));
     await user.click(screen.getByRole("radio", { name: "Bank transfer" }));
-    await user.type(screen.getByLabelText("Transfer reference"), "TRF-77");
+    await user.type(screen.getByLabelText("Bank reference"), "TRF-77");
     await user.click(screen.getByRole("button", { name: "Save delivery" }));
 
     await waitFor(() => expect(posts).toHaveLength(1));

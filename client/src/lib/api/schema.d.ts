@@ -2706,6 +2706,9 @@ export interface components {
             /** Format: int64 */
             oldBrandId?: number;
             paid?: number;
+            /** @enum {string} */
+            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            payReference?: string;
             approveOverLimit?: boolean;
             /** Format: int64 */
             fromQuotationId?: number;
@@ -3078,8 +3081,6 @@ export interface components {
             /** @enum {string} */
             method?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
             reference?: string;
-            /** Format: int64 */
-            poId?: number;
             note?: string;
         };
         PaymentRow: {
@@ -3193,6 +3194,9 @@ export interface components {
             /** @enum {string} */
             method?: "RETURN" | "DEPOSIT";
             paid?: number;
+            /** @enum {string} */
+            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            payReference?: string;
             note?: string;
             approveOverLimit?: boolean;
         };
@@ -3252,6 +3256,7 @@ export interface components {
             paid?: number;
             /** @enum {string} */
             payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            payReference?: string;
             note?: string;
             approveOverLimit?: boolean;
         };
@@ -3269,6 +3274,9 @@ export interface components {
             /** Format: int64 */
             oldBrandId?: number;
             paid?: number;
+            /** @enum {string} */
+            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            payReference?: string;
             note?: string;
             approveOverLimit?: boolean;
         };
@@ -3288,6 +3296,9 @@ export interface components {
             /** Format: int64 */
             oldBrandId?: number;
             paid?: number;
+            /** @enum {string} */
+            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            payReference?: string;
             note?: string;
             approveOverLimit?: boolean;
         };
@@ -3306,6 +3317,9 @@ export interface components {
             reason?: string;
             note?: string;
             paid?: number;
+            /** @enum {string} */
+            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            payReference?: string;
             approveOverLimit?: boolean;
         };
         CollectEmptiesRequest: {
@@ -3531,8 +3545,6 @@ export interface components {
             bank?: string;
             /** Format: date */
             chequeDate?: string;
-            /** Format: int64 */
-            invoiceId?: number;
             note?: string;
         };
         CustomerLink: {
@@ -3604,7 +3616,6 @@ export interface components {
             payments: number;
             amount: number;
             totalDue: number;
-            paid: number;
             createdByName: string;
         };
         SkippedCustomer: {
@@ -3617,7 +3628,6 @@ export interface components {
         FactoryPaymentRequest: {
             /** Format: int64 */
             factoryId?: number;
-            period?: string;
             /** Format: date */
             date: string;
             amount?: number;
@@ -3639,8 +3649,8 @@ export interface components {
             /** Format: date */
             date: string;
             factory: components["schemas"]["FactoryLink"];
-            period: string;
-            periodLabel: string;
+            period: string | null;
+            periodLabel: string | null;
             method: string;
             methodLabel: string;
             reference: string | null;
@@ -4315,7 +4325,6 @@ export interface components {
             payments: number;
             amount: number;
             totalDue: number;
-            paid: number;
             lines: components["schemas"]["InvoiceLine"][];
             createdByName: string;
         };

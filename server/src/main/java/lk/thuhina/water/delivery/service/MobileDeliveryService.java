@@ -47,7 +47,7 @@ public class MobileDeliveryService {
     @Transactional
     public PaymentSaved receive(MobilePaymentRequest r) {
         return payments.receive(new CustomerPaymentRequest(r.customerId(), BusinessDates.today(clock), r.amount(), r.method(),
-                r.reference(), r.bank(), r.chequeDate(), null, r.note()));
+                r.reference(), r.bank(), r.chequeDate(), r.note()));
     }
 
     @Transactional(readOnly = true)

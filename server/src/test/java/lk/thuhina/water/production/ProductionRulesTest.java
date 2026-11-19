@@ -31,6 +31,17 @@ class ProductionRulesTest {
     }
 
     @Test
+    void factoryPaymentsClearTheOldestMonthFirst() {
+        List<BigDecimal> costs = List.of(new BigDecimal("2400"), new BigDecimal("1800"), new BigDecimal("3000"));
+        assertThat(ProductionRules.spreadOldestFirst(costs, new BigDecimal("3000"))).usingElementComparator(BigDecimal::compareTo)
+                .containsExactly(new BigDecimal("2400"), new BigDecimal("600"), BigDecimal.ZERO);
+        // Paid ahead: the extra sits on the newest month.
+        assertThat(ProductionRules.spreadOldestFirst(costs, new BigDecimal("8000"))).usingElementComparator(BigDecimal::compareTo)
+                .containsExactly(new BigDecimal("2400"), new BigDecimal("1800"), new BigDecimal("3800"));
+        assertThat(ProductionRules.spreadOldestFirst(costs, BigDecimal.ZERO)).allMatch(b -> b.signum() == 0);
+    }
+
+    @Test
     void returnChecks() {
         assertThat(ProductionRules.returnProblem(18, 18, 0, null)).isNull();
         assertThat(ProductionRules.returnProblem(18, 10, 2, "Seal")).isNull();

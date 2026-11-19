@@ -15,14 +15,10 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import type { ExpenseRow, ExpenseSaved, ExpenseType } from "@/lib/api/types";
 import { formatMoney } from "@/lib/format";
 import { errorText } from "@/lib/forms";
+import { PaidByFields } from "@/components/shared/PaidBy";
 import { toast } from "@/lib/toast";
 import { useSaveExpense, useSaveExpenseType, type ExpenseBody } from "./api";
 
-export const PAY_METHODS = [
-  { value: "CASH", label: "Cash" },
-  { value: "BANK_TRANSFER", label: "Bank transfer" },
-  { value: "CHEQUE", label: "Cheque" },
-] as const;
 type Method = ExpenseBody["method"];
 
 interface MonthChoice {
@@ -197,22 +193,13 @@ export function ExpenseDialog({
             onChange={(e) => setAmount(e.target.value)}
           />
         </div>
-        <div className="field req">
-          <label htmlFor="ex-method">Paid by</label>
-          <select id="ex-method" value={method} onChange={(e) => setMethod(e.target.value as Method)}>
-            {PAY_METHODS.map((m) => (
-              <option key={m.value} value={m.value}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        {method !== "CASH" && (
-          <div className="field req">
-            <label htmlFor="ex-ref">Cheque no. / bank ref.</label>
-            <input id="ex-ref" value={reference} onChange={(e) => setReference(e.target.value)} />
-          </div>
-        )}
+        <PaidByFields
+          id="ex"
+          method={method}
+          reference={reference}
+          onMethod={setMethod}
+          onReference={setReference}
+        />
       </div>
     </FormDialog>
   );

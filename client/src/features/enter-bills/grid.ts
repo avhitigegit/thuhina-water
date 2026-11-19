@@ -3,6 +3,7 @@
  * hand ("typed"), and end "saved" (locked) or with the server's error. The live result of a row comes from the
  * TypeScript copy of ExchangeRules; the server checks again on save.
  */
+import { payFields, referenceProblem, type PayMethod } from "@/components/shared/PaidBy";
 import type { BottleType, CustomerDetail, DueCustomer, SaleResult } from "@/lib/api/types";
 import { addDaysIso, formatDate, formatMoney, parseDmy } from "@/lib/format";
 import { calculate, exceedsCredit, NOTE_REQUIRED, type Bottles, type ExchangeCalc } from "./exchangeRules";
@@ -66,6 +67,9 @@ export interface Row {
   paid: string;
   /** The user typed the cash paid – stop filling it in. */
   paidTouched: boolean;
+  /** How the money paid was received (Cash by default) and the cheque number / bank reference. */
+  method: PayMethod;
+  reference: string;
   phone: boolean;
   note: string;
   status: "open" | "saving" | "saved" | "failed";
@@ -165,6 +169,8 @@ export function emptyRow(date: string, paper = ""): Row {
     qty: {},
     paid: "",
     paidTouched: false,
+    method: "CASH",
+    reference: "",
     phone: false,
     note: "",
     status: "open",
@@ -328,7 +334,10 @@ export function rowView(
       else if (p.field === "note") err("Note needed");
       else err(p.message);
     }
-    const credit = exceedsCredit(c.payType, c.creditLimit, c.balance, calc.amount, paidNumber(r, calc));
+    const paid = paidNumber(r, calc);
+    const refProblem = paid > 0 ? referenceProblem(r.method, r.reference) : null;
+    if (refProblem) err(refProblem);
+    const credit = exceedsCredit(c.payType, c.creditLimit, c.balance, calc.amount, paid);
     overLimit = credit.exceeds;
     if (overLimit) msgs.push({ kind: "warn", text: "Over credit limit" });
     if (iso && !hasError)
@@ -353,6 +362,7 @@ export function savedText(res: SaleResult): string {
 /** The request for POST /sales/bills. */
 export function billRequest(r: Row, cols: BottleCol[], approveOverLimit: boolean) {
   const left = r.kind === "LEFT_AT_DOOR";
+  const paid = paidNumber(r, rowCalc(r, cols));
   return {
     customerId: r.customer?.id ?? null,
     date: parseDmy(r.date),
@@ -365,7 +375,8 @@ export function billRequest(r: Row, cols: BottleCol[], approveOverLimit: boolean
         empties: left ? 0 : num(r.qty[b.code]?.empties),
       }))
       .filter((l) => l.filled || l.empties),
-    paid: paidNumber(r, rowCalc(r, cols)),
+    paid,
+    ...(paid > 0 ? { payMethod: r.method, payReference: payFields(r.method, r.reference).reference } : {}),
     note: r.note.trim() || null,
     phoneConfirmed: left && r.phone,
     approveOverLimit,

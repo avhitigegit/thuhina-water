@@ -345,29 +345,28 @@ describe("Filling Factory", () => {
     expect(within(dialog).getByTestId("return-cost")).toHaveTextContent("Rs. 6,060.00");
   });
 
-  it("shows the filling cost by month and pays an unpaid month", async () => {
+  it("shows the filling cost by month and pays a factory – oldest cost first, no month to choose", async () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(screen.getByRole("tab", { name: "Factory payments" }));
     const sep = (await screen.findByText("September 2026")).closest("tr") as HTMLElement;
     expect(sep).toHaveTextContent("Unpaid");
     expect(screen.getByText("August 2026").closest("tr") as HTMLElement).toHaveTextContent("Paid");
-    await user.click(screen.getByRole("button", { name: "+ Record payment" }));
-    const dialog = await screen.findByRole("dialog", { name: "Record factory payment" });
-    expect(within(dialog).getByLabelText("Factory and month")).toHaveDisplayValue(
-      "AquaSeal – September 2026 – Rs. 72,480.00 due",
-    );
+    await user.click(screen.getByRole("button", { name: "Pay factory" }));
+    const dialog = await screen.findByRole("dialog", { name: "Pay factory" });
+    expect(within(dialog).getByLabelText("Factory")).toHaveDisplayValue("AquaSeal – owed Rs. 72,480.00");
     expect(within(dialog).getByLabelText("Amount (Rs.)")).toHaveValue(72480);
-    await user.type(within(dialog).getByLabelText("Cheque no. / ref."), "COM-TRF-1");
-    await user.click(within(dialog).getByRole("button", { name: "Save" }));
+    expect(dialog).toHaveTextContent("The payment clears the oldest filling cost first.");
+    await user.type(within(dialog).getByLabelText("Bank reference"), "COM-TRF-1");
+    await user.click(within(dialog).getByRole("button", { name: "Save payment" }));
     await waitFor(() => expect(posted("/api/factory-payments")).toHaveLength(1));
     expect(posted("/api/factory-payments")[0].body).toMatchObject({
       factoryId: 1,
-      period: "2026-09",
       amount: 72480,
       method: "BANK_TRANSFER",
       reference: "COM-TRF-1",
     });
+    expect(posted("/api/factory-payments")[0].body).not.toHaveProperty("period");
   });
 
   it("opens Send empties from a link (?send=1)", async () => {
@@ -387,6 +386,6 @@ describe("Filling Factory", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Factory payments" }));
     expect(await screen.findByText("September 2026")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "+ Record payment" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pay factory" })).not.toBeInTheDocument();
   });
 });

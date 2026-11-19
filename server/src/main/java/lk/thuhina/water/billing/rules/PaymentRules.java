@@ -10,18 +10,15 @@ public final class PaymentRules {
     public static final String MSG_CUSTOMER = "Select a customer.";
     public static final String MSG_AMOUNT = "Enter the amount received.";
     public static final String MSG_METHOD = "Select how the money was received.";
-    public static final String MSG_BANK_REF = "Enter the bank reference.";
-    public static final String MSG_CHEQUE_NO = "Enter the cheque number.";
+    public static final String MSG_BANK_REF = PayMethod.MSG_BANK_REF;
+    public static final String MSG_CHEQUE_NO = PayMethod.MSG_CHEQUE_NO;
 
     private PaymentRules() {
     }
 
     /** The reference message when it is missing: bank transfer and cheque need one, cash does not. Null = fine. */
     public static String referenceProblem(PayMethod method, String reference) {
-        if (method == null || method == PayMethod.CASH || (reference != null && !reference.isBlank())) {
-            return null;
-        }
-        return method == PayMethod.CHEQUE ? MSG_CHEQUE_NO : MSG_BANK_REF;
+        return method == null ? null : method.referenceProblem(reference);
     }
 
     /** Less than the balance owed: "Part payment". */

@@ -8,6 +8,7 @@
  * refused here; only the office can approve it. After a bill: "WhatsApp bill sent to 077…" or "Customer has no WhatsApp –
  * give a paper bill", with Send again.
  */
+import { PAY_METHODS, referenceLabel } from "@/components/shared/PaidBy";
 import { useState } from "react";
 import { KpiCard, KpiGrid } from "@/components/shared/KpiCard";
 import { Badge } from "@/components/shared/StatusBadge";
@@ -32,11 +33,12 @@ import {
 
 const TABS = ["visit", "day"] as const;
 
-export const METHODS: { id: PayMethod; label: string; ref: string }[] = [
-  { id: "CASH", label: "Cash", ref: "" },
-  { id: "BANK_TRANSFER", label: "Bank transfer", ref: "Transfer reference" },
-  { id: "CHEQUE", label: "Cheque", ref: "Cheque number" },
-];
+/** The shared Paid by list as phone buttons, with the reference label for each. */
+export const METHODS: { id: PayMethod; label: string; ref: string }[] = PAY_METHODS.map((m) => ({
+  id: m.value,
+  label: m.label,
+  ref: referenceLabel(m.value),
+}));
 
 export function MyDeliveries({ today = todayIso() }: { today?: string }) {
   const [tab, setTab] = useHashTab(TABS);

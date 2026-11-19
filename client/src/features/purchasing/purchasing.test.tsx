@@ -506,11 +506,12 @@ describe("Purchasing – supplier payments and roles", () => {
     expect(row).toHaveTextContent("Rs. 106,950.00");
     expect(row).toHaveTextContent(`${formatDate("2026-09-10")} (32 days)`);
     await user.click(within(row).getByRole("button", { name: "Pay" }));
-    const dialog = await screen.findByRole("dialog", { name: "Record supplier payment" });
+    const dialog = await screen.findByRole("dialog", { name: "Pay supplier" });
     await waitFor(() => expect(within(dialog).getByLabelText("Supplier")).toHaveValue("4"));
     expect(within(dialog).getByLabelText("Amount (Rs.)")).toHaveValue(106950);
-    await user.selectOptions(within(dialog).getByLabelText("Method"), "CHEQUE");
-    await user.type(within(dialog).getByLabelText("Cheque no. / bank ref."), "Cheque 004601");
+    expect(within(dialog).queryByLabelText("Purchase order")).not.toBeInTheDocument();
+    await user.selectOptions(within(dialog).getByLabelText("Paid by"), "CHEQUE");
+    await user.type(within(dialog).getByLabelText("Cheque number"), "Cheque 004601");
     await user.click(within(dialog).getByRole("button", { name: "Save payment" }));
     await waitFor(() => expect(posted("/api/supplier-payments")).toHaveLength(1));
     expect(posted("/api/supplier-payments")[0].body).toMatchObject({

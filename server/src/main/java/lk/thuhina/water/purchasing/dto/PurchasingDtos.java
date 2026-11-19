@@ -259,7 +259,6 @@ public final class PurchasingDtos {
             BigDecimal amount,
             PayMethod method,
             @Size(max = 100, message = "Reference: at most 100 characters.") String reference,
-            Long poId,
             @Size(max = 300, message = "Note: at most 300 characters.") String note) {
     }
 

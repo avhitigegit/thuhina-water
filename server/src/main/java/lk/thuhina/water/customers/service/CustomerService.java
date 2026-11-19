@@ -205,7 +205,8 @@ public class CustomerService {
 
     private static SalesService.GivenBottles given(CustomerRequest r) {
         return new SalesService.GivenBottles(r.bottlesGiven() == null ? Map.of() : r.bottlesGiven(),
-                r.oldBottles() == null ? 0 : r.oldBottles(), r.oldBrandId(), Money.of(r.paid()), Boolean.TRUE.equals(r.approveOverLimit()));
+                r.oldBottles() == null ? 0 : r.oldBottles(), r.oldBrandId(), Money.of(r.paid()), r.payMethod(),
+                r.payReference(), Boolean.TRUE.equals(r.approveOverLimit()));
     }
 
     /** Edit details, delivery and payment. Changed fields are listed in the audit log. */

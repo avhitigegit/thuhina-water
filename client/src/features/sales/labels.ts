@@ -1,6 +1,6 @@
 /* Words of the Sales & Bills page (prototype sales/sales-bills.html, store.js KINDS, ui.js kindBadge). */
 import type { BadgeKind } from "@/components/shared/StatusBadge";
-import type { PayMethod, SaleLine } from "@/lib/api/types";
+import type { SaleLine } from "@/lib/api/types";
 import { formatMoney } from "@/lib/format";
 
 /** Kinds of bill (server SalesKind) with their badge colour, in the prototype's order. */
@@ -37,15 +37,7 @@ export function isSaleKind(v: string | null): v is SaleKind {
   return NEW_ENTRIES.some((e) => e.kind === v);
 }
 
-export const PAY_METHODS: { value: PayMethod; label: string }[] = [
-  { value: "CASH", label: "Cash" },
-  { value: "BANK_TRANSFER", label: "Bank transfer" },
-  { value: "CHEQUE", label: "Cheque" },
-];
-
-export function payMethodLabel(v: string | null | undefined): string {
-  return PAY_METHODS.find((m) => m.value === v)?.label ?? v ?? "";
-}
+export { PAY_METHODS, payMethodLabel } from "@/components/shared/PaidBy";
 
 /**
  * One bill line in words (bill details, prototype showBill):

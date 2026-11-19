@@ -89,6 +89,22 @@ public final class ProductionRules {
         return Money.times(charge, filled);
     }
 
+    /**
+     * Spreads what was paid over the costs, oldest first: each takes up to its cost; anything over the total (paid in
+     * advance) goes on the newest. Same order as supplier and customer payments.
+     */
+    public static List<BigDecimal> spreadOldestFirst(List<BigDecimal> costsOldestFirst, BigDecimal paid) {
+        List<BigDecimal> out = new ArrayList<>();
+        BigDecimal left = Money.of(paid);
+        for (int i = 0; i < costsOldestFirst.size(); i++) {
+            BigDecimal cost = Money.of(costsOldestFirst.get(i));
+            BigDecimal take = i == costsOldestFirst.size() - 1 ? left : left.min(cost).max(BigDecimal.ZERO);
+            out.add(Money.of(take));
+            left = left.subtract(take);
+        }
+        return out;
+    }
+
     /** Paid when nothing is due (1 cent tolerance), Part paid when something was paid, else Unpaid. */
     public static String paymentStatus(BigDecimal cost, BigDecimal paid) {
         if (cost.subtract(paid).compareTo(new BigDecimal("0.01")) <= 0) {

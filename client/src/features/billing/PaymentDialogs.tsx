@@ -2,42 +2,34 @@
 
 /*
  * Billing pop-ups (prototype billing/billing.html):
- *   Receive payment (FR-50) – customer, date, amount (default = balance), how paid with the bank reference / cheque number
- *     (and the cheque's bank and date), the invoice it is for (latest by default), note; beside it balance now, paying and
- *     balance after, with "Part payment" or the advance. The server checks everything again.
+ *   Receive payment (FR-50) – customer, date, amount (default = balance), Paid by with the bank reference / cheque number
+ *     (and the cheque's bank and date), note; beside it balance now, paying and balance after, with "Part payment" or the
+ *     advance. It clears the oldest amounts first – there is no invoice to choose. The server checks everything again.
  *   Payment saved – the server's message and Print receipt.
  *   Statement (FR-52) – from (start of last month) / to (today) → the statement PDF.
  */
 import { useState } from "react";
 import { DateField } from "@/components/shared/DateField";
 import { FormDialog } from "@/components/shared/FormDialog";
+import { PaidByFields, payFields, referenceProblem, type PayMethod } from "@/components/shared/PaidBy";
 import { CustomerPicker } from "@/features/customers/CustomerPicker";
 import type { CustomerLookupRow, PaymentSaved } from "@/lib/api/types";
 import { formatMoney } from "@/lib/format";
 import { errorText } from "@/lib/forms";
 import { openPdf, receiptUrl, statementUrl, useAccount, useReceivePayment } from "./api";
 
-export const PAY_METHODS = [
-  { value: "CASH", label: "Cash" },
-  { value: "BANK_TRANSFER", label: "Bank transfer" },
-  { value: "CHEQUE", label: "Cheque" },
-] as const;
-type Method = (typeof PAY_METHODS)[number]["value"];
-
 /** The message when a payment cannot be saved yet (same wording as the server), or null. */
 export function paymentProblem(p: {
   customer: boolean;
   date: string | null;
   amount: number;
-  method: Method;
+  method: PayMethod;
   reference: string;
 }): string | null {
   if (!p.customer) return "Select a customer.";
   if (!p.date) return "Enter the date.";
   if (!(p.amount > 0)) return "Enter the amount received.";
-  if (p.method === "BANK_TRANSFER" && !p.reference.trim()) return "Enter the bank reference.";
-  if (p.method === "CHEQUE" && !p.reference.trim()) return "Enter the cheque number.";
-  return null;
+  return referenceProblem(p.method, p.reference);
 }
 
 export function ReceivePaymentDialog({
@@ -56,22 +48,20 @@ export function ReceivePaymentDialog({
   const account = useAccount(customer?.id ?? null);
   const [date, setDate] = useState<string | null>(today);
   const [amount, setAmount] = useState("");
-  const [method, setMethod] = useState<Method>("CASH");
+  const [method, setMethod] = useState<PayMethod>("CASH");
   const [reference, setReference] = useState("");
   const [bank, setBank] = useState("");
   const [chequeDate, setChequeDate] = useState<string | null>(null);
-  const [invoice, setInvoice] = useState("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
 
-  // A newly chosen customer's account fills in the amount (their balance) and their latest invoice.
+  // A newly chosen customer's account fills in the amount (their balance).
   const loaded = customer && account.data?.account.customerId === customer.id ? account.data : null;
   const [filledFor, setFilledFor] = useState<number | null>(null);
   if (loaded && filledFor !== loaded.account.customerId) {
     setFilledFor(loaded.account.customerId);
     const bal = Number(loaded.account.balance);
     setAmount(bal > 0 ? bal.toFixed(2) : "");
-    setInvoice(loaded.invoices[0] ? String(loaded.invoices[0].id) : "");
   }
 
   const balance = Number(loaded?.account.balance ?? 0);
@@ -90,11 +80,9 @@ export function ReceivePaymentDialog({
         customerId: customer!.id,
         date: date!,
         amount: paying,
-        method,
-        reference: method === "CASH" ? undefined : reference.trim(),
+        ...payFields(method, reference),
         bank: method === "CHEQUE" && bank.trim() ? bank.trim() : undefined,
         chequeDate: method === "CHEQUE" && chequeDate ? chequeDate : undefined,
-        invoiceId: invoice ? Number(invoice) : undefined,
         note: note.trim() || undefined,
       },
       { onSuccess: onSaved, onError: (err) => setError(errorText(err)) },
@@ -139,22 +127,13 @@ export function ReceivePaymentDialog({
               onChange={(e) => setAmount(e.target.value)}
             />
           </div>
-          <div className="field req">
-            <label htmlFor="pay-method">How paid</label>
-            <select id="pay-method" value={method} onChange={(e) => setMethod(e.target.value as Method)}>
-              {PAY_METHODS.map((m) => (
-                <option key={m.value} value={m.value}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {method !== "CASH" && (
-            <div className="field req">
-              <label htmlFor="pay-ref">{method === "CHEQUE" ? "Cheque number" : "Bank reference"}</label>
-              <input id="pay-ref" value={reference} onChange={(e) => setReference(e.target.value)} />
-            </div>
-          )}
+          <PaidByFields
+            id="pay"
+            method={method}
+            reference={reference}
+            onMethod={setMethod}
+            onReference={setReference}
+          />
           {method === "CHEQUE" && (
             <>
               <div className="field">
@@ -171,19 +150,6 @@ export function ReceivePaymentDialog({
                 <DateField id="pay-cdate" value={chequeDate} onChange={setChequeDate} today={today} />
               </div>
             </>
-          )}
-          {loaded && loaded.invoices.length > 0 && (
-            <div className="field span2">
-              <label htmlFor="pay-inv">Against invoice</label>
-              <select id="pay-inv" value={invoice} onChange={(e) => setInvoice(e.target.value)}>
-                <option value="">—</option>
-                {loaded.invoices.map((i) => (
-                  <option key={i.id} value={i.id}>
-                    {i.invoiceNo} – {i.periodLabel}
-                  </option>
-                ))}
-              </select>
-            </div>
           )}
           <div className="field full">
             <label htmlFor="pay-note">Note</label>
