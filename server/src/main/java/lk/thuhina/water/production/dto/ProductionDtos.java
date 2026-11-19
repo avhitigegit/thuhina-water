@@ -91,6 +91,24 @@ public final class ProductionDtos {
             @Size(max = 200, message = "Note: at most 200 characters.") String note) {
     }
 
+    /**
+     * What came back from a factory in one load, for one bottle type – split over its open batches oldest first, so
+     * bottles left at the factory last time are received with the next load.
+     */
+    public record FactoryReceiveRequest(
+            Long factoryId,
+            String bottleTypeCode,
+            @NotNull(message = "Enter the date.") LocalDate date,
+            Integer filled,
+            Integer rejected,
+            @Size(max = 200, message = "Reason: at most 200 characters.") String rejectReason,
+            @Size(max = 200, message = "Note: at most 200 characters.") String note) {
+    }
+
+    /** One return per batch the load was split over; {@code stillAtFactory} = this factory and bottle type after it. */
+    public record FactoryReceiveResult(List<ReturnResult> returns, int filled, int rejected, BigDecimal cost, int stillAtFactory) {
+    }
+
     /** The saved return, the batch after it and the damage record of the rejects (null when none). */
     public record ReturnResult(ReturnView saved, BatchView batch, @Schema(nullable = true) String damageNo) {
     }

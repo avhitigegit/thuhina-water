@@ -68,6 +68,16 @@ function batch(id: number, over: Partial<BatchView> = {}): BatchView {
 
 const BATCHES = [
   batch(17),
+  batch(19, {
+    date: "2026-10-03",
+    qtySent: 100,
+    filled: 0,
+    rejected: 0,
+    atFactory: 100,
+    cost: 0,
+    status: "AT_FACTORY",
+    statusLabel: "At factory",
+  }),
   batch(18, {
     factory: { id: 2, code: "F02", name: "Pure Lanka" },
     bottleTypeCode: "B10",
@@ -166,15 +176,13 @@ function server() {
       if (path === "/api/factories") return json(FACTORIES);
     }
     if (path === "/api/factory-dispatches") return json(SENT, 201);
-    if (path === "/api/factory-batches/17/returns")
+    if (path === "/api/factory-returns") {
+      const b = body as { filled: number };
       return json(
-        {
-          saved: { cost: 240, returnNo: "FR-0019" },
-          batch: { ...batch(17), atFactory: 0 },
-          damageNo: "DMG-0010",
-        },
+        { returns: [], filled: b.filled, rejected: 0, cost: b.filled * 60, stillAtFactory: 106 - b.filled },
         201,
       );
+    }
     if (path === "/api/factory-payments") return json({ id: 2, fpNo: "FP-0002" }, 201);
     return json({ code: "NOT_FOUND", message: "Not found " + method + " " + path }, 404);
   });
@@ -283,32 +291,58 @@ describe("Filling Factory", () => {
     expect(opened).toEqual(["/api/print/dispatch-note/FD-0020"]);
   });
 
-  it("receives filled bottles with rejects and shows the cost", async () => {
+  it("receives a load with rejects, oldest batch first, and shows the cost", async () => {
     const user = userEvent.setup();
     renderPage();
     const row = (await screen.findByText("FB-0017")).closest("tr") as HTMLElement;
     await user.click(within(row).getByRole("button", { name: "Receive" }));
     const dialog = await screen.findByRole("dialog", { name: "Receive filled bottles" });
-    expect(within(dialog).getByLabelText("Batch")).toHaveValue("17");
-    expect(within(dialog).getByLabelText("Filled bottles received")).toHaveValue(6);
+    expect(within(dialog).getByLabelText("Factory")).toHaveValue("1");
+    expect(within(dialog).getByLabelText("Bottle")).toHaveValue("B20");
+    // 6 left from FB-0017 + 100 of FB-0019.
+    expect(within(dialog).getByLabelText("Filled bottles received")).toHaveValue(106);
     const filled = within(dialog).getByLabelText("Filled bottles received");
     await user.clear(filled);
     await user.type(filled, "4");
     const rej = within(dialog).getByLabelText("Rejected / damaged");
     await user.clear(rej);
     await user.type(rej, "1");
-    expect(within(dialog).getByTestId("left-after")).toHaveTextContent("1");
+    expect(within(dialog).getByTestId("left-after")).toHaveTextContent("101");
     expect(within(dialog).getByTestId("return-cost")).toHaveTextContent("Rs. 240.00");
+    const split = within(dialog).getByTestId("receive-split");
+    expect(within(split).getByText("FB-0017").closest("tr")).toHaveTextContent("FB-001726/09/2026641");
     await user.type(within(dialog).getByLabelText("Reject reason"), "Failed seal test");
     await user.click(within(dialog).getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(posted("/api/factory-batches/17/returns")).toHaveLength(1));
-    expect(posted("/api/factory-batches/17/returns")[0].body).toEqual({
+    await waitFor(() => expect(posted("/api/factory-returns")).toHaveLength(1));
+    expect(posted("/api/factory-returns")[0].body).toEqual({
+      factoryId: 1,
+      bottleTypeCode: "B20",
       date: TODAY,
       filled: 4,
       rejected: 1,
       rejectReason: "Failed seal test",
     });
-    expect(await screen.findByText("Received – filling cost Rs. 240.00")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Received – filling cost Rs. 240.00, 102 still at the factory"),
+    ).toBeInTheDocument();
+  });
+
+  it("bottles kept back by the factory are received with the next load", async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("FB-0019");
+    await user.click(screen.getByRole("button", { name: "Receive filled bottles" }));
+    const dialog = await screen.findByRole("dialog", { name: "Receive filled bottles" });
+    const filled = within(dialog).getByLabelText("Filled bottles received");
+    await user.clear(filled);
+    await user.type(filled, "101");
+    // The 6 old ones close FB-0017; 95 of the new batch come back, 5 stay at the factory (not damaged).
+    const split = within(dialog).getByTestId("receive-split");
+    expect(within(split).getByText("FB-0017").closest("tr")).toHaveTextContent("660");
+    expect(within(split).getByText("FB-0019").closest("tr")).toHaveTextContent("100955");
+    expect(within(dialog).getByTestId("left-after")).toHaveTextContent("5");
+    expect(dialog).toHaveTextContent("can be received with the next load");
+    expect(within(dialog).getByTestId("return-cost")).toHaveTextContent("Rs. 6,060.00");
   });
 
   it("shows the filling cost by month and pays an unpaid month", async () => {
