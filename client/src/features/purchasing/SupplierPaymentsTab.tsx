@@ -110,7 +110,7 @@ export function SupplierPaymentsTab({ today = todayIso() }: { today?: string }) 
           <h2>Amounts owed to suppliers</h2>
           <Can permission={P.PURCHASING_EDIT}>
             <button className="btn primary" type="button" onClick={() => setPaying(null)}>
-              + Record payment
+              Pay supplier
             </button>
           </Can>
         </div>

@@ -542,7 +542,7 @@ describe("Purchasing – supplier payments and roles", () => {
 
     await user.click(screen.getByRole("tab", { name: "Supplier payments" }));
     expect(await screen.findByText("HomeCool")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "+ Record payment" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pay supplier" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Pay" })).not.toBeInTheDocument();
   });
 });
