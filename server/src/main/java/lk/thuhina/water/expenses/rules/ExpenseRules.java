@@ -24,7 +24,6 @@ public final class ExpenseRules {
     public static final String MSG_TYPE_INACTIVE = "That expense type is not active.";
     public static final String MSG_AMOUNT = "Enter the amount paid.";
     public static final String MSG_METHOD = "Select the payment method.";
-    public static final String MSG_REFERENCE = "Enter the cheque number or bank reference.";
     public static final String MSG_REASON = "Enter the reason for deleting.";
     public static final String MSG_TYPE_NAME = "Enter the expense type name.";
     public static final String MSG_TYPE_EXISTS = "That expense type already exists.";
@@ -72,8 +71,9 @@ public final class ExpenseRules {
         if (in.method() == null) {
             return new Problem("method", MSG_METHOD);
         }
-        if (in.method() != PayMethod.CASH && (in.reference() == null || in.reference().isBlank())) {
-            return new Problem("reference", MSG_REFERENCE);
+        String refProblem = in.method().referenceProblem(in.reference());
+        if (refProblem != null) {
+            return new Problem("reference", refProblem);
         }
         return null;
     }

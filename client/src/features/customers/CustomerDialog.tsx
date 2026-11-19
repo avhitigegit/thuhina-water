@@ -11,6 +11,7 @@
  * Register as customer from an accepted customer quotation (M16) opens it pre-filled (name, phone, address, area, type,
  * notes and the quoted water prices as agreed prices) and links the new customer to the quotation.
  */
+import { PaidByFields, payFields, referenceProblem, type PayMethod } from "@/components/shared/PaidBy";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useState } from "react";
 import { Controller, useForm, useWatch, type Resolver } from "react-hook-form";
@@ -148,6 +149,10 @@ function CustomerForm({
   // Cash paid on the registration bills. Nothing is filled in: the user types what was really received.
   const [paidText, setPaidText] = useState<string | null>(null);
   const [paidError, setPaidError] = useState("");
+  // How the money paid now was received (the same "Paid by" as every bill and payment).
+  const [payMethod, setPayMethod] = useState<PayMethod>("CASH");
+  const [payReference, setPayReference] = useState("");
+  const [refError, setRefError] = useState("");
   // Old-bottle brand chosen when more than one is accepted for the size ("" = the first, N-03).
   const [oldBrand, setOldBrand] = useState("");
   const brands = useOldBottleBrands();
@@ -315,6 +320,9 @@ function CustomerForm({
             oldBottles: canSell && !inactiveNew ? whole(v.oldBottles) : 0,
             oldBrandId: canSell && !inactiveNew && whole(v.oldBottles) > 0 ? oldBrandId : undefined,
             paid: anyGiven ? paidNumber : 0,
+            ...(anyGiven && paidNumber > 0
+              ? { payMethod, payReference: payFields(payMethod, payReference).reference }
+              : {}),
             approveOverLimit,
             fromQuotationId: prefill?.quotationId,
             ...(inactiveNew
@@ -396,13 +404,15 @@ function CustomerForm({
       ? cashPaidProblem(payType, paidValue, rp ? Number(rp.amount) : undefined)
       : "";
     setPaidError(paidProblem);
+    const refProblem = anyGiven && paidNumber > 0 ? (referenceProblem(payMethod, payReference) ?? "") : "";
+    setRefError(refProblem);
     const makingInactive = status.value === "INACTIVE" && customer?.status !== "INACTIVE";
     const statusProblem = makingInactive
       ? inactiveProblem(status, today, isNew ? getValues("registeredOn") : null)
       : "";
     void handleSubmit(
       (v) => {
-        if (paidProblem) {
+        if (paidProblem || refProblem) {
           setError(MSG_FIX_FIELDS);
           showFirstProblem();
         } else if (statusProblem) setError(statusProblem);
@@ -728,7 +738,7 @@ function CustomerForm({
                 {errors.oldBottles && <span className="error">{errors.oldBottles.message}</span>}
               </div>
               <div className={payType === "CASH" && anyGiven ? "field req" : "field"}>
-                <label htmlFor="cu-paid">Cash paid now (Rs.)</label>
+                <label htmlFor="cu-paid">Paid now (Rs.)</label>
                 <input
                   id="cu-paid"
                   type="number"
@@ -743,6 +753,19 @@ function CustomerForm({
                 />
                 {paidError && <span className="error">{paidError}</span>}
               </div>
+              {anyGiven && paidNumber > 0 && (
+                <PaidByFields
+                  id="cu-pay"
+                  method={payMethod}
+                  reference={payReference}
+                  onMethod={setPayMethod}
+                  onReference={(v) => {
+                    setPayReference(v);
+                    setRefError("");
+                  }}
+                  error={refError}
+                />
+              )}
               <div className="full">
                 <RegistrationSummary preview={rp} paid={paidNumber} anyGiven={anyGiven} />
               </div>

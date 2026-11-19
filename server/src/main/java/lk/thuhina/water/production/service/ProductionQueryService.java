@@ -143,7 +143,10 @@ public class ProductionQueryService {
         return out;
     }
 
-    /** Filling cost by factory and month of return, newest month first, with what was paid for that month. */
+    /**
+     * Filling cost by factory and month of return, newest month first. Each factory's payments are spread over its months
+     * oldest first (as supplier and customer payments are), so a payment can cover several months.
+     */
     @Transactional(readOnly = true)
     public List<FactoryMonth> months() {
         record Key(long factoryId, String period) {
@@ -159,10 +162,16 @@ public class ProductionQueryService {
             rows.put(new Key(rs.getLong("factory_id"), rs.getString("period")),
                     new Object[] {rs.getInt("filled"), rs.getInt("rejected"), Money.of(rs.getBigDecimal("cost")), Money.ZERO});
         });
-        jdbc.query("select factory_id, period, sum(amount) as paid from factory_payment group by factory_id, period", rs -> {
-            Object[] r = rows.computeIfAbsent(new Key(rs.getLong("factory_id"), rs.getString("period")),
-                    k -> new Object[] {0, 0, Money.ZERO, Money.ZERO});
-            r[3] = Money.of(rs.getBigDecimal("paid"));
+        Map<Long, BigDecimal> paidBy = new HashMap<>();
+        jdbc.query("select factory_id, sum(amount) as paid from factory_payment group by factory_id", rs -> {
+            paidBy.put(rs.getLong("factory_id"), Money.of(rs.getBigDecimal("paid")));
+        });
+        paidBy.forEach((factoryId, paid) -> {
+            List<Key> keys = rows.keySet().stream().filter(k -> k.factoryId() == factoryId).sorted(Comparator.comparing(Key::period)).toList();
+            List<BigDecimal> split = ProductionRules.spreadOldestFirst(keys.stream().map(k -> (BigDecimal) rows.get(k)[2]).toList(), paid);
+            for (int i = 0; i < keys.size(); i++) {
+                rows.get(keys.get(i))[3] = split.get(i);
+            }
         });
         List<FactoryMonth> out = new ArrayList<>();
         rows.forEach((k, r) -> {
@@ -190,7 +199,7 @@ public class ProductionQueryService {
         return raw.stream().map(r -> {
             PayMethod m = (PayMethod) r[5];
             return new FactoryPaymentRow((long) r[0], (String) r[1], (java.time.LocalDate) r[2], (FactoryLink) r[3], (String) r[4],
-                    ProductionRules.periodLabel((String) r[4]), m.name(), m.label(), (String) r[6], Money.of((BigDecimal) r[7]),
+                    r[4] == null ? null : ProductionRules.periodLabel((String) r[4]), m.name(), m.label(), (String) r[6], Money.of((BigDecimal) r[7]),
                     (String) r[8], names.get((String) r[9]));
         }).toList();
     }

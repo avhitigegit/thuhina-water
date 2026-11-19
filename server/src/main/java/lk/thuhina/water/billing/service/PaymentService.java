@@ -23,8 +23,6 @@ import lk.thuhina.water.numbering.service.SequenceNames;
 import lk.thuhina.water.sales.model.PayMethod;
 import lk.thuhina.water.sales.service.AccountService;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,12 +40,11 @@ public class PaymentService {
     private final BillingQueryService query;
     private final NumberingService numbering;
     private final AuditService audit;
-    private final NamedParameterJdbcTemplate jdbc;
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
     public PaymentService(CustomerPaymentRepository payments, CustomerRepository customers, AccountService accounts,
-                          BillingQueryService query, NumberingService numbering, AuditService audit, NamedParameterJdbcTemplate jdbc,
+                          BillingQueryService query, NumberingService numbering, AuditService audit,
                           ApplicationEventPublisher events, Clock clock) {
         this.payments = payments;
         this.customers = customers;
@@ -55,7 +52,6 @@ public class PaymentService {
         this.query = query;
         this.numbering = numbering;
         this.audit = audit;
-        this.jdbc = jdbc;
         this.events = events;
         this.clock = clock;
     }
@@ -81,19 +77,13 @@ public class PaymentService {
         if (refProblem != null) {
             throw new ValidationException("reference", refProblem);
         }
-        if (r.invoiceId() != null) {
-            Integer mine = jdbc.queryForObject("select count(*) from monthly_invoice where id = :id and customer_id = :c",
-                    new MapSqlParameterSource("id", r.invoiceId()).addValue("c", c.getId()), Integer.class);
-            if (mine == null || mine == 0) {
-                throw new ValidationException("invoiceId", "Choose one of " + c.getName() + "'s invoices.");
-            }
-        }
         boolean cheque = r.method() == PayMethod.CHEQUE;
         BigDecimal amount = Money.of(r.amount());
 
         BigDecimal before = accounts.lockedBalance(c.getId());
         CustomerPayment p = payments.saveAndFlush(new CustomerPayment(numbering.next(SequenceNames.RECEIPT), c.getId(), r.date(), amount,
-                r.method(), reference, cheque ? Texts.blankToNull(r.bank()) : null, cheque ? r.chequeDate() : null, r.invoiceId(),
+                r.method(), r.method() == PayMethod.CASH ? null : reference, cheque ? Texts.blankToNull(r.bank()) : null,
+                cheque ? r.chequeDate() : null, null,
                 Texts.blankToNull(r.note()), before));
         accounts.add(c.getId(), amount.negate());
         BigDecimal after = before.subtract(amount);

@@ -240,7 +240,7 @@ public class DemoDataService {
             if (customer != null) {
                 try {
                     sales.extraOrder(new ExtraOrderRequest(customer, d, run.paper(), main, 2, 0, 0, null, BigDecimal.ZERO,
-                            "Extra for weekend orders", true));
+                            null, null, "Extra for weekend orders", true));
                     run.extra++;
                 } catch (RuntimeException e) {
                     run.problem(d, "extra order", e);
@@ -257,7 +257,7 @@ public class DemoDataService {
                 try {
                     sales.productSale(new ProductSaleRequest(customer, null, d, run.paper(),
                             List.of(new ProductItemRequest((String) product.get("code"), 1, null)), (BigDecimal) product.get("price"),
-                            PayMethod.CASH, null, true));
+                            PayMethod.CASH, null, null, true));
                     run.products++;
                 } catch (RuntimeException e) {
                     run.problem(d, "product sale", e);
@@ -372,7 +372,7 @@ public class DemoDataService {
             PayMethod m = methods[i++ % methods.length];
             String ref = m == PayMethod.CASH ? null : m == PayMethod.CHEQUE ? "Cheque " + (440000 + i * 37) : "TRF-" + (650000 + i * 91);
             try {
-                payments.receive(new CustomerPaymentRequest(((Number) row.get("id")).longValue(), d, Money.of(amount), m, ref, null, null, null,
+                payments.receive(new CustomerPaymentRequest(((Number) row.get("id")).longValue(), d, Money.of(amount), m, ref, null, null,
                         share.compareTo(BigDecimal.ONE) < 0 ? "Part payment" : "Monthly bill"));
                 run.payments++;
             } catch (RuntimeException e) {

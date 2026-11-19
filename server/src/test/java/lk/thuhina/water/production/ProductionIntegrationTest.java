@@ -359,17 +359,15 @@ class ProductionIntegrationTest extends IntegrationTest {
         assertThat(f).containsEntry("atFactory", 10);
         assertThat(money(f.get("owed"))).isEqualByComparingTo("2400");
 
-        String period = today.toString().substring(0, 7);
-        Map<String, Object> pay = map("factoryId", factoryId, "period", period, "date", today.toString(), "amount", 1000, "method", "BANK_TRANSFER");
+        // No month to choose: a payment clears the oldest filling cost first.
+        Map<String, Object> pay = map("factoryId", factoryId, "date", today.toString(), "amount", 1000, "method", "BANK_TRANSFER");
         send(post("/factory-payments"), pay)
-                .andExpect(jsonPath("$.details.fields.reference").value("Enter the cheque number or bank reference."));
-        send(post("/factory-payments"), map("factoryId", factoryId, "period", "2026", "date", today.toString(), "amount", 10, "method", "CASH"))
-                .andExpect(jsonPath("$.details.fields.period").value("Select the month."));
+                .andExpect(jsonPath("$.details.fields.reference").value("Enter the bank reference."));
         pay.put("reference", "COM-1");
         Map<String, Object> paid = ok(send(post("/factory-payments"), pay), 201);
         assertThat((String) paid.get("fpNo")).matches("FP-\\d{4,}");
         assertThat(monthRow()).containsEntry("status", "PART_PAID");
-        ok(send(post("/factory-payments"), map("factoryId", factoryId, "period", period, "date", today.toString(), "amount", 1400,
+        ok(send(post("/factory-payments"), map("factoryId", factoryId, "date", today.toString(), "amount", 1400,
                 "method", "CASH")), 201);
         m = monthRow();
         assertThat(m).containsEntry("status", "PAID").containsEntry("statusLabel", "Paid");

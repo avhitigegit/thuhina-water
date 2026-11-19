@@ -711,6 +711,14 @@
   .bill-grid input.w-paid {
     width: 86px;
   }
+  .bill-grid .paid-by {
+    display: grid;
+    gap: 4px;
+    margin-top: 4px;
+  }
+  .bill-grid .paid-by select {
+    width: 86px;
+  }
   .bill-grid input.w-note {
     width: 190px;
   }
