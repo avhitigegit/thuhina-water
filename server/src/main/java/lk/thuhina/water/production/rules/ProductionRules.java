@@ -3,6 +3,8 @@ package lk.thuhina.water.production.rules;
 import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 import lk.thuhina.water.common.Money;
@@ -60,6 +62,26 @@ public final class ProductionRules {
             return "Enter the reason for the rejected bottles.";
         }
         return null;
+    }
+
+    /**
+     * Splits one load received from a factory over its open batches, oldest first: the filled bottles fill the oldest
+     * batches, then the rejected ones take the space left. Bottles not sent back stay at the factory and come with a later
+     * load. {@code stillAtFactory} is per batch, oldest first; the result has a {filled, rejected} pair per batch.
+     * The caller has checked that filled + rejected fits.
+     */
+    public static List<int[]> allocate(List<Integer> stillAtFactory, int filled, int rejected) {
+        List<int[]> out = new ArrayList<>();
+        int f = filled;
+        int r = rejected;
+        for (int left : stillAtFactory) {
+            int takeF = Math.min(f, left);
+            int takeR = Math.min(r, left - takeF);
+            out.add(new int[] {takeF, takeR});
+            f -= takeF;
+            r -= takeR;
+        }
+        return out;
     }
 
     /** Filling cost = bottles filled × the batch's charge (BR-11) – rejected bottles are not charged. */

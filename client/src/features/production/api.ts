@@ -11,8 +11,8 @@ import type {
   FactoryPaymentRequest,
   FactoryPaymentRow,
   ProductionSummary,
-  ReturnRequest,
-  ReturnResult,
+  FactoryReceiveRequest,
+  FactoryReceiveResult,
 } from "@/lib/api/types";
 
 const KEY = ["production"] as const;
@@ -64,10 +64,24 @@ function useChange<TVars, TResult>(fn: (vars: TVars) => Promise<TResult>) {
 export const useSendEmpties = () =>
   useChange((body: DispatchRequest) => api<DispatchView>("/factory-dispatches", { method: "POST", body }));
 
+/** One load back from a factory: the server splits it over the open batches of that bottle type, oldest first. */
 export const useReceiveFilled = () =>
-  useChange(({ batchId, body }: { batchId: number; body: ReturnRequest }) =>
-    api<ReturnResult>(`/factory-batches/${batchId}/returns`, { method: "POST", body }),
+  useChange((body: FactoryReceiveRequest) =>
+    api<FactoryReceiveResult>("/factory-returns", { method: "POST", body }),
   );
+
+/** How a load is split over the open batches (oldest first): filled first, then rejected (as the server does). */
+export function allocate(stillAtFactory: number[], filled: number, rejected: number): [number, number][] {
+  let f = filled;
+  let r = rejected;
+  return stillAtFactory.map((left) => {
+    const takeF = Math.min(f, left);
+    const takeR = Math.min(r, left - takeF);
+    f -= takeF;
+    r -= takeR;
+    return [takeF, takeR];
+  });
+}
 
 export const usePayFactory = () =>
   useChange((body: FactoryPaymentRequest) =>

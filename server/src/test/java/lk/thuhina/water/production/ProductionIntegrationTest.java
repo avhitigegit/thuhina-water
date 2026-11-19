@@ -290,6 +290,60 @@ class ProductionIntegrationTest extends IntegrationTest {
         assertThat(getList("/factory-batches?open=true", admin)).noneMatch(x -> id(x) == batchId);
     }
 
+    private ResultActions receiveLoad(LocalDate date, int filled, int rejected, String reason) throws Exception {
+        return send(post("/factory-returns"), map("factoryId", factoryId, "bottleTypeCode", bottle, "date", date.toString(),
+                "filled", filled, "rejected", rejected, "rejectReason", reason));
+    }
+
+    @Test
+    void bottlesKeptBackComeWithTheNextLoadAndFillTheOldestBatchFirst() throws Exception {
+        LocalDate first = today.minusDays(7);
+        jdbc.update("insert into factory_charge (factory_id, bottle_type_code, charge, effective_from) values (?, ?, 60, ?)", factoryId, bottle,
+                first);
+        count("EMPTY", 150);
+        long a = id(batchOf(ok(dispatch(first, 100), 201)));
+
+        // 100 sent, 95 back: the 5 are not damaged – they stay at the factory.
+        Map<String, Object> r1 = ok(receiveLoad(first.plusDays(2), 95, 0, null), 201);
+        assertThat(r1).containsEntry("filled", 95).containsEntry("stillAtFactory", 5);
+        assertThat(list(r1.get("returns"))).hasSize(1);
+        assertThat(ok(mvc.perform(get("/factory-batches/" + a).cookie(admin)), 200)).containsEntry("atFactory", 5)
+                .containsEntry("status", "PARTLY_RETURNED");
+
+        // Next filling: 50 more sent; the factory brings back the 5 + 50.
+        long b = id(batchOf(ok(dispatch(today, 50), 201)));
+        // Dated before the new dispatch, only the old batch counts.
+        receiveLoad(today.minusDays(1), 55, 0, null)
+                .andExpect(jsonPath("$.details.fields.filled").value(org.hamcrest.Matchers.allOf(
+                        org.hamcrest.Matchers.startsWith("Only 5 × "),
+                        org.hamcrest.Matchers.endsWith(" are still at " + factoryName + " (sent on or before "
+                                + BusinessDates.format(today.minusDays(1)) + ")."))));
+        receiveLoad(today, 56, 0, null).andExpect(status().isBadRequest());
+        receiveLoad(today, 54, 1, " ")
+                .andExpect(jsonPath("$.details.fields.rejectReason").value("Enter the reason for the rejected bottles."));
+
+        Map<String, Object> r2 = ok(receiveLoad(today, 54, 1, "Cracked"), 201);
+        assertThat(r2).containsEntry("filled", 54).containsEntry("rejected", 1).containsEntry("stillAtFactory", 0);
+        List<Map<String, Object>> parts = list(r2.get("returns"));
+        assertThat(parts).hasSize(2);
+        Map<?, ?> oldBatch = (Map<?, ?>) parts.get(0).get("batch");
+        Map<?, ?> newBatch = (Map<?, ?>) parts.get(1).get("batch");
+        assertThat(((Number) oldBatch.get("id")).longValue()).isEqualTo(a);
+        assertThat(oldBatch.get("status")).isEqualTo("RETURNED");
+        assertThat(((Number) newBatch.get("id")).longValue()).isEqualTo(b);
+        assertThat(newBatch.get("filled")).isEqualTo(49);
+        assertThat(newBatch.get("rejected")).isEqualTo(1);
+        assertThat(money(r2.get("cost"))).isEqualByComparingTo(BigDecimal.valueOf(54 * 60));
+        assertThat(stock("FACTORY")).isZero();
+        assertThat(stock("FILLED")).isEqualTo(149);
+        assertThat(stock("WRITTEN_OFF")).isEqualTo(1);
+
+        receiveLoad(today, 1, 0, null).andExpect(jsonPath("$.details.fields.filled")
+                .value(org.hamcrest.Matchers.startsWith("No ")));
+        mvc.perform(body(post("/factory-returns"), accountant, map("factoryId", factoryId, "bottleTypeCode", bottle,
+                "date", today.toString(), "filled", 1))).andExpect(status().isForbidden());
+    }
+
     // ------------------------------------------------------------------ S4 – balances and payments
 
     @Test

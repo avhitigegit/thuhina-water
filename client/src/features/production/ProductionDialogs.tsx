@@ -5,7 +5,8 @@
  *   Send empties – one entry for every bottle type (factory, date, vehicle, note; a row per bottle type with empty in store,
  *     sent now, empty after, at factory after, charge, cost), with the "below zero" and "no charge" warnings (BR-12);
  *   Dispatch sent – the batches made and Print dispatch note;
- *   Receive filled – batch, date, filled (default all still at the factory), rejected + reason, and the calculation;
+ *   Receive filled – factory, bottle, date, filled (default all still at the factory), rejected + reason; the load is
+ *     split over the open batches oldest first (bottles kept back come with a later load), shown before saving;
  *   Record factory payment – factory and month from the unpaid list, amount (default = due), method, reference.
  */
 import { useState } from "react";
@@ -16,7 +17,7 @@ import { ApiError } from "@/lib/api/client";
 import type { BatchView, DispatchView, FactoryBottleStock, FactoryMonth } from "@/lib/api/types";
 import { formatDate, formatMoney } from "@/lib/format";
 import { toast } from "@/lib/toast";
-import { dispatchNoteUrl, usePayFactory, useReceiveFilled, useSendEmpties } from "./api";
+import { allocate, dispatchNoteUrl, usePayFactory, useReceiveFilled, useSendEmpties } from "./api";
 
 /** The message to show for a failed save: field messages of a 400, else the error message. */
 export function errorText(err: unknown): string {
@@ -261,10 +262,10 @@ export function DispatchSentDialog({ dispatch, onClose }: { dispatch: DispatchVi
 
 // ------------------------------------------------------------------ receive filled (FR-24, FR-26)
 
-export function batchLabel(b: BatchView): string {
-  return `${b.batchNo} – ${b.factory.name} – sent ${formatDate(b.date)} – ${b.atFactory} × ${b.bottleLabel} at factory`;
-}
-
+/**
+ * Receive one load back from a factory for one bottle type. The load is split over that factory's open batches, oldest
+ * first, so bottles the factory kept back last time (not damaged – just not ready) are received with the next load.
+ */
 export function ReceiveFilledDialog({
   open,
   batchId,
@@ -277,31 +278,67 @@ export function ReceiveFilledDialog({
   onClose: () => void;
 }) {
   const receive = useReceiveFilled();
-  const [batch, setBatch] = useState(String(batchId ?? open[0]?.id ?? ""));
-  const b = open.find((x) => String(x.id) === batch);
+  const start = open.find((x) => x.id === batchId) ?? open[0];
+  const [factoryId, setFactoryId] = useState(String(start?.factory.id ?? ""));
+  const [bottle, setBottle] = useState(start?.bottleTypeCode ?? "");
   const [date, setDate] = useState<string | null>(today);
-  const [filled, setFilled] = useState(String(b?.atFactory ?? ""));
+  const factories = [...new Map(open.map((x) => [String(x.factory.id), x.factory.name])).entries()];
+  const bottlesAt = (fid: string) => [
+    ...new Map(
+      open.filter((x) => String(x.factory.id) === fid).map((x) => [x.bottleTypeCode, x.bottleLabel]),
+    ).entries(),
+  ];
+  // Open batches of this factory and bottle type sent on or before the date, oldest first.
+  const batches = open
+    .filter(
+      (x) => String(x.factory.id) === factoryId && x.bottleTypeCode === bottle && (!date || x.date <= date),
+    )
+    .sort((p, q) => p.date.localeCompare(q.date) || p.id - q.id);
+  const total = batches.reduce((n, x) => n + x.atFactory, 0);
+  const [filled, setFilled] = useState(String(total || ""));
   const [rejected, setRejected] = useState("0");
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const f = Number(filled) || 0;
   const r = Number(rejected) || 0;
-  const left = (b?.atFactory ?? 0) - f - r;
+  const left = total - f - r;
+  const split = allocate(
+    batches.map((x) => x.atFactory),
+    f,
+    r,
+  );
+  const cost = batches.reduce((sum, x, i) => sum + split[i][0] * Number(x.charge), 0);
+  const label = batches[0]?.bottleLabel ?? "";
+
+  function pick(fid: string, code: string) {
+    setFactoryId(fid);
+    setBottle(code);
+    const n = open
+      .filter((x) => String(x.factory.id) === fid && x.bottleTypeCode === code && (!date || x.date <= date))
+      .reduce((sum, x) => sum + x.atFactory, 0);
+    setFilled(String(n || ""));
+  }
 
   function submit() {
-    if (!b) return;
     setError("");
     if (!date) {
       setError("Enter the date.");
       return;
     }
     receive.mutate(
-      { batchId: b.id, body: { date, filled: f, rejected: r, rejectReason: reason } },
+      {
+        factoryId: Number(factoryId),
+        bottleTypeCode: bottle,
+        date,
+        filled: f,
+        rejected: r,
+        rejectReason: reason,
+      },
       {
         onSuccess: (res) => {
           toast(
-            `Received – filling cost ${formatMoney(res.saved.cost)}` +
-              (res.batch.atFactory ? `, ${res.batch.atFactory} still at the factory` : ""),
+            `Received – filling cost ${formatMoney(res.cost)}` +
+              (res.stillAtFactory ? `, ${res.stillAtFactory} still at the factory` : ""),
             "ok",
           );
           onClose();
@@ -314,6 +351,7 @@ export function ReceiveFilledDialog({
   return (
     <FormDialog
       open
+      wide
       onOpenChange={(o) => !o && onClose()}
       title="Receive filled bottles"
       onSubmit={submit}
@@ -324,20 +362,31 @@ export function ReceiveFilledDialog({
         <p className="muted">No bottles are at the factory.</p>
       ) : (
         <>
-          <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
-            <div className="field req full">
-              <label htmlFor="fr-batch">Batch</label>
+          <p className="small muted" style={{ marginTop: 0 }}>
+            Enter what the factory brought back. It is matched to the oldest batches first. Bottles not
+            brought back stay at the factory and can be received with the next load.
+          </p>
+          <div className="form-grid">
+            <div className="field req">
+              <label htmlFor="fr-factory">Factory</label>
               <select
-                id="fr-batch"
-                value={batch}
-                onChange={(e) => {
-                  setBatch(e.target.value);
-                  setFilled(String(open.find((x) => String(x.id) === e.target.value)?.atFactory ?? ""));
-                }}
+                id="fr-factory"
+                value={factoryId}
+                onChange={(e) => pick(e.target.value, bottlesAt(e.target.value)[0]?.[0] ?? "")}
               >
-                {open.map((x) => (
-                  <option key={x.id} value={x.id}>
-                    {batchLabel(x)}
+                {factories.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field req">
+              <label htmlFor="fr-bottle">Bottle</label>
+              <select id="fr-bottle" value={bottle} onChange={(e) => pick(factoryId, e.target.value)}>
+                {bottlesAt(factoryId).map(([code, l]) => (
+                  <option key={code} value={code}>
+                    {l}
                   </option>
                 ))}
               </select>
@@ -376,19 +425,50 @@ export function ReceiveFilledDialog({
               />
             </div>
           </div>
-          {b && (
+          {batches.length === 0 ? (
+            <p className="muted">No bottles sent on or before this date are at this factory.</p>
+          ) : (
+            <table style={{ marginTop: 10 }} data-testid="receive-split">
+              <thead>
+                <tr>
+                  <th>Batch</th>
+                  <th>Sent</th>
+                  <th className="num">At factory</th>
+                  <th className="num">Filled now</th>
+                  <th className="num">Rejected now</th>
+                  <th className="num">Still at factory after</th>
+                </tr>
+              </thead>
+              <tbody>
+                {batches.map((x, i) => (
+                  <tr key={x.id}>
+                    <td className="mono">{x.batchNo}</td>
+                    <td>{formatDate(x.date)}</td>
+                    <td className="num">{x.atFactory}</td>
+                    <td className="num">{split[i][0] || ""}</td>
+                    <td className="num">{split[i][1] || ""}</td>
+                    <td className="num">{x.atFactory - split[i][0] - split[i][1]}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {batches.length > 0 && (
             <div className="summary" style={{ marginTop: 10 }}>
-              <span>Still at factory after this</span>
+              <span>Still at factory after this {label && `(${label})`}</span>
               <b className="num" data-testid="left-after" style={left ? { color: "var(--warn)" } : undefined}>
                 {left}
               </b>
+              {left > 0 && (
+                <span className="small muted" style={{ gridColumn: "1 / -1" }}>
+                  Not damaged – they stay at the factory and can be received with the next load.
+                </span>
+              )}
               <span>Rejected → written off (company)</span>
               <b className="num">{r}</b>
-              <span className="total">
-                Filling cost ({f} × {formatMoney(b.charge)})
-              </span>
+              <span className="total">Filling cost ({f} filled × the batch charge)</span>
               <b className="num total" data-testid="return-cost">
-                {formatMoney(f * Number(b.charge))}
+                {formatMoney(cost)}
               </b>
             </div>
           )}
