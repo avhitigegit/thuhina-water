@@ -38,6 +38,8 @@ import lk.thuhina.water.production.dto.ProductionDtos.DispatchRequest;
 import lk.thuhina.water.production.dto.ProductionDtos.DispatchView;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryPaymentRequest;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryPaymentRow;
+import lk.thuhina.water.production.dto.ProductionDtos.FactoryReceiveRequest;
+import lk.thuhina.water.production.dto.ProductionDtos.FactoryReceiveResult;
 import lk.thuhina.water.production.dto.ProductionDtos.ReturnRequest;
 import lk.thuhina.water.production.dto.ProductionDtos.ReturnResult;
 import lk.thuhina.water.production.dto.ProductionDtos.BatchView;
@@ -61,6 +63,8 @@ import org.springframework.transaction.annotation.Transactional;
  * <ul>
  *   <li>send empties – one dispatch for every bottle type, one batch each, all-or-nothing; the charge on the dispatch date
  *       is copied to the batch; EMPTY −Q, FACTORY +Q through the Ledger Engine (never below zero);</li>
+ *   <li>receive filled from a factory – one load split over the open batches of that bottle type, oldest first, so
+ *       bottles kept back last time come with a later load;</li>
  *   <li>receive filled – partial returns; FACTORY −(filled + rejected), FILLED +filled, WRITTEN_OFF +rejected; rejects become a
  *       company damage record "At factory"; cost = filled × batch charge;</li>
  *   <li>pay a factory for a month.</li>
@@ -214,6 +218,62 @@ public class ProductionService {
                 + Money.format(b.getChargePerBottle()) + ")");
         BatchView after = query.batch(b.getId());
         return new ReturnResult(after.returns().stream().filter(x -> x.id() == ret.getId()).findFirst().orElseThrow(), after, damageNo);
+    }
+
+    /** Receive one load from a factory: split over its open batches of the bottle type, oldest first (see {@link ProductionRules#allocate}). */
+    @Transactional
+    public FactoryReceiveResult receiveFromFactory(FactoryReceiveRequest r) {
+        Factory factory = r.factoryId() == null ? null : factories.findById(r.factoryId()).orElse(null);
+        if (factory == null) {
+            throw new ValidationException("factoryId", "Select the factory.");
+        }
+        BottleType bottle = r.bottleTypeCode() == null ? null : bottleTypes.findById(r.bottleTypeCode().trim()).orElse(null);
+        if (bottle == null) {
+            throw new ValidationException("bottleTypeCode", "Select the bottle type.");
+        }
+        checkNotFuture(r.date());
+        // Lock the factory's batches of this type (id order), then read what is still open, oldest first.
+        jdbc.query("select id from factory_batch where factory_id = :f and bottle_type_code = :t order by id for update",
+                new MapSqlParameterSource("f", factory.getId()).addValue("t", bottle.getCode()), (rs, i) -> rs.getLong(1));
+        List<long[]> open = jdbc.query("select b.id, b.qty_sent - coalesce(sum(x.filled_qty + x.rejected_qty), 0) as left_qty "
+                        + "from factory_batch b left join factory_return x on x.batch_id = b.id "
+                        + "where b.factory_id = :f and b.bottle_type_code = :t and b.dispatch_date <= :d "
+                        + "group by b.id, b.qty_sent, b.dispatch_date "
+                        + "having b.qty_sent - coalesce(sum(x.filled_qty + x.rejected_qty), 0) > 0 "
+                        + "order by b.dispatch_date, b.id",
+                new MapSqlParameterSource("f", factory.getId()).addValue("t", bottle.getCode()).addValue("d", r.date()),
+                (rs, i) -> new long[] {rs.getLong(1), rs.getLong(2)});
+        int total = open.stream().mapToInt(x -> (int) x[1]).sum();
+        int filled = r.filled() == null ? 0 : r.filled();
+        int rejected = r.rejected() == null ? 0 : r.rejected();
+        String reason = Texts.blankToNull(r.rejectReason());
+        String label = LedgerRules.bottleLabel(bottle.getLitres());
+        if (total == 0) {
+            throw new ValidationException("filled", "No " + label + " bottles sent on or before " + BusinessDates.format(r.date())
+                    + " are still at " + factory.getName() + ".");
+        }
+        String problem = ProductionRules.returnProblem(total, filled, rejected, reason);
+        if (problem != null) {
+            if (problem.startsWith("Only ")) {
+                problem = "Only " + total + " × " + label + " are still at " + factory.getName() + " (sent on or before "
+                        + BusinessDates.format(r.date()) + ").";
+            }
+            throw new ValidationException(problem.startsWith("Enter the reason") ? "rejectReason" : "filled", problem);
+        }
+        List<int[]> split = ProductionRules.allocate(open.stream().map(x -> (int) x[1]).toList(), filled, rejected);
+        List<ReturnResult> saved = new ArrayList<>();
+        BigDecimal cost = BigDecimal.ZERO;
+        for (int i = 0; i < open.size(); i++) {
+            int[] part = split.get(i);
+            if (part[0] + part[1] == 0) {
+                continue;
+            }
+            ReturnResult res = receive(open.get(i)[0],
+                    new ReturnRequest(r.date(), part[0], part[1], part[1] > 0 ? reason : null, r.note()));
+            saved.add(res);
+            cost = cost.add(res.saved().cost());
+        }
+        return new FactoryReceiveResult(saved, filled, rejected, cost, total - filled - rejected);
     }
 
     // ------------------------------------------------------------------ factory payments (FR-26)

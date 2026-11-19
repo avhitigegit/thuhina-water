@@ -11,6 +11,8 @@ import lk.thuhina.water.production.dto.ProductionDtos.DispatchView;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryMonth;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryPaymentRequest;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryPaymentRow;
+import lk.thuhina.water.production.dto.ProductionDtos.FactoryReceiveRequest;
+import lk.thuhina.water.production.dto.ProductionDtos.FactoryReceiveResult;
 import lk.thuhina.water.production.dto.ProductionDtos.ProductionSummary;
 import lk.thuhina.water.production.dto.ProductionDtos.ReturnRequest;
 import lk.thuhina.water.production.dto.ProductionDtos.ReturnResult;
@@ -85,6 +87,15 @@ public class ProductionController {
     @PreAuthorize(EDIT)
     public ReturnResult receive(@PathVariable long id, @Valid @RequestBody ReturnRequest request) {
         return service.receive(id, request);
+    }
+
+    @Operation(summary = "Receive one load from a factory – split over its open batches of that bottle type, oldest first; "
+            + "bottles not sent back stay at the factory for a later load")
+    @PostMapping("/factory-returns")
+    @ResponseStatus(HttpStatus.CREATED)
+    @PreAuthorize(EDIT)
+    public FactoryReceiveResult receiveFromFactory(@Valid @RequestBody FactoryReceiveRequest request) {
+        return service.receiveFromFactory(request);
     }
 
     @Operation(summary = "Filling cost by factory and month, with paid, due and status")

@@ -3733,6 +3733,29 @@ export interface components {
             rejectReason?: string;
             note?: string;
         };
+        FactoryReceiveRequest: {
+            /** Format: int64 */
+            factoryId: number | null;
+            bottleTypeCode: string | null;
+            /** Format: date */
+            date: string;
+            /** Format: int32 */
+            filled?: number | null;
+            /** Format: int32 */
+            rejected?: number | null;
+            rejectReason?: string | null;
+            note?: string | null;
+        };
+        FactoryReceiveResult: {
+            returns: components["schemas"]["ReturnResult"][];
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            rejected: number;
+            cost: number;
+            /** Format: int32 */
+            stillAtFactory: number;
+        };
         ReturnResult: {
             saved: components["schemas"]["ReturnView"];
             batch: components["schemas"]["BatchView"];

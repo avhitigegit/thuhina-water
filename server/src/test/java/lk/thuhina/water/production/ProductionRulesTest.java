@@ -3,6 +3,7 @@ package lk.thuhina.water.production;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 import lk.thuhina.water.production.rules.ProductionRules;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,16 @@ class ProductionRulesTest {
         assertThat(ProductionRules.batchStatus(50, 48, 2)).isEqualTo(ProductionRules.RETURNED);
         assertThat(ProductionRules.stillAtFactory(50, 30, 2)).isEqualTo(18);
         assertThat(ProductionRules.batchStatusLabel(ProductionRules.PARTLY_RETURNED)).isEqualTo("Partly returned");
+    }
+
+    @Test
+    void aLoadFillsTheOldestBatchesFirst() {
+        // 5 left from the first batch + 100 of the new one come back as 103 filled and 2 rejected.
+        List<int[]> split = ProductionRules.allocate(List.of(5, 100), 103, 2);
+        assertThat(split).containsExactly(new int[] {5, 0}, new int[] {98, 2});
+        // Only part of the load: the newest batch keeps the rest at the factory.
+        assertThat(ProductionRules.allocate(List.of(5, 100), 95, 0)).containsExactly(new int[] {5, 0}, new int[] {90, 0});
+        assertThat(ProductionRules.allocate(List.of(5, 100), 0, 3)).containsExactly(new int[] {0, 3}, new int[] {0, 0});
     }
 
     @Test
