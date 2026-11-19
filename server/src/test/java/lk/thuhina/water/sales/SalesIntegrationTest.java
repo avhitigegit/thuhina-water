@@ -154,7 +154,7 @@ class SalesIntegrationTest extends SalesTestSupport {
                 .andExpect(jsonPath("$.details.fields.payReference").value("Enter the cheque number."));
         Map<String, Object> byCheque = sale("/sales/extra-order", map("customerId", c, "date", today.toString(), "bottleTypeCode", bottle,
                 "filled", 1, "empties", 1, "paid", 350, "payMethod", "CHEQUE", "payReference", "100245"));
-        assertThat(byCheque).containsEntry("payMethod", "CHEQUE").containsEntry("payReference", "100245");
+        assertThat(byCheque).containsEntry("payMethod", "Cheque").containsEntry("payReference", "100245");
         filled -= 1;
         send("/sales/extra-order", map("customerId", c, "date", today.toString(), "bottleTypeCode", bottle, "filled", 2, "empties", 3))
                 .andExpect(jsonPath("$.details.fields.empties")
@@ -229,6 +229,7 @@ class SalesIntegrationTest extends SalesTestSupport {
         send("/sales/product-sale", req).andExpect(jsonPath("$.details.fields.paid").value("Walk-in sales must be paid in full."));
         req.put("paid", 300);
         req.put("payMethod", "BANK_TRANSFER");
+        req.put("payReference", "TRF-9");
         Map<String, Object> txn = sale("/sales/product-sale", req);
         assertThat(txn.get("customerName")).isEqualTo("Walk-in Kamal");
         assertThat(txn.get("payMethod")).isEqualTo("Bank transfer");
