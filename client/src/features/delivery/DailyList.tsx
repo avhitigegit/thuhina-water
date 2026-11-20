@@ -2,7 +2,8 @@
 
 /*
  * Daily Delivery List (M08, prototype delivery/delivery-schedule.html, FR-42 – FR-44): who to deliver to on a date
- * (‹ date › Today, area), KPIs, the customer table and the printed delivery sheet – view and print only for every role.
+ * (‹ date › Today, area), KPIs, the customer table in two tabs – Today (due on the date) and Missed (today only: delivery
+ * date passed, nothing entered; red count, hidden when none) – and the printed delivery sheet – view and print only.
  * Bills are typed on Enter Bills (or on the phone, My Deliveries); the upcoming bottle requirement is on Delivery Planning.
  */
 import { useSearchParams } from "next/navigation";
@@ -11,12 +12,13 @@ import { PageActions } from "@/components/layout/PageActions";
 import { DateField } from "@/components/shared/DateField";
 import { KpiCard, KpiGrid } from "@/components/shared/KpiCard";
 import { Badge, StatusBadge } from "@/components/shared/StatusBadge";
+import { Tabs } from "@/components/shared/Tabs";
 import { useAreas } from "@/features/customers/api";
 import type { DueCustomer } from "@/lib/api/types";
 import { addDaysIso, formatDate, formatMoney, isValidIso, todayIso } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { deliverySheetUrl, useDueList } from "./api";
-import { bottlesText, sum } from "./labels";
+import { bottlesText, splitDue, sum } from "./labels";
 
 export function DailyList({ today = todayIso() }: { today?: string }) {
   const params = useSearchParams();
@@ -57,6 +59,10 @@ function DayPane({
   const list = useDueList(date, area);
   const data = list.data;
   const items = data?.items ?? [];
+  const { today: dueList, missed } = splitDue(items);
+  const [part, setPart] = useState<"today" | "missed">("today");
+  const open = missed.length ? part : "today";
+  const rows = open === "missed" ? missed : dueList;
 
   return (
     <>
@@ -118,9 +124,23 @@ function DayPane({
       <div className="card">
         <div className="card-head">
           <h2>
-            {data ? `${data.dayName} ${formatDate(data.date)} – ${items.length} customers` : "Loading…"}
+            {!data
+              ? "Loading…"
+              : open === "missed"
+                ? `Missed earlier – ${missed.length} customers, longest missed first`
+                : `${data.dayName} ${formatDate(data.date)} – ${dueList.length} customers`}
           </h2>
         </div>
+        {missed.length > 0 && (
+          <Tabs
+            tabs={[
+              { id: "today", label: "Today", count: dueList.length },
+              { id: "missed", label: "Missed", count: missed.length, countKind: "bad" },
+            ]}
+            value={open}
+            onChange={setPart}
+          />
+        )}
         <div className="table-wrap">
           <table>
             <thead>
@@ -137,10 +157,10 @@ function DayPane({
               </tr>
             </thead>
             <tbody>
-              {items.map((c) => (
+              {rows.map((c) => (
                 <DayRow key={c.id} c={c} />
               ))}
-              {data && items.length === 0 && (
+              {data && rows.length === 0 && (
                 <tr>
                   <td colSpan={9} className="empty-state">
                     No customers due on this day.
