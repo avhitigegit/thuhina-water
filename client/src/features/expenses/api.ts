@@ -66,6 +66,7 @@ function useChange<TVars, TResult>(fn: (vars: TVars) => Promise<TResult>) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEY });
       qc.invalidateQueries({ queryKey: ["admin", "audit"] });
+      qc.invalidateQueries({ queryKey: ["money"] });
     },
     meta: { silent: true },
   });

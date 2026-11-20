@@ -10,6 +10,7 @@ import type { BatchView, DispatchView, FactoryMonth, MeResponse, ProductionSumma
 import { todayIso } from "@/lib/format";
 import { P } from "@/lib/permissions";
 import { Production } from "./Production";
+import { FactoryPaymentDialog } from "./ProductionDialogs";
 
 let search = "";
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(search) }));
@@ -198,14 +199,15 @@ function Shell({ children }: { children: ReactNode }) {
   );
 }
 
-function renderPage(role: "ADMIN" | "ACCOUNTANT" = "ADMIN") {
+function renderPage(
+  role: "ADMIN" | "ACCOUNTANT" = "ADMIN",
+  children: ReactNode = <Production today={TODAY} />,
+) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <AccessProvider value={{ me: me(role), viewOnly: role !== "ADMIN" }}>
-        <Shell>
-          <Production today={TODAY} />
-        </Shell>
+        <Shell>{children}</Shell>
         <Toaster />
       </AccessProvider>
     </QueryClientProvider>,
@@ -345,14 +347,26 @@ describe("Filling Factory", () => {
     expect(within(dialog).getByTestId("return-cost")).toHaveTextContent("Rs. 6,060.00");
   });
 
-  it("shows the filling cost by month and pays a factory – oldest cost first, no month to choose", async () => {
+  it("shows the filling cost by month; Pay factory opens the Payments page", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole("tab", { name: "Factory payments" }));
+    await user.click(screen.getByRole("tab", { name: "Owed to factories" }));
     const sep = (await screen.findByText("September 2026")).closest("tr") as HTMLElement;
     expect(sep).toHaveTextContent("Unpaid");
     expect(screen.getByText("August 2026").closest("tr") as HTMLElement).toHaveTextContent("Paid");
-    await user.click(screen.getByRole("button", { name: "Pay factory" }));
+    expect(screen.getByRole("link", { name: "Pay factory" })).toHaveAttribute(
+      "href",
+      "/payments?factory=1#out",
+    );
+    expect(screen.queryByText("Payments made")).not.toBeInTheDocument();
+  });
+
+  it("Pay factory (on the Payments page) – oldest cost first, no month to choose", async () => {
+    const user = userEvent.setup();
+    renderPage(
+      "ADMIN",
+      <FactoryPaymentDialog factories={SUMMARY.factories} today={TODAY} onClose={() => {}} />,
+    );
     const dialog = await screen.findByRole("dialog", { name: "Pay factory" });
     expect(within(dialog).getByLabelText("Factory")).toHaveDisplayValue("AquaSeal – owed Rs. 72,480.00");
     expect(within(dialog).getByLabelText("Amount (Rs.)")).toHaveValue(72480);
@@ -384,8 +398,8 @@ describe("Filling Factory", () => {
     expect(within(row).getByRole("button", { name: "Print" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Send empties" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("tab", { name: "Factory payments" }));
+    await user.click(screen.getByRole("tab", { name: "Owed to factories" }));
     expect(await screen.findByText("September 2026")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Pay factory" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Pay factory" })).not.toBeInTheDocument();
   });
 });

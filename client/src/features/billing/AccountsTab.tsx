@@ -3,20 +3,21 @@
 /*
  * Customer accounts (FR-48, FR-51, prototype billing.html): KPIs (total outstanding and each age bucket, 90+ in red),
  * search / payment type / show filters, one row per customer with a balance – 0–30 / 31–60 / 61–90 (amber) / 90+ (red),
- * balance ("over limit" in red), Receive / Statement – totals of every matching row; then recent payments and cash
- * collected (FR-47). The customer name opens the customer panel.
+ * balance ("over limit" in red), Receive (opens the Payments page) / Statement – totals of every matching row. The
+ * customer name opens the customer panel. Every payment received is listed on the Payments page (Money in).
  */
+import Link from "next/link";
 import { useState } from "react";
 import { DataTable, type Column } from "@/components/shared/DataTable";
 import { KpiCard, KpiGrid } from "@/components/shared/KpiCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useCan } from "@/features/auth/access";
 import { PAY_TYPES } from "@/features/customers/labels";
-import type { AccountRow, RecentMoney } from "@/lib/api/types";
-import { formatDate, formatMoney, formatNumber } from "@/lib/format";
+import type { AccountRow } from "@/lib/api/types";
+import { formatMoney, formatNumber } from "@/lib/format";
 import { P } from "@/lib/permissions";
 import { useDebounced } from "@/lib/useDebounced";
-import { useAccounts, useAccountSummary, useRecentMoney } from "./api";
+import { useAccounts, useAccountSummary } from "./api";
 
 const PAGE_SIZE = 50;
 
@@ -28,11 +29,9 @@ function bucket(v: number | string): string {
 
 export function AccountsTab({
   onOpen,
-  onReceive,
   onStatement,
 }: {
   onOpen: (customerId: number) => void;
-  onReceive: (a: AccountRow) => void;
   onStatement: (a: AccountRow) => void;
 }) {
   const canPay = useCan(P.BILLING_EDIT);
@@ -118,9 +117,9 @@ export function AccountsTab({
         <>
           {canPay && Number(a.balance) > 0 && (
             <>
-              <button className="btn sm primary" type="button" onClick={() => onReceive(a)}>
+              <Link className="btn sm primary" href={`/payments?pay=${encodeURIComponent(a.code)}`}>
                 Receive
-              </button>{" "}
+              </Link>{" "}
             </>
           )}
           <button className="btn sm" type="button" onClick={() => onStatement(a)}>
@@ -207,53 +206,6 @@ export function AccountsTab({
           />
         )}
       </div>
-      <RecentCard onOpen={onOpen} />
     </>
-  );
-}
-
-function RecentCard({ onOpen }: { onOpen: (customerId: number) => void }) {
-  const recent = useRecentMoney();
-  const columns: Column<RecentMoney>[] = [
-    { key: "date", header: "Date", cell: (r) => formatDate(r.date) },
-    {
-      key: "customer",
-      header: "Customer",
-      cell: (r) =>
-        r.customerId ? (
-          <button type="button" className="btn link" onClick={() => onOpen(r.customerId!)}>
-            {r.customerName}
-          </button>
-        ) : (
-          r.customerName
-        ),
-    },
-    {
-      key: "how",
-      header: "How",
-      cell: (r) => (
-        <>
-          {r.how}
-          {r.kind === "PAYMENT" && <div className="small muted mono">{r.ref}</div>}
-        </>
-      ),
-    },
-    { key: "amount", header: "Amount", align: "num", cell: (r) => formatMoney(r.amount) },
-  ];
-  return (
-    <div className="card">
-      <h2>Recent payments and cash collected</h2>
-      {recent.isError ? (
-        <div className="banner bad">{recent.error.message}</div>
-      ) : (
-        <DataTable
-          columns={columns}
-          rows={recent.data}
-          loading={recent.isPending}
-          rowKey={(r) => `${r.kind}-${r.id}`}
-          empty="No payments yet."
-        />
-      )}
-    </div>
   );
 }

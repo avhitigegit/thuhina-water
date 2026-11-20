@@ -65,8 +65,11 @@ public class MenuService {
                     new Page("my-deliveries", "My Deliveries", "/delivery/my-deliveries", DELIVERY_ENTRY, DELIVERY_ENTRY),
                     new Page("delivery-planning", "Delivery Planning", "/delivery/planning", DELIVERY_PLANNING_VIEW, null),
                     new Page("daily-delivery-list", "Daily Delivery List", "/delivery/daily-list", DELIVERY_LIST_VIEW, null))),
-            new Module("Billing & Payments", "money", null, List.of(
-                    new Page("billing", "Billing & Payments", "/billing", BILLING_VIEW, BILLING_EDIT))),
+            new Module("Billing", "file", null, List.of(
+                    new Page("billing", "Billing", "/billing", BILLING_VIEW, BILLING_EDIT))),
+            // One home for money: receive from customers, pay suppliers and factories; every payment listed (in and out).
+            new Module("Payments", "money", null, List.of(
+                    new Page("payments", "Payments", "/payments", BILLING_VIEW, BILLING_EDIT))),
             new Module("Expenses", "receipt", null, List.of(
                     new Page("expenses", "Expenses", "/expenses", EXPENSES_VIEW, EXPENSES_EDIT))),
             new Module("Data Migration", "upload", FEATURE_DATA_MIGRATION, List.of(

@@ -83,6 +83,7 @@ export function useSalePreview(kind: SaleKind, body: object | null) {
 export function invalidateAfterSale(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: KEY });
   qc.invalidateQueries({ queryKey: ["customers"] });
+  qc.invalidateQueries({ queryKey: ["money"] });
   qc.invalidateQueries({ queryKey: ["inventory"] });
   qc.invalidateQueries({ queryKey: ["masterdata", "products"] });
   qc.invalidateQueries({ queryKey: ["masterdata", "brands"] });

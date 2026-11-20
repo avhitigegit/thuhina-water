@@ -2,25 +2,25 @@
 
 /*
  * Filling Factory (M10, prototype production/production.html, FR-23 – FR-26): actions Send empties and Receive filled
- * bottles (Admin); KPIs (empty and at factory per bottle type, owed to each factory); tabs Batches · Factory payments.
+ * bottles (Admin); KPIs (empty and at factory per bottle type, owed to each factory); tabs Batches · Owed to factories.
+ * Paying a factory has one home – the Payments page (Money out).
  * ?send=1 opens Send empties (links from the Stock page and Delivery Planning). Accountant: view only.
  */
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { PageActions } from "@/components/layout/PageActions";
 import { DataTable, type Column } from "@/components/shared/DataTable";
 import { KpiCard, KpiGrid } from "@/components/shared/KpiCard";
-import { MoneyText } from "@/components/shared/MoneyText";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Tabs, useHashTab } from "@/components/shared/Tabs";
 import { Can, useCan } from "@/features/auth/access";
-import type { BatchView, DispatchView, FactoryMonth, FactoryPaymentRow } from "@/lib/api/types";
+import type { BatchView, DispatchView, FactoryMonth } from "@/lib/api/types";
 import { formatDate, formatMoney, todayIso } from "@/lib/format";
 import { P } from "@/lib/permissions";
-import { useBatches, useFactoryBalances, useFactoryPayments, useProductionSummary } from "./api";
+import { useBatches, useFactoryBalances, useProductionSummary } from "./api";
 import {
   DispatchSentDialog,
-  FactoryPaymentDialog,
   openDispatchNote,
   ReceiveFilledDialog,
   SendEmptiesDialog,
@@ -32,7 +32,6 @@ type Dialog =
   | { kind: "send" }
   | { kind: "sent"; dispatch: DispatchView }
   | { kind: "receive"; batchId: number | null }
-  | { kind: "pay" }
   | null;
 
 export function Production({ today = todayIso() }: { today?: string }) {
@@ -86,7 +85,7 @@ export function Production({ today = todayIso() }: { today?: string }) {
       <Tabs
         tabs={[
           { id: "batches", label: "Batches" },
-          { id: "payments", label: "Factory payments" },
+          { id: "payments", label: "Owed to factories" },
         ]}
         value={tab}
         onChange={setTab}
@@ -99,7 +98,7 @@ export function Production({ today = todayIso() }: { today?: string }) {
           onReceive={(id) => setDialog({ kind: "receive", batchId: id })}
         />
       )}
-      {tab === "payments" && <PaymentsTab onPay={() => setDialog({ kind: "pay" })} />}
+      {tab === "payments" && <PaymentsTab />}
 
       {dialog?.kind === "send" && s && (
         <SendEmptiesDialog
@@ -120,7 +119,6 @@ export function Production({ today = todayIso() }: { today?: string }) {
           onClose={() => setDialog(null)}
         />
       )}
-      {dialog?.kind === "pay" && <PayDialogLoader today={today} onClose={() => setDialog(null)} />}
     </>
   );
 }
@@ -207,9 +205,8 @@ function BatchesTab({
   );
 }
 
-function PaymentsTab({ onPay }: { onPay: () => void }) {
+function PaymentsTab() {
   const balances = useFactoryBalances();
-  const payments = useFactoryPayments();
   const monthColumns: Column<FactoryMonth>[] = [
     { key: "month", header: "Month", cell: (m) => m.periodLabel },
     { key: "factory", header: "Factory", cell: (m) => m.factoryName },
@@ -219,66 +216,32 @@ function PaymentsTab({ onPay }: { onPay: () => void }) {
     { key: "paid", header: "Paid", align: "num", cell: (m) => formatMoney(m.paid) },
     { key: "status", header: "Status", cell: (m) => <StatusBadge status={m.statusLabel} /> },
   ];
-  const payColumns: Column<FactoryPaymentRow>[] = [
-    { key: "ref", header: "Ref", cell: (p) => <span className="mono">{p.fpNo}</span> },
-    { key: "date", header: "Date", cell: (p) => formatDate(p.date) },
-    { key: "factory", header: "Factory", cell: (p) => p.factory.name },
-    {
-      key: "method",
-      header: "Method",
-      cell: (p) => (
-        <>
-          {p.methodLabel}
-          {p.reference && <div className="small muted">{p.reference}</div>}
-        </>
-      ),
-    },
-    { key: "amount", header: "Amount", align: "num", cell: (p) => <MoneyText value={p.amount} /> },
-  ];
   return (
-    <>
-      <div className="card">
-        <div className="card-head">
-          <h2>Filling cost by month</h2>
+    <div className="card">
+      <div className="card-head">
+        <h2>Filling cost by month</h2>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Link className="btn" href="/payments#out">
+            Payments made →
+          </Link>
           <Can permission={P.PRODUCTION_EDIT}>
-            <button className="btn primary" type="button" disabled={!balances.data} onClick={onPay}>
+            <Link className="btn primary" href="/payments?factory=1#out">
               Pay factory
-            </button>
+            </Link>
           </Can>
         </div>
-        {balances.isError ? (
-          <div className="banner bad">{balances.error.message}</div>
-        ) : (
-          <DataTable
-            columns={monthColumns}
-            rows={balances.data}
-            loading={balances.isPending}
-            rowKey={(m) => `${m.factoryId}-${m.period}`}
-            empty="No filling cost yet."
-          />
-        )}
       </div>
-      <div className="card">
-        <h2>Payments made</h2>
-        {payments.isError ? (
-          <div className="banner bad">{payments.error.message}</div>
-        ) : (
-          <DataTable
-            columns={payColumns}
-            rows={payments.data}
-            loading={payments.isPending}
-            rowKey={(p) => p.id}
-            empty="No payments yet."
-          />
-        )}
-      </div>
-    </>
+      {balances.isError ? (
+        <div className="banner bad">{balances.error.message}</div>
+      ) : (
+        <DataTable
+          columns={monthColumns}
+          rows={balances.data}
+          loading={balances.isPending}
+          rowKey={(m) => `${m.factoryId}-${m.period}`}
+          empty="No filling cost yet."
+        />
+      )}
+    </div>
   );
-}
-
-/** The payment pop-up lists the factories with what is owed to each. */
-function PayDialogLoader({ today, onClose }: { today: string; onClose: () => void }) {
-  const summary = useProductionSummary();
-  if (!summary.data) return null;
-  return <FactoryPaymentDialog factories={summary.data.factories} today={today} onClose={onClose} />;
 }

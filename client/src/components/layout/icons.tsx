@@ -44,6 +44,12 @@ const PATHS: Record<string, ReactNode> = {
     </>
   ),
   upload: <path d="M12 16V4M7 9l5-5 5 5M4 20h16" />,
+  file: (
+    <>
+      <path d="M6 2h9l5 5v15H6z" />
+      <path d="M14 2v6h6M9 13h8M9 17h6" />
+    </>
+  ),
   receipt: (
     <>
       <path d="M5 2h14v20l-3-2-2 2-2-2-2 2-2-2-3 2z" />

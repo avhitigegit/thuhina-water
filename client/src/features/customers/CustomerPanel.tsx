@@ -277,7 +277,7 @@ function PanelBody({ c, onEdit }: { c: CustomerDetail; onEdit?: (c: CustomerDeta
             </>
           )}
           {canPay && c.outstanding > 0 && (
-            <Link className="btn" href={`/billing?pay=${c.code}`}>
+            <Link className="btn" href={`/payments?pay=${c.code}`}>
               Receive payment
             </Link>
           )}

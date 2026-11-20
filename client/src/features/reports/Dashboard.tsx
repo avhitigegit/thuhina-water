@@ -66,7 +66,7 @@ export function Dashboard() {
           </Link>
         </Can>
         <Can permission={P.BILLING_EDIT}>
-          <Link className="btn" href="/billing?pay=new">
+          <Link className="btn" href="/payments?pay=new">
             Receive payment
           </Link>
         </Can>
