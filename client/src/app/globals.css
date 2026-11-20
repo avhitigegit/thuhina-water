@@ -1398,10 +1398,6 @@
     flex-direction: column;
     gap: 4px;
   }
-  .mob-tel {
-    font-weight: 600;
-    color: var(--brand);
-  }
   .mob-toggle {
     display: flex;
     flex-wrap: wrap;

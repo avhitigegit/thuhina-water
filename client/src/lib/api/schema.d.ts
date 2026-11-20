@@ -4621,7 +4621,8 @@ export interface components {
             id: number;
             code: string;
             name: string;
-            phone: string;
+            /** @description Not sent to Delivery Staff */
+            phone: string | null;
             address: string;
             notes: string | null;
             /** Format: int64 */

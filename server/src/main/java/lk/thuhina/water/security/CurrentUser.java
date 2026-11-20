@@ -26,6 +26,19 @@ public final class CurrentUser {
         return get().orElseThrow(() -> new IllegalStateException("No logged-in user"));
     }
 
+    /** True when the logged-in user has {@code permission}. */
+    public static boolean can(String permission) {
+        return get().map(u -> u.permissions().contains(permission)).orElse(false);
+    }
+
+    /**
+     * Customer phone numbers are shown only to users who may view customers (Admin, Accountant) – never to Delivery
+     * Staff: their lists, searches, WhatsApp messages and printed sheets carry no phone number.
+     */
+    public static boolean seesCustomerPhones() {
+        return can(Permissions.CUSTOMERS_VIEW);
+    }
+
     public static String usernameOrSystem() {
         return get().map(AuthUser::username).orElse(SYSTEM);
     }

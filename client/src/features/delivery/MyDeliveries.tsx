@@ -96,7 +96,7 @@ function VisitList({ today, onOpen }: { today: string; onOpen: (c: DueCustomer) 
       <div className="mob-filters">
         <input
           type="search"
-          placeholder="Find a customer – name, code, phone"
+          placeholder="Find a customer – name, code or address"
           aria-label="Find a customer"
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -364,11 +364,6 @@ export function VisitForm({ customer: c, onDone }: { customer: DueCustomer; onDo
       <div className="card mob-who">
         <b>{c.name}</b> <span className="muted">{c.code}</span>
         <div className="muted">{c.address}</div>
-        {c.phone && (
-          <a href={`tel:${c.phone.replace(/\s/g, "")}`} className="mob-tel">
-            Call {c.phone}
-          </a>
-        )}
         <div>
           Balance before: <b>{formatMoney(c.balance)}</b> · {c.payTypeLabel}
         </div>

@@ -72,7 +72,8 @@ public class WhatsAppSendService {
         if (m == null) {
             String text = !outbox.active(MessageType.DELIVERY_BILL) ? MSG_BILL_OFF : !customerOk ? MSG_NO_WHATSAPP
                     : "WhatsApp bill not sent yet.";
-            return new SendStatus("NONE", text, number == null ? null : WhatsAppRules.local(number), canSend, null);
+            return new SendStatus("NONE", text, number == null || !CurrentUser.seesCustomerPhones() ? null : WhatsAppRules.local(number),
+                    canSend, null);
         }
         return status(m, "bill", canSend);
     }
@@ -178,7 +179,9 @@ public class WhatsAppSendService {
     // ------------------------------------------------------------------
 
     private static SendStatus status(WhatsAppMessage m, String what, boolean canSend) {
-        String to = WhatsAppRules.local(m.getToNumber());
+        // Delivery Staff never see the customer's number (CurrentUser.seesCustomerPhones).
+        boolean shown = CurrentUser.seesCustomerPhones();
+        String to = shown ? WhatsAppRules.local(m.getToNumber()) : "the customer";
         String text = switch (m.getStatus()) {
             case QUEUED -> "WhatsApp " + what + " is being sent to " + to + ".";
             case SENT -> "WhatsApp " + what + " sent to " + to + (m.isTestMode() ? " (test mode – written to the log only)." : ".");
@@ -187,7 +190,7 @@ public class WhatsAppSendService {
             case FAILED -> "WhatsApp " + what + " to " + to + " failed: " + m.getError() + (what.equals("bill") ? " Give a paper bill." : "");
             case SKIPPED -> what.equals("bill") ? MSG_NO_WHATSAPP : "Not sent: " + m.getError();
         };
-        return new SendStatus(m.getStatus().name(), text, m.getStatus() == MessageStatus.SKIPPED ? null : to, canSend, m.getId());
+        return new SendStatus(m.getStatus().name(), text, m.getStatus() == MessageStatus.SKIPPED || !shown ? null : to, canSend, m.getId());
     }
 
     private static LocalDate date(Object value) {

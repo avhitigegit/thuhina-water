@@ -288,6 +288,9 @@ class DeliveryScheduleIntegrationTest extends SalesTestSupport {
         String text = pdfText("/print/delivery-sheet?area=" + areaId, staff);
         assertThat(text).contains("DELIVERY SHEET", BusinessDates.format(today), "Driver: Test Delivery Staff", "2 customers", areaName(),
                 "Sheet A", "Blue gate", "3 × " + label, "NEW", "Bill no.", "Filled", "Empties", "Cash / note", "Not home?", "Checked by");
+        // The driver's sheet has no phone numbers (not even for the Admin's print, which is handed to the driver).
+        String phoneA = jdbc.queryForObject("select phone from customer where id = ?", String.class, a);
+        assertThat(text).doesNotContain("Phone", phoneA);
         // Printed by the Admin: a blank line for the driver's name.
         assertThat(pdfText("/print/delivery-sheet?area=" + areaId + "&date=" + today, admin)).contains("Driver: ________________");
     }
@@ -309,6 +312,7 @@ class DeliveryScheduleIntegrationTest extends SalesTestSupport {
         String text = pdfText("/print/load-sheet?area=" + areaId + "&date=" + today, admin);
         assertThat(text).contains("LOAD SHEET", "2 customers · load 6 × " + label, "Route (area)", label + " to load",
                 "Load A", "Load B", "4 × " + label, "Loaded by", "Driver", "Checked by");
+        assertThat(text).doesNotContain("Phone", jdbc.queryForObject("select phone from customer where id = ?", String.class, b));
         assertThat(text).doesNotContain(doneName);
 
         // Route totals: customers, bottles to load per type, empties to collect.
@@ -323,7 +327,8 @@ class DeliveryScheduleIntegrationTest extends SalesTestSupport {
         PrintDocument.Table customers = doc.tables().get(1);
         assertThat(customers.rows()).hasSize(3);
         assertThat(customers.rows().getFirst()).containsExactly(areaName());
-        assertThat(customers.rows().get(1).subList(8, 12)).containsOnly("");
+        assertThat(customers.rows().get(1).subList(7, 11)).containsOnly("");
+        assertThat(customers.headers()).doesNotContain("Phone");
         assertThat(doc.page()).isEqualTo(PrintDocument.Page.A4_LANDSCAPE);
     }
 
