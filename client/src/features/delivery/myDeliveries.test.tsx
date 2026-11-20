@@ -79,16 +79,18 @@ const LIST: DueList = {
 };
 
 let posts: { path: string; body: Record<string, unknown> }[] = [];
+let dueList: DueList = LIST;
 
 beforeEach(() => {
   posts = [];
+  dueList = LIST;
   window.location.hash = "";
   vi.stubGlobal(
     "fetch",
     vi.fn(async (url: string, init?: RequestInit) => {
       const path = url.split("?")[0];
       const body = init?.body ? JSON.parse(String(init.body)) : {};
-      if (path === "/api/delivery/due") return new Response(JSON.stringify(LIST));
+      if (path === "/api/delivery/due") return new Response(JSON.stringify(dueList));
       if (path === "/api/areas") return new Response(JSON.stringify([]));
       if (path === "/api/delivery/mobile/customers") {
         return new Response(JSON.stringify([due(1, "W.M. Sunil Perera"), due(77, "Other Route Stores")]));
@@ -175,6 +177,57 @@ describe("My Deliveries", () => {
     expect(screen.getByText("Other customers")).toBeInTheDocument();
     // Today's list is filtered; the customer already on it is not repeated under "Other customers".
     expect(screen.queryByText("W.M. Sunil Perera")).not.toBeInTheDocument();
+  });
+
+  it("puts missed customers on their own tab (red count, longest missed first); search looks in both", async () => {
+    const user = userEvent.setup();
+    dueList = {
+      ...LIST,
+      items: [
+        ...LIST.items,
+        due(5, "Missed Two Days", {
+          overdue: true,
+          due: false,
+          daysLate: 2,
+          nextDeliveryDate: addDaysIso(TODAY, -2),
+        }),
+        due(6, "Missed Week Stores", {
+          overdue: true,
+          due: false,
+          daysLate: 7,
+          nextDeliveryDate: addDaysIso(TODAY, -7),
+        }),
+      ],
+    };
+    renderPage();
+    expect(await screen.findByText("W.M. Sunil Perera")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /^Todays*2$/ })).toHaveAttribute("aria-selected", "true");
+    expect(within(screen.getByRole("tab", { name: /^Misseds*2$/ })).getByText("2")).toHaveClass(
+      "tab-count",
+      "bad",
+    );
+    expect(screen.queryByText("Missed Two Days")).not.toBeInTheDocument();
+    expect(screen.getByTestId("mob-count")).toHaveTextContent("2 customer(s) to visit · 1 done");
+
+    await user.click(screen.getByRole("tab", { name: /^Misseds*2$/ }));
+    expect(screen.getByTestId("mob-count")).toHaveTextContent("2 missed customer(s) – longest missed first");
+    const names = screen.getAllByRole("button", { name: /Missed/ }).map((b) => b.textContent ?? "");
+    expect(names[0]).toContain("Missed Week Stores");
+    expect(names[1]).toContain("Missed Two Days");
+    expect(screen.queryByText("W.M. Sunil Perera")).not.toBeInTheDocument();
+
+    // A search finds a customer on either tab.
+    await user.click(screen.getByRole("tab", { name: /^Todays*2$/ }));
+    await user.type(screen.getByLabelText("Find a customer"), "week");
+    expect(await screen.findByText("Missed Week Stores")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /^Misseds*2$/ })).not.toBeInTheDocument();
+  });
+
+  it("shows no Missed tab when nobody is missed", async () => {
+    renderPage();
+    expect(await screen.findByText("W.M. Sunil Perera")).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /Missed/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /Today/ })).not.toBeInTheDocument();
   });
 
   it("saves the bottles left, empties collected and a bank transfer with its reference", async () => {

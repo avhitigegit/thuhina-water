@@ -321,7 +321,14 @@ afterEach(() => vi.unstubAllGlobals());
 describe("Daily Delivery List", () => {
   it("shows today's customers with KPIs, balances and status – view and print only, also for the Admin", async () => {
     renderPage(<DailyList today={TODAY} />);
-    expect(await screen.findByText(`Monday ${formatDate(TODAY)} – 4 customers`)).toBeInTheDocument();
+    // Today tab: the 3 due today; the missed one is on its own tab with a red count.
+    expect(await screen.findByText(`Monday ${formatDate(TODAY)} – 3 customers`)).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: /^Todays*3$/ })).toHaveAttribute("aria-selected", "true");
+    expect(within(screen.getByRole("tab", { name: /^Misseds*1$/ })).getByText("1")).toHaveClass(
+      "tab-count",
+      "bad",
+    );
+    expect(screen.queryByText("Late Lanka")).toBeNull();
     expect(screen.getByText("Load 20L filled").nextSibling).toHaveTextContent("8");
     expect(screen.getByText("1 done · 1 overdue")).toBeInTheDocument();
     expect(screen.getByText("Money to collect").nextSibling).toHaveTextContent("Rs. 1,400.00");
@@ -332,25 +339,27 @@ describe("Daily Delivery List", () => {
     expect(sunil).toHaveTextContent("Rs. 1,400.00");
     // Bills are typed on Enter Bills (one place), not from this list.
     expect(within(sunil).queryByRole("link", { name: "Enter bill" })).toBeNull();
-    expect(rowOf("Late Lanka")).toHaveTextContent(`Missed ${formatDate(addDaysIso(TODAY, -3))}`);
-    expect(rowOf("Late Lanka")).toHaveClass("row-bad");
     const entered = rowOf("Sampath Grocery");
     expect(entered).toHaveClass("row-ok");
     expect(entered).toHaveTextContent(`bill B000009 · next ${formatDate(TODAY)}`);
     expect(within(entered).queryByRole("link", { name: "Enter bill" })).toBeNull();
     expect(rowOf("Anoma Wickramaratne")).toHaveTextContent("New – deposit");
     expect(screen.queryByRole("link", { name: "Enter bills" })).toBeNull();
+    await userEvent.setup().click(screen.getByRole("tab", { name: /^Misseds*1$/ }));
+    expect(screen.getByText("Missed earlier – 1 customers, longest missed first")).toBeInTheDocument();
+    expect(rowOf("Late Lanka")).toHaveTextContent(`Missed ${formatDate(addDaysIso(TODAY, -3))}`);
+    expect(rowOf("Late Lanka")).toHaveClass("row-bad");
+    expect(screen.queryByText("W.M. Sunil Perera")).toBeNull();
     // The upcoming bottle requirement is on Delivery Planning only.
-    expect(screen.queryByRole("tab")).toBeNull();
     expect(calls.some((c) => c.includes("/api/delivery/requirement"))).toBe(false);
   });
 
   it("moves day by day; prints the sheet for the date and area", async () => {
     const user = userEvent.setup();
     renderPage(<DailyList today={TODAY} />);
-    await screen.findByText(`Monday ${formatDate(TODAY)} – 4 customers`);
+    await screen.findByText(`Monday ${formatDate(TODAY)} – 3 customers`);
     await user.click(screen.getByRole("button", { name: "Next day" }));
-    await screen.findByText(`Monday ${formatDate(TOMORROW)} – 4 customers`);
+    await screen.findByText(`Monday ${formatDate(TOMORROW)} – 3 customers`);
     expect(calls.some((c) => c.includes("/api/delivery/due") && c.includes("date=" + TOMORROW))).toBe(true);
     expect(screen.queryByRole("link", { name: "Enter bill" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Enter bills" })).toBeNull();
@@ -363,10 +372,10 @@ describe("Daily Delivery List", () => {
 
   it("Delivery Staff only views and prints: no Enter bill links, no requirement tab", async () => {
     renderPage(<DailyList today={TODAY} />, "DELIVERY_STAFF");
-    await screen.findByText(`Monday ${formatDate(TODAY)} – 4 customers`);
+    await screen.findByText(`Monday ${formatDate(TODAY)} – 3 customers`);
     expect(screen.queryByRole("link", { name: "Enter bill" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Enter bills" })).toBeNull();
-    expect(screen.queryByRole("tab")).toBeNull();
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Today3", "Missed1"]);
     expect(screen.getByRole("button", { name: "Print delivery sheet" })).toBeInTheDocument();
     expect(calls.some((c) => c.includes("/api/delivery/requirement"))).toBe(false);
   });
