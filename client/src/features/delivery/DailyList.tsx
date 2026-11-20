@@ -13,9 +13,11 @@ import { DateField } from "@/components/shared/DateField";
 import { KpiCard, KpiGrid } from "@/components/shared/KpiCard";
 import { Badge, StatusBadge } from "@/components/shared/StatusBadge";
 import { Tabs } from "@/components/shared/Tabs";
+import { useCan } from "@/features/auth/access";
 import { useAreas } from "@/features/customers/api";
 import type { DueCustomer } from "@/lib/api/types";
 import { addDaysIso, formatDate, formatMoney, isValidIso, todayIso } from "@/lib/format";
+import { P } from "@/lib/permissions";
 import { cn } from "@/lib/utils";
 import { deliverySheetUrl, useDueList } from "./api";
 import { bottlesText, splitDue, sum } from "./labels";
@@ -63,6 +65,8 @@ function DayPane({
   const [part, setPart] = useState<"today" | "missed">("today");
   const open = missed.length ? part : "today";
   const rows = open === "missed" ? missed : dueList;
+  // Customer phone numbers are not shown to Delivery Staff (the server does not send them either).
+  const phones = useCan(P.CUSTOMERS_VIEW);
 
   return (
     <>
@@ -146,7 +150,7 @@ function DayPane({
             <thead>
               <tr>
                 <th>Customer</th>
-                <th>Phone</th>
+                {phones && <th>Phone</th>}
                 <th>Pays</th>
                 <th className="num">Bottles held</th>
                 <th className="num">Usual</th>
@@ -158,11 +162,11 @@ function DayPane({
             </thead>
             <tbody>
               {rows.map((c) => (
-                <DayRow key={c.id} c={c} />
+                <DayRow key={c.id} c={c} phones={phones} />
               ))}
               {data && rows.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="empty-state">
+                  <td colSpan={phones ? 9 : 8} className="empty-state">
                     No customers due on this day.
                   </td>
                 </tr>
@@ -175,7 +179,7 @@ function DayPane({
   );
 }
 
-function DayRow({ c }: { c: DueCustomer }) {
+function DayRow({ c, phones }: { c: DueCustomer; phones: boolean }) {
   const held = bottlesText(c.bottles, "held");
   const collect = sum(c.bottles, (b) => b.toCollect);
   const owed = sum(c.bottles, (b) => b.owed);
@@ -189,7 +193,7 @@ function DayRow({ c }: { c: DueCustomer }) {
         </div>
         {c.notes && <div className="small">{c.notes}</div>}
       </td>
-      <td className="nowrap">{c.phone}</td>
+      {phones && <td className="nowrap">{c.phone}</td>}
       <td>
         <StatusBadge status={c.payTypeLabel} />
       </td>

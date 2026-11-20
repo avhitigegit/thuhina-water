@@ -33,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DeliveryPrintService {
 
-    static final String NOTE = "Not home? Phone the customer and leave the bottles only if they agree – write a note. "
+    static final String NOTE = "Not home? Leave the bottles at the gate or door – write a note. "
             + "Fewer empties for any other reason – write the reason.";
     private static final float WRITE_HEIGHT = 24;
 
@@ -77,7 +77,7 @@ public class DeliveryPrintService {
             String who = c.name() + (c.overdue() ? " (missed " + BusinessDates.format(c.nextDeliveryDate()) + ")" : "") + "\n" + c.address()
                     + (c.notes() == null || c.notes().isBlank() ? "" : "\n" + c.notes());
             String held = text(c.bottles(), true);
-            rows.add(List.of(String.valueOf(++n), who, c.phone(), c.payTypeLabel(), held.isEmpty() ? "NEW" : held, text(c.bottles(), false),
+            rows.add(List.of(String.valueOf(++n), who, c.payTypeLabel(), held.isEmpty() ? "NEW" : held, text(c.bottles(), false),
                     blankZero(c.bottles().stream().mapToInt(DueBottle::toCollect).sum()),
                     blankZero(c.bottles().stream().mapToInt(DueBottle::owed).sum()), money(c.balance()), "", "", "", ""));
         }
@@ -85,10 +85,10 @@ public class DeliveryPrintService {
             rows.add(List.of("No customers due."));
         }
         PrintDocument.Table table = new PrintDocument.Table(
-                List.of("#", "Customer / address", "Phone", "Pays", "Held", "Usual", "Collect", "Owed", "Balance", "Bill no.", "Filled",
+                List.of("#", "Customer / address", "Pays", "Held", "Usual", "Collect", "Owed", "Balance", "Bill no.", "Filled",
                         "Empties", "Cash / note"),
-                new boolean[] {false, false, false, false, false, false, true, true, true, false, false, false, false}, rows,
-                new float[] {0.6f, 4.2f, 2f, 1.6f, 2.2f, 2.2f, 1.1f, 1f, 1.4f, 1.6f, 1.3f, 1.5f, 2.6f}, WRITE_HEIGHT);
+                new boolean[] {false, false, false, false, false, true, true, true, false, false, false, false}, rows,
+                new float[] {0.6f, 5.4f, 1.6f, 2.4f, 2.4f, 1.1f, 1f, 1.4f, 1.6f, 1.3f, 1.5f, 3.2f}, WRITE_HEIGHT);
         return new PrintDocument("DELIVERY SHEET", meta, List.of(), null, List.of(table), List.of(), List.of(NOTE),
                 List.of("Driver", "Checked by"), PrintDocument.Page.A4_LANDSCAPE);
     }
@@ -144,7 +144,7 @@ public class DeliveryPrintService {
             }
             rows.add(List.of(r.areaName()));
             for (PlanRow x : todo) {
-                rows.add(List.of(String.valueOf(++n), x.name() + "\n" + x.address(), x.phone(), x.payTypeLabel(), PlanningService.text(x.thisDate()),
+                rows.add(List.of(String.valueOf(++n), x.name() + "\n" + x.address(), x.payTypeLabel(), PlanningService.text(x.thisDate()),
                         blankZero(x.toCollect()), blankZero(x.owed()), money(x.balance()), "", "", "", ""));
             }
         }
@@ -152,10 +152,10 @@ public class DeliveryPrintService {
             rows.add(List.of("No customers to deliver."));
         }
         PrintDocument.Table list = new PrintDocument.Table(
-                List.of("#", "Customer / address", "Phone", "Pays", "Usual", "Collect", "Owed", "Balance", "Bill no.", "Filled", "Empties",
+                List.of("#", "Customer / address", "Pays", "Usual", "Collect", "Owed", "Balance", "Bill no.", "Filled", "Empties",
                         "Cash / note"),
-                new boolean[] {false, false, false, false, false, true, true, true, false, false, false, false}, rows,
-                new float[] {0.6f, 4.4f, 2f, 1.6f, 2.4f, 1.1f, 1f, 1.4f, 1.6f, 1.3f, 1.5f, 2.6f}, WRITE_HEIGHT);
+                new boolean[] {false, false, false, false, true, true, true, false, false, false, false}, rows,
+                new float[] {0.6f, 5.6f, 1.6f, 2.4f, 1.1f, 1f, 1.4f, 1.6f, 1.3f, 1.5f, 3.2f}, WRITE_HEIGHT);
         return new PrintDocument("LOAD SHEET", meta, List.of(), null, List.of(routes, list), List.of(), List.of(),
                 List.of("Loaded by", "Driver", "Checked by"), PrintDocument.Page.A4_LANDSCAPE);
     }

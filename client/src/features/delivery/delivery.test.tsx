@@ -333,6 +333,7 @@ describe("Daily Delivery List", () => {
     expect(screen.getByText("1 done · 1 overdue")).toBeInTheDocument();
     expect(screen.getByText("Money to collect").nextSibling).toHaveTextContent("Rs. 1,400.00");
 
+    expect(screen.getByRole("columnheader", { name: "Phone" })).toBeInTheDocument();
     const sunil = rowOf("W.M. Sunil Perera");
     expect(sunil).toHaveTextContent("1, Temple Road, Nugegoda");
     expect(sunil).toHaveTextContent("Ring the bell twice");
@@ -375,6 +376,8 @@ describe("Daily Delivery List", () => {
     await screen.findByText(`Monday ${formatDate(TODAY)} – 3 customers`);
     expect(screen.queryByRole("link", { name: "Enter bill" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Enter bills" })).toBeNull();
+    // Delivery Staff never see customer phone numbers.
+    expect(screen.queryByRole("columnheader", { name: "Phone" })).toBeNull();
     expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Today3", "Missed1"]);
     expect(screen.getByRole("button", { name: "Print delivery sheet" })).toBeInTheDocument();
     expect(calls.some((c) => c.includes("/api/delivery/requirement"))).toBe(false);

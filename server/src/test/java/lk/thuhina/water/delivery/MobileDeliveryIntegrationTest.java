@@ -148,6 +148,35 @@ class MobileDeliveryIntegrationTest extends SalesTestSupport {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
+    void driversNeverSeeOrSearchCustomerPhoneNumbers() throws Exception {
+        String name = "Nophone " + System.nanoTime();
+        long c = customerHolding(name, 2);
+        String digits = String.format("%06d", System.nanoTime() % 1_000_000L);
+        String phone = "079 9" + digits.substring(0, 2) + " " + digits.substring(2);
+        jdbc.update("update customer set phone = ?, delivery_day = ?, next_delivery_date = ? where id = ?", phone,
+                today.getDayOfWeek().getValue(), today, c);
+
+        // Due list: no number for the driver; the office still sees it.
+        Map<String, Object> mine = staffGet("/delivery/due?area=" + areaId);
+        assertThat(((List<Map<String, Object>>) mine.get("items")).stream().filter(x -> ((Number) x.get("id")).longValue() == c))
+                .singleElement().satisfies(x -> assertThat(x.get("phone")).isNull());
+        Map<String, Object> office = read(mvc.perform(get("/delivery/due").param("area", String.valueOf(areaId)).cookie(admin))
+                .andExpect(status().isOk()).andReturn());
+        assertThat(((List<Map<String, Object>>) office.get("items")).stream().filter(x -> ((Number) x.get("id")).longValue() == c))
+                .singleElement().satisfies(x -> assertThat(x).containsEntry("phone", phone));
+
+        // Search: the driver cannot find a customer by phone number, and a name search carries no number.
+        String byNumber = "99" + digits;
+        mvc.perform(get("/delivery/mobile/customers").param("q", byNumber).cookie(staff))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get("/delivery/mobile/customers").param("q", name).cookie(staff))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].phone").doesNotExist());
+        mvc.perform(get("/delivery/mobile/customers").param("q", byNumber).cookie(admin))
+                .andExpect(status().isOk()).andExpect(jsonPath("$[0].phone").value(phone));
+    }
+
+    @Test
     void onlyDeliveryEntryMayUseIt() throws Exception {
         long c = customerHolding("Mobile Access", 2);
         // Delivery staff still cannot use the office sales and payment screens.
