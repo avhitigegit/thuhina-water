@@ -110,9 +110,17 @@ export const ROUTES: RouteInfo[] = [
   },
   {
     path: "/billing",
-    module: "Billing & Payments",
-    title: "Billing & Payments",
-    description: "Customer balances, payments, statements and monthly invoices",
+    module: "Billing",
+    title: "Billing",
+    description: "Customer balances, statements and monthly invoices",
+    buildModule: "M11",
+  },
+  {
+    path: "/payments",
+    module: "Payments",
+    title: "Payments",
+    description:
+      "One place for money: money in from customers, money out to suppliers, factories and expenses",
     buildModule: "M11",
   },
   {

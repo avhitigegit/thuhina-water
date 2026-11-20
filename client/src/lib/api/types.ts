@@ -217,6 +217,8 @@ export type CustomerPaymentRow = Schemas["CustomerPaymentRow"];
 export type PaymentSaved = Schemas["PaymentSaved"];
 export type PaymentList = Schemas["PaymentListResponse"];
 export type RecentMoney = Schemas["RecentMoney"];
+export type MoneyRow = Schemas["MoneyRow"];
+export type MoneyList = Schemas["MoneyList"];
 export type PeriodOption = Schemas["PeriodOption"];
 /** `invoice` is null until generated (springdoc drops "nullable" on object references). */
 export type InvoiceMonthRow = Omit<Schemas["InvoiceMonthRow"], "invoice"> & { invoice: InvoiceLink | null };

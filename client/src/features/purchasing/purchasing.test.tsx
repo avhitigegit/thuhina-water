@@ -17,6 +17,7 @@ import type {
 } from "@/lib/api/types";
 import { addDaysIso, formatDate, todayIso } from "@/lib/format";
 import { P } from "@/lib/permissions";
+import { PaySupplierDialog } from "@/features/payments/PaySupplierDialog";
 import { Purchasing } from "./Purchasing";
 
 const TODAY = todayIso();
@@ -498,14 +499,23 @@ describe("Purchasing – purchase orders", () => {
 });
 
 describe("Purchasing – supplier payments and roles", () => {
-  it("shows the owed amounts and records a payment", async () => {
+  it("shows the owed amounts; Pay opens the Payments page", async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole("tab", { name: "Supplier payments" }));
+    await user.click(screen.getByRole("tab", { name: "Owed to suppliers" }));
     const row = (await screen.findByText("HomeCool")).closest("tr") as HTMLElement;
     expect(row).toHaveTextContent("Rs. 106,950.00");
     expect(row).toHaveTextContent(`${formatDate("2026-09-10")} (32 days)`);
-    await user.click(within(row).getByRole("button", { name: "Pay" }));
+    expect(within(row).getByRole("link", { name: "Pay" })).toHaveAttribute(
+      "href",
+      "/payments?supplier=4#out",
+    );
+    expect(screen.queryByText("Payments made")).not.toBeInTheDocument();
+  });
+
+  it("Pay supplier (on the Payments page) records a payment", async () => {
+    const user = userEvent.setup();
+    renderPage("ADMIN", <PaySupplierDialog supplierId={4} today={TODAY} onClose={() => {}} />);
     const dialog = await screen.findByRole("dialog", { name: "Pay supplier" });
     await waitFor(() => expect(within(dialog).getByLabelText("Supplier")).toHaveValue("4"));
     expect(within(dialog).getByLabelText("Amount (Rs.)")).toHaveValue(106950);
@@ -540,9 +550,8 @@ describe("Purchasing – supplier payments and roles", () => {
     expect(within(poDialog).queryByRole("button", { name: /Next:/ })).not.toBeInTheDocument();
     await user.click(within(poDialog).getByText("Close"));
 
-    await user.click(screen.getByRole("tab", { name: "Supplier payments" }));
+    await user.click(screen.getByRole("tab", { name: "Owed to suppliers" }));
     expect(await screen.findByText("HomeCool")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Pay supplier" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Pay" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Pay" })).not.toBeInTheDocument();
   });
 });
