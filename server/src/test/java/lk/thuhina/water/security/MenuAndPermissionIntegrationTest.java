@@ -26,7 +26,7 @@ class MenuAndPermissionIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.landingPage").value("/dashboard"))
                 .andExpect(jsonPath("$.menu[*].module").value(contains("Dashboard", "Master Data", "Purchasing", "Production",
-                        "Inventory", "Sales & Deliveries", "Delivery Schedule", "Billing & Payments", "Expenses",
+                        "Inventory", "Sales & Deliveries", "Delivery Schedule", "Billing", "Payments", "Expenses",
                         "Data Migration", "Reports", "Administration")))
                 .andExpect(jsonPath("$.menu[?(@.module == 'Data Migration')].hidden").value(contains(true)))
                 .andExpect(jsonPath("$.menu[?(@.module == 'Dashboard')].group").value(contains(false)))
@@ -41,11 +41,11 @@ class MenuAndPermissionIntegrationTest extends IntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.landingPage").value("/dashboard"))
                 .andExpect(jsonPath("$.menu[*].module").value(contains("Dashboard", "Master Data", "Purchasing", "Production",
-                        "Sales & Deliveries", "Billing & Payments", "Expenses", "Reports")))
+                        "Sales & Deliveries", "Billing", "Payments", "Expenses", "Reports")))
                 .andExpect(jsonPath("$.menu[?(@.module == 'Master Data')].items[*].key").value(contains("customers", "suppliers")))
                 .andExpect(jsonPath("$.menu[?(@.module == 'Master Data')].items[*].view").value(contains(true, true)))
                 .andExpect(jsonPath("$.menu[?(@.module == 'Sales & Deliveries')].items[*].key").value(contains("quotations")))
-                .andExpect(jsonPath("$.menu[?(@.module == 'Billing & Payments')].items[0].view").value(contains(false)))
+                .andExpect(jsonPath("$.menu[?(@.module == 'Billing')].items[0].view").value(contains(false)))
                 .andExpect(jsonPath("$.permissions").value(not(hasItem(Permissions.STOCK_VIEW))));
     }
 

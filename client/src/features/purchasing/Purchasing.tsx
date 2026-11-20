@@ -2,7 +2,8 @@
 
 /*
  * Purchasing page (M09, prototype purchasing/purchasing.html, FR-15 – FR-21): tabs Quotations · Purchase orders ·
- * Supplier payments. A purchase order created from a quotation opens on the Purchase orders tab.
+ * Owed to suppliers (paying them is on the Payments page). A purchase order created from a quotation opens on the
+ * Purchase orders tab.
  * Admin full; Accountant view only (no buttons).
  */
 import { useState } from "react";
@@ -23,7 +24,7 @@ export function Purchasing({ today = todayIso() }: { today?: string }) {
         tabs={[
           { id: "quotes", label: "Quotations" },
           { id: "pos", label: "Purchase orders" },
-          { id: "pay", label: "Supplier payments" },
+          { id: "pay", label: "Owed to suppliers" },
         ]}
         value={tab}
         onChange={setTab}
@@ -38,7 +39,7 @@ export function Purchasing({ today = todayIso() }: { today?: string }) {
         />
       )}
       {tab === "pos" && <PurchaseOrdersTab onOpen={setPo} />}
-      {tab === "pay" && <SupplierPaymentsTab today={today} />}
+      {tab === "pay" && <SupplierPaymentsTab />}
       {po !== null && <PoDialog id={po} today={today} onClose={() => setPo(null)} />}
     </>
   );

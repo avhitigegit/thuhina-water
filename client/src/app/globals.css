@@ -938,6 +938,22 @@
     border-bottom-color: var(--brand);
     font-weight: 600;
   }
+  .tabs .tab-count {
+    display: inline-block;
+    min-width: 20px;
+    margin-left: 6px;
+    padding: 0 6px;
+    border-radius: 10px;
+    background: var(--border);
+    color: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+  }
+  .tabs .tab-count.bad {
+    background: var(--bad);
+    color: #fff;
+  }
 
   /* Step bar (document status) */
   .steps-bar {
@@ -1381,10 +1397,6 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-  }
-  .mob-tel {
-    font-weight: 600;
-    color: var(--brand);
   }
   .mob-toggle {
     display: flex;

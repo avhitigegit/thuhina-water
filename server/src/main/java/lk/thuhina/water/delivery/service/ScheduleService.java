@@ -30,6 +30,7 @@ import lk.thuhina.water.ledger.rules.LedgerRules;
 import lk.thuhina.water.masterdata.service.PricingService;
 import lk.thuhina.water.masterdata.service.PricingService.WaterPrice;
 import lk.thuhina.water.sales.model.SalesKind;
+import lk.thuhina.water.security.CurrentUser;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -159,9 +160,10 @@ public class ScheduleService {
             sql += " and c.area_id = :area";
             p.addValue("area", areaId);
         }
+        boolean phones = CurrentUser.seesCustomerPhones();
         if (text != null) {
             sql += " and (lower(c.code) like :text or lower(c.name) like :text or lower(c.address) like :text"
-                    + " or regexp_replace(c.phone, '[^0-9]', '', 'g') like :digits)";
+                    + (phones ? " or regexp_replace(c.phone, '[^0-9]', '', 'g') like :digits" : "") + ")";
             String digits = text.replaceAll("[^0-9]", "");
             p.addValue("text", "%" + text.toLowerCase() + "%").addValue("digits", digits.isEmpty() ? "-" : "%" + digits + "%");
         }
@@ -170,7 +172,7 @@ public class ScheduleService {
             sql += " limit " + limit;
         }
         List<Row> rows = jdbc.query(sql, p, (rs, i) -> new Row(rs.getLong("id"), rs.getString("code"), rs.getString("name"),
-                rs.getString("phone"), rs.getString("address"), rs.getString("notes"), rs.getLong("area_id"), rs.getString("area_name"),
+                phones ? rs.getString("phone") : null, rs.getString("address"), rs.getString("notes"), rs.getLong("area_id"), rs.getString("area_name"),
                 PayType.valueOf(rs.getString("pay_type")), rs.getBigDecimal("credit_limit"), rs.getBigDecimal("balance"),
                 rs.getInt("cycle_weeks"), rs.getObject("next_delivery_date", LocalDate.class),
                 rs.getObject("registered_on", LocalDate.class), DayOfWeek.of(rs.getInt("delivery_day")), rs.getLong("customer_type_id")));

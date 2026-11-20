@@ -1,8 +1,9 @@
 "use client";
 
 /*
- * My Deliveries (M17) – the delivery person's phone screen, for today only. "To visit": today's customers (and missed ones)
- * with a search that also finds any other customer; tap one to enter the filled bottles left, the empties collected and
+ * My Deliveries (M17) – the delivery person's phone screen, for today only. "To visit": two tabs – Today (customers due
+ * today) and Missed (delivery date passed, nothing entered; red count, hidden when none) – and a search that looks in both
+ * and also finds any other customer; tap one to enter the filled bottles left, the empties collected and
  * the money received (Cash, Bank transfer or Cheque with its number). With no bottles the money is saved as a payment.
  * "My day": what was saved today – bottles and money by method for the hand-over. A sale over the credit limit is
  * refused here; only the office can approve it. After a bill: "WhatsApp bill sent to 077…" or "Customer has no WhatsApp –
@@ -21,6 +22,7 @@ import { formatDate, formatDateTime, formatMoney, formatNumber, todayIso } from 
 import { toast } from "@/lib/toast";
 import { cn } from "@/lib/utils";
 import { useDueList } from "./api";
+import { splitDue } from "./labels";
 import {
   useBillWhatsApp,
   useFindCustomers,
@@ -67,28 +69,34 @@ export function MyDeliveries({ today = todayIso() }: { today?: string }) {
 function VisitList({ today, onOpen }: { today: string; onOpen: (c: DueCustomer) => void }) {
   const [area, setArea] = useState("");
   const [q, setQ] = useState("");
+  const [part, setPart] = useState<"today" | "missed">("today");
   const areas = useAreas();
   const due = useDueList(today, area);
   const found = useFindCustomers(q);
 
   const text = q.trim().toLowerCase();
   const items = due.data?.items ?? [];
+  const { today: todayList, missed } = splitDue(items);
+  // Missed tab only while someone is missed; a search looks in both tabs.
+  const open = missed.length ? part : "today";
   const shown = text
     ? items.filter((c) =>
         [c.name, c.code, c.address, c.phone].some((v) => (v ?? "").toLowerCase().includes(text)),
       )
-    : items;
+    : open === "missed"
+      ? missed
+      : todayList;
   // Customers not on today's list (another day's route, or no delivery planned today).
   const listed = new Set(items.map((c) => c.id));
   const others = text.length >= 2 ? (found.data ?? []).filter((c) => !listed.has(c.id)) : [];
-  const done = items.filter((c) => c.entered).length;
+  const done = todayList.filter((c) => c.entered).length;
 
   return (
     <>
       <div className="mob-filters">
         <input
           type="search"
-          placeholder="Find a customer – name, code, phone"
+          placeholder="Find a customer – name, code or address"
           aria-label="Find a customer"
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -104,10 +112,24 @@ function VisitList({ today, onOpen }: { today: string; onOpen: (c: DueCustomer) 
             ))}
         </select>
       </div>
+      {missed.length > 0 && !text && (
+        <Tabs
+          tabs={[
+            { id: "today", label: "Today", count: todayList.length },
+            { id: "missed", label: "Missed", count: missed.length, countKind: "bad" },
+          ]}
+          value={open}
+          onChange={setPart}
+        />
+      )}
       <p className="mob-count muted" data-testid="mob-count">
         {due.isPending
           ? "Loading today's customers…"
-          : `${formatDate(today)}: ${items.length} customer(s) to visit · ${done} done`}
+          : text
+            ? `Search in today's and missed customers`
+            : open === "missed"
+              ? `${missed.length} missed customer(s) – longest missed first`
+              : `${formatDate(today)}: ${todayList.length} customer(s) to visit · ${done} done`}
       </p>
       {due.isError && <div className="banner bad">{errorText(due.error)}</div>}
       <ul className="mob-list">
@@ -342,11 +364,6 @@ export function VisitForm({ customer: c, onDone }: { customer: DueCustomer; onDo
       <div className="card mob-who">
         <b>{c.name}</b> <span className="muted">{c.code}</span>
         <div className="muted">{c.address}</div>
-        {c.phone && (
-          <a href={`tel:${c.phone.replace(/\s/g, "")}`} className="mob-tel">
-            Call {c.phone}
-          </a>
-        )}
         <div>
           Balance before: <b>{formatMoney(c.balance)}</b> · {c.payTypeLabel}
         </div>

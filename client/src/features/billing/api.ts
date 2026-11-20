@@ -14,7 +14,6 @@ import type {
   PaymentList,
   CustomerPaymentRequest,
   PaymentSaved,
-  RecentMoney,
 } from "@/lib/api/types";
 
 const KEY = ["billing"] as const;
@@ -48,13 +47,6 @@ export function useAccount(customerId: number | null) {
     queryKey: [...KEY, "account", customerId],
     queryFn: ({ signal }) => api<AccountView>(`/accounts/${customerId}`, { signal }),
     enabled: customerId !== null,
-  });
-}
-
-export function useRecentMoney() {
-  return useQuery({
-    queryKey: [...KEY, "recent"],
-    queryFn: ({ signal }) => api<RecentMoney[]>("/payments/recent", { signal }),
   });
 }
 
@@ -102,6 +94,7 @@ function useChange<TVars, TResult>(fn: (vars: TVars) => Promise<TResult>) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: KEY });
       qc.invalidateQueries({ queryKey: ["customers"] });
+      qc.invalidateQueries({ queryKey: ["money"] });
       qc.invalidateQueries({ queryKey: ["admin", "audit"] });
     },
     meta: { silent: true },

@@ -4292,6 +4292,40 @@ export interface components {
             how: string;
             amount: number;
         };
+        MoneyRow: {
+            kind: string;
+            kindLabel: string;
+            /** Format: int64 */
+            id: number;
+            ref: string;
+            /** Format: date */
+            date: string;
+            /** Format: date-time */
+            at: string;
+            /**
+             * Format: int64
+             * @description Customer, supplier or factory id; null for a walk-in or an expense
+             */
+            partyId: number | null;
+            party: string;
+            methodLabel: string;
+            reference: string | null;
+            note: string | null;
+            amount: number;
+            enteredBy: string;
+        };
+        MoneyList: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            items: components["schemas"]["MoneyRow"][];
+            /** Format: int64 */
+            count: number;
+            total: number;
+            /** Format: int32 */
+            limit: number;
+        };
         InvoiceLine: {
             /** Format: date */
             date: string;
@@ -4621,7 +4655,8 @@ export interface components {
             id: number;
             code: string;
             name: string;
-            phone: string;
+            /** @description Not sent to Delivery Staff */
+            phone: string | null;
             address: string;
             notes: string | null;
             /** Format: int64 */

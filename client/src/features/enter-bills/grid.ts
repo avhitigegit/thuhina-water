@@ -100,7 +100,7 @@ export function fromDue(d: DueCustomer, typeName = ""): GridCustomer {
     id: d.id,
     code: d.code,
     name: d.name,
-    phone: d.phone,
+    phone: d.phone ?? "",
     typeName,
     payType: d.payType,
     payTypeLabel: d.payTypeLabel,

@@ -257,7 +257,7 @@ describe("Dashboard", () => {
     );
     expect(within(actions).getByRole("link", { name: "Receive payment" })).toHaveAttribute(
       "href",
-      "/billing?pay=new",
+      "/payments?pay=new",
     );
   });
 

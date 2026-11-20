@@ -361,8 +361,9 @@ class WhatsAppIntegrationTest extends SalesTestSupport {
                 List.of(map("bottleTypeCode", bottle, "filled", 2, "empties", 2)), "paid", 0))).andExpect(status().isCreated()).andReturn());
         String url = "/delivery/mobile/bills/" + txn + "/whatsapp";
         Map<String, Object> st = read(mvc.perform(get(url).cookie(staff)).andExpect(status().isOk()).andReturn());
-        assertThat(st).containsEntry("state", "QUEUED").containsEntry("toNumber", "077 888 1234").containsEntry("canSend", true);
-        assertThat((String) st.get("text")).isEqualTo("WhatsApp bill is being sent to 077 888 1234.");
+        // The driver never sees the customer's number.
+        assertThat(st).containsEntry("state", "QUEUED").containsEntry("toNumber", null).containsEntry("canSend", true);
+        assertThat((String) st.get("text")).isEqualTo("WhatsApp bill is being sent to the customer.");
         mvc.perform(post(url).cookie(staff)).andExpect(status().isOk());
         assertThat(messages(opted, "DELIVERY_BILL")).hasSize(2);
         mvc.perform(get(url).cookie(login(createUser(Role.DELIVERY_STAFF)))).andExpect(status().isNotFound());   // not their bill

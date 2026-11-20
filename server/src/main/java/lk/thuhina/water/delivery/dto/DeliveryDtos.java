@@ -45,7 +45,7 @@ public final class DeliveryDtos {
             long id,
             String code,
             String name,
-            String phone,
+            @Schema(nullable = true, description = "Not sent to Delivery Staff") String phone,
             String address,
             @Schema(nullable = true) String notes,
             long areaId,

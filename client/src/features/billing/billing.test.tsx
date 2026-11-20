@@ -15,13 +15,18 @@ import type {
   MeResponse,
   PaymentSaved,
 } from "@/lib/api/types";
+import { Payments } from "@/features/payments/Payments";
 import { P } from "@/lib/permissions";
 import { Billing } from "./Billing";
 import { generatedText } from "./InvoicesTab";
 import { paymentProblem, startOfLastMonth } from "./PaymentDialogs";
 
 let search = "";
-vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(search) }));
+const routerReplace = vi.fn();
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(search),
+  useRouter: () => ({ replace: routerReplace }),
+}));
 
 const TODAY = "2026-10-14";
 
@@ -261,31 +266,71 @@ function server() {
             },
           ],
         });
-      if (path === "/api/payments/recent")
-        return json([
-          {
-            kind: "PAYMENT",
-            id: 15,
-            ref: "RC-00015",
-            date: "2026-09-25",
-            at: "2026-09-25T05:00:00Z",
-            customerId: 21,
-            customerName: "Lanka Bakers",
-            how: "Cash",
-            amount: 1400,
-          },
-          {
-            kind: "BILL",
-            id: 278,
-            ref: "B000278",
-            date: "2026-09-24",
-            at: "2026-09-24T05:00:00Z",
-            customerId: null,
-            customerName: "Walk-in",
-            how: "Cash on delivery – bill B000278",
-            amount: 700,
-          },
-        ]);
+      if (path === "/api/money/in")
+        return json({
+          from: "2026-10-01",
+          to: "2026-10-14",
+          count: 2,
+          total: 2100,
+          limit: 500,
+          items: [
+            {
+              kind: "PAYMENT",
+              kindLabel: "Payment received",
+              id: 15,
+              ref: "RC-00015",
+              date: "2026-10-05",
+              at: "2026-10-05T05:00:00Z",
+              partyId: 21,
+              party: "Lanka Bakers",
+              methodLabel: "Cheque",
+              reference: "551200",
+              note: null,
+              amount: 1400,
+              enteredBy: "Shanika",
+            },
+            {
+              kind: "BILL",
+              kindLabel: "Paid on bill",
+              id: 278,
+              ref: "B000278",
+              date: "2026-10-04",
+              at: "2026-10-04T05:00:00Z",
+              partyId: null,
+              party: "Walk-in",
+              methodLabel: "Cash",
+              reference: null,
+              note: null,
+              amount: 700,
+              enteredBy: "Kamal",
+            },
+          ],
+        });
+      if (path === "/api/money/out")
+        return json({
+          from: "2026-10-01",
+          to: "2026-10-14",
+          count: 1,
+          total: 18000,
+          limit: 500,
+          items: [
+            {
+              kind: "EXPENSE",
+              kindLabel: "Expense",
+              id: 3,
+              ref: "EX-0003",
+              date: "2026-10-02",
+              at: "2026-10-02T05:00:00Z",
+              partyId: null,
+              party: "CEB",
+              methodLabel: "Bank transfer",
+              reference: "T-1",
+              note: "Electricity",
+              amount: 18000,
+              enteredBy: "Shanika",
+            },
+          ],
+        });
       if (path === "/api/invoices/preview") {
         const period = new URL(url, "http://x").searchParams.get("period");
         const o = PREVIEW.periods.find((x) => x.period === period);
@@ -293,16 +338,29 @@ function server() {
       }
       if (path === "/api/invoices/41") return json(INVOICE);
       if (path === "/api/customers/lookup")
-        return json([
-          {
-            id: 12,
-            code: "C0012",
-            name: "Hiru Salon",
-            phone: "077 555 1212",
-            areaName: "Maharagama",
-            status: "ACTIVE",
-          },
-        ]);
+        return json(
+          /C0008/.test(url)
+            ? [
+                {
+                  id: 8,
+                  code: "C0008",
+                  name: "Ceyknit Garments",
+                  phone: "038 224 1180",
+                  areaName: "Ja-Ela",
+                  status: "ACTIVE",
+                },
+              ]
+            : [
+                {
+                  id: 12,
+                  code: "C0012",
+                  name: "Hiru Salon",
+                  phone: "077 555 1212",
+                  areaName: "Maharagama",
+                  status: "ACTIVE",
+                },
+              ],
+        );
     }
     if (path === "/api/payments") {
       const b = body as { amount: number };
@@ -332,14 +390,12 @@ function Shell({ children }: { children: ReactNode }) {
   );
 }
 
-function renderPage(role: Role = "ADMIN") {
+function renderPage(role: Role = "ADMIN", page: "billing" | "payments" = "billing") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={qc}>
       <AccessProvider value={{ me: me(role), viewOnly: role === "VIEWER" }}>
-        <Shell>
-          <Billing today={TODAY} />
-        </Shell>
+        <Shell>{page === "billing" ? <Billing today={TODAY} /> : <Payments today={TODAY} />}</Shell>
         <Toaster />
       </AccessProvider>
     </QueryClientProvider>,
@@ -352,6 +408,7 @@ beforeEach(() => {
   calls = [];
   opened = [];
   search = "";
+  routerReplace.mockClear();
   vi.stubGlobal("fetch", server());
   vi.stubGlobal(
     "open",
@@ -393,25 +450,36 @@ describe("billing rules", () => {
   });
 });
 
-describe("Billing & Payments", () => {
-  it("shows the KPIs, the aging table with totals and the recent money", async () => {
+describe("Billing", () => {
+  it("shows the KPIs and the aging table with totals; Receive opens the Payments page", async () => {
     renderPage();
     expect((await screen.findByText("Total outstanding")).nextSibling).toHaveTextContent("Rs. 14,360.00");
     expect(screen.getByText("Over 90 days").closest(".kpi")).toHaveClass("alert");
     const hiru = (await screen.findByRole("button", { name: "Hiru Salon" })).closest("tr") as HTMLElement;
     expect(within(hiru).getByText("7,900")).toHaveStyle({ color: "var(--bad)" });
-    expect(within(hiru).getByRole("button", { name: "Receive" })).toBeInTheDocument();
+    expect(within(hiru).getByRole("link", { name: "Receive" })).toHaveAttribute(
+      "href",
+      "/payments?pay=C0012",
+    );
     const ceyknit = screen.getByRole("button", { name: "Ceyknit Garments" }).closest("tr") as HTMLElement;
     expect(within(ceyknit).getByText("6,760")).toHaveStyle({ color: "var(--warn)" });
     expect(ceyknit).toHaveTextContent("over limit");
     const adv = screen.getByRole("button", { name: "Advance Ltd" }).closest("tr") as HTMLElement;
     expect(adv).toHaveTextContent("-Rs. 300.00");
     expect(adv).toHaveTextContent("advance");
-    expect(within(adv).queryByRole("button", { name: "Receive" })).not.toBeInTheDocument();
+    expect(within(adv).queryByRole("link", { name: "Receive" })).not.toBeInTheDocument();
     const foot = screen.getByText("Total").closest("tr") as HTMLElement;
     expect(foot).toHaveTextContent("Rs. 14,360.00");
-    expect(await screen.findByText("Cash on delivery – bill B000278")).toBeInTheDocument();
-    expect(screen.getByText("RC-00015")).toBeInTheDocument();
+    // Receiving a payment has one home: the Payments page.
+    expect(screen.queryByRole("button", { name: "+ Receive payment" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Recent payments and cash collected")).not.toBeInTheDocument();
+  });
+
+  it("an old link (?pay=C0012) goes to the Payments page", async () => {
+    search = "pay=C0012";
+    renderPage();
+    await waitFor(() => expect(routerReplace).toHaveBeenCalledWith("/payments?pay=C0012"));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
   it("filters by payment type and show", async () => {
@@ -431,9 +499,8 @@ describe("Billing & Payments", () => {
 
   it("receives a part payment by cheque and offers the receipt", async () => {
     const user = userEvent.setup();
-    renderPage();
-    const row = (await screen.findByRole("button", { name: "Hiru Salon" })).closest("tr") as HTMLElement;
-    await user.click(within(row).getByRole("button", { name: "Receive" }));
+    search = "pay=C0012";
+    renderPage("ADMIN", "payments");
     const dialog = await screen.findByRole("dialog", { name: "Receive payment" });
     const amount = within(dialog).getByLabelText("Amount (Rs.)");
     await waitFor(() => expect(amount).toHaveValue(7900));
@@ -471,11 +538,8 @@ describe("Billing & Payments", () => {
 
   it("a Monthly bill payment has no invoice to choose (oldest first) and shows an advance", async () => {
     const user = userEvent.setup();
-    renderPage();
-    const row = (await screen.findByRole("button", { name: "Ceyknit Garments" })).closest(
-      "tr",
-    ) as HTMLElement;
-    await user.click(within(row).getByRole("button", { name: "Receive" }));
+    search = "pay=C0008";
+    renderPage("ADMIN", "payments");
     const dialog = await screen.findByRole("dialog", { name: "Receive payment" });
     await waitFor(() => expect(within(dialog).getByTestId("pay-balance")).toHaveTextContent("Rs. 6,760.00"));
     expect(within(dialog).queryByLabelText("Against invoice")).not.toBeInTheDocument();
@@ -495,7 +559,7 @@ describe("Billing & Payments", () => {
 
   it("opens Receive payment for the customer in the link (?pay=C0012)", async () => {
     search = "pay=C0012";
-    renderPage();
+    renderPage("ADMIN", "payments");
     const dialog = await screen.findByRole("dialog", { name: "Receive payment" });
     expect(within(dialog).getByLabelText("Customer")).toHaveValue("C0012 – Hiru Salon – 077 555 1212");
     await waitFor(() => expect(within(dialog).getByLabelText("Amount (Rs.)")).toHaveValue(7900));
@@ -572,15 +636,54 @@ describe("Billing & Payments", () => {
 
   it("a role with view only sees the accounts and invoices but cannot receive or generate", async () => {
     const user = userEvent.setup();
-    search = "pay=C0012";
     renderPage("VIEWER");
     const row = (await screen.findByRole("button", { name: "Hiru Salon" })).closest("tr") as HTMLElement;
-    expect(within(row).queryByRole("button", { name: "Receive" })).not.toBeInTheDocument();
+    expect(within(row).queryByRole("link", { name: "Receive" })).not.toBeInTheDocument();
     expect(within(row).getByRole("button", { name: "Statement" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "+ Receive payment" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "Monthly invoices" }));
     expect(await screen.findByRole("button", { name: "Vertex Software" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Generate invoices" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Payments", () => {
+  it("lists money in with the total, and money out on its own tab", async () => {
+    const user = userEvent.setup();
+    renderPage("ADMIN", "payments");
+    expect(await screen.findByText("RC-00015")).toBeInTheDocument();
+    const bill = screen.getByText("B000278").closest("tr") as HTMLElement;
+    expect(bill).toHaveTextContent("Paid on bill");
+    expect(bill).toHaveTextContent("Walk-in");
+    expect(screen.getByText("551200")).toBeInTheDocument();
+    const foot = screen.getByText("2 payments").closest("tr") as HTMLElement;
+    expect(foot).toHaveTextContent("Rs. 2,100.00");
+    expect(
+      calls.some(
+        (c) => c.path === "/api/money/in" && /from=2026-10-01/.test(c.url) && /to=2026-10-14/.test(c.url),
+      ),
+    ).toBe(true);
+    expect(screen.getByRole("button", { name: "+ Receive payment" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("tab", { name: "Money out" }));
+    const exp = (await screen.findByText("EX-0003")).closest("tr") as HTMLElement;
+    expect(exp).toHaveTextContent("CEB");
+    expect(exp).toHaveTextContent("Electricity");
+    expect(screen.getByText("1 payment").closest("tr")).toHaveTextContent("Rs. 18,000.00");
+
+    await user.type(screen.getByLabelText("Search"), "ceb");
+    await waitFor(() =>
+      expect(calls.some((c) => c.path === "/api/money/out" && /q=ceb/.test(c.url))).toBe(true),
+    );
+  });
+
+  it("view only: the lists but no payment buttons", async () => {
+    search = "pay=C0012";
+    renderPage("VIEWER", "payments");
+    expect(await screen.findByText("RC-00015")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "+ Receive payment" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Pay supplier" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 });

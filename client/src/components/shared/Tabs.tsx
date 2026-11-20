@@ -5,12 +5,15 @@
  * (e.g. /billing#invoices) opens the same tab.
  *   const [tab, setTab] = useHashTab(["accounts", "payments"]);
  *   <Tabs tabs={[{ id: "accounts", label: "Accounts" }, …]} value={tab} onChange={setTab} />
+ * A tab can show a count after its label ({ count: 2, countKind: "bad" } = a red 2).
  */
 import { useCallback, useEffect, useState } from "react";
 
 export interface TabItem {
   id: string;
   label: string;
+  count?: number;
+  countKind?: "bad";
 }
 
 export function useHashTab<T extends string>(ids: readonly T[]): [T, (id: T) => void] {
@@ -46,7 +49,7 @@ export function Tabs<T extends string>({
   value,
   onChange,
 }: {
-  tabs: { id: T; label: string }[];
+  tabs: (TabItem & { id: T })[];
   value: T;
   onChange: (id: T) => void;
 }) {
@@ -62,6 +65,11 @@ export function Tabs<T extends string>({
           onClick={() => onChange(t.id)}
         >
           {t.label}
+          {t.count !== undefined && (
+            <span className={t.countKind === "bad" && t.count > 0 ? "tab-count bad" : "tab-count"}>
+              {t.count}
+            </span>
+          )}
         </button>
       ))}
     </div>
