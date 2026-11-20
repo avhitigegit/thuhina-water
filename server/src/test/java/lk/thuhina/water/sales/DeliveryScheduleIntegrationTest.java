@@ -327,7 +327,8 @@ class DeliveryScheduleIntegrationTest extends SalesTestSupport {
         PrintDocument.Table customers = doc.tables().get(1);
         assertThat(customers.rows()).hasSize(3);
         assertThat(customers.rows().getFirst()).containsExactly(areaName());
-        assertThat(customers.rows().get(1).subList(8, 12)).containsOnly("");
+        assertThat(customers.rows().get(1).subList(7, 11)).containsOnly("");
+        assertThat(customers.headers()).doesNotContain("Phone");
         assertThat(doc.page()).isEqualTo(PrintDocument.Page.A4_LANDSCAPE);
     }
 
