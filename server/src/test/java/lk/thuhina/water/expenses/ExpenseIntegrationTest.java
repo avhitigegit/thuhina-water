@@ -170,7 +170,7 @@ class ExpenseIntegrationTest extends IntegrationTest {
         assertThat(fieldError(call(post("/expenses"), admin, expense("method", "CHEQUE"), 400)))
                 .isEqualTo("reference: Enter the cheque number.");
         assertThat(fieldError(call(post("/expenses"), admin, expense("method", "BANK_TRANSFER", "reference", " "), 400)))
-                .isEqualTo("reference: Enter the bank reference.");
+                .isEqualTo("reference: Enter the transfer reference.");
         assertThat(fieldError(call(post("/expenses"), admin, expense("paidDate", today.plusDays(1).toString()), 400)))
                 .isEqualTo("paidDate: Date cannot be after today (" + BusinessDates.format(today) + ").");
         assertThat(fieldError(call(post("/expenses"), admin, expense("forMonth", thisMonth.plusMonths(1).toString()), 400)))
@@ -223,7 +223,7 @@ class ExpenseIntegrationTest extends IntegrationTest {
                 + "where id = ?", Boolean.class, id)).isTrue();
         List<Map<String, Object>> log = audit(no);
         assertThat(log).extracting(a -> a.get("action")).containsExactly("CREATE", "UPDATE", "UPDATE", "DELETE");
-        assertThat((String) log.get(1).get("details")).contains("amount Rs. 4,260.00 → Rs. 4,500.00", "paid by Bank transfer (TRF-1)");
+        assertThat((String) log.get(1).get("details")).contains("amount Rs. 4,260.00 → Rs. 4,500.00", "paid by Online transfer (TRF-1)");
         assertThat((String) log.getLast().get("details")).isEqualTo(typeName + " Rs. 4,600.00 for " + ExpenseRules.monthLabel(thisMonth)
                 + " – Store – bill – deleted: Entered twice");
         assertThat(jdbc.queryForObject("select details from audit_log where entity = 'Expense type' and ref = ? and action = 'UPDATE'",

@@ -126,16 +126,25 @@ public final class ProductionDtos {
     }
 
     /**
-     * Filling cost of one factory in one month (by return date); {@code paid} = the factory's payments spread over its
-     * months oldest first. Status PAID / PART_PAID / UNPAID.
+     * Filling cost of one factory in one month (by return date); {@code paid} = what was paid on that month's bills. Status PAID / PART_PAID / UNPAID.
      */
     public record FactoryMonth(long factoryId, String factoryName, String period, String periodLabel, int filled, int rejected,
                                BigDecimal cost, BigDecimal paid, BigDecimal due, String status, String statusLabel) {
     }
 
-    /** A payment to a factory: it clears the oldest filling cost first. */
+    /**
+     * A filling bill: one factory return (FR-0001) with its filling cost. Factory payments are Bill to Bill – each payment
+     * pays the bills ticked. Status PAID / PART_PAID / UNPAID.
+     */
+    public record FactoryBill(long id, String billNo, LocalDate date, FactoryLink factory, String batchNo, String dispatchNo,
+                              String bottleLabel, int filled, int rejected, BigDecimal cost, BigDecimal paid, BigDecimal due,
+                              String status, String statusLabel) {
+    }
+
+    /** A payment to a factory against the bills ticked ({@code billIds} = factory return ids); the amount goes oldest bill first. */
     public record FactoryPaymentRequest(
             Long factoryId,
+            @Schema(description = "The filling bills paid (factory return ids) – at least one") List<Long> billIds,
             @NotNull(message = "Enter the date.") LocalDate date,
             BigDecimal amount,
             PayMethod method,
@@ -143,9 +152,12 @@ public final class ProductionDtos {
             @Size(max = 200, message = "Note: at most 200 characters.") String note) {
     }
 
-    /** {@code period} only on payments recorded for one month (before payments cleared the oldest cost first). */
+    /**
+     * {@code bills} = the bill numbers paid ("FR-0003, FR-0004"); null on payments made before Bill to Bill, which
+     * cleared the oldest cost first ({@code period} only on the even older ones recorded for one month).
+     */
     public record FactoryPaymentRow(long id, String fpNo, LocalDate date, FactoryLink factory, @Schema(nullable = true) String period,
-                                    @Schema(nullable = true) String periodLabel,
+                                    @Schema(nullable = true) String periodLabel, @Schema(nullable = true) String bills,
                                     String method, String methodLabel, @Schema(nullable = true) String reference, BigDecimal amount,
                                     @Schema(nullable = true) String note, String createdByName) {
     }

@@ -88,7 +88,7 @@ public class BillingController {
 
     // ------------------------------------------------------------------ payments
 
-    @Operation(summary = "Receive a payment (RC-00001). Reference required for Bank transfer and Cheque; part payments and advances allowed")
+    @Operation(summary = "Receive a payment (RC-00001). Reference required for Online transfer, Cheque and Bill to Bill; part payments and advances allowed")
     @PostMapping("/payments")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize(EDIT)

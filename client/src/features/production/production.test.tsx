@@ -6,11 +6,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PageActionsSlotContext } from "@/components/layout/PageActions";
 import { Toaster } from "@/components/shared/Toaster";
 import { AccessProvider } from "@/features/auth/access";
-import type { BatchView, DispatchView, FactoryMonth, MeResponse, ProductionSummary } from "@/lib/api/types";
+import type {
+  BatchView,
+  DispatchView,
+  FactoryBill,
+  FactoryMonth,
+  MeResponse,
+  ProductionSummary,
+} from "@/lib/api/types";
 import { todayIso } from "@/lib/format";
 import { P } from "@/lib/permissions";
 import { Production } from "./Production";
-import { FactoryPaymentDialog } from "./ProductionDialogs";
+import { FactoryPaymentDialog } from "./FactoryPaymentDialog";
 
 let search = "";
 vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams(search) }));
@@ -123,6 +130,33 @@ const MONTHS: FactoryMonth[] = [
   },
 ];
 
+function bill(id: number, billNo: string, date: string, cost: number, paid: number): FactoryBill {
+  const due = cost - paid;
+  const status = due <= 0 ? "PAID" : paid > 0 ? "PART_PAID" : "UNPAID";
+  return {
+    id,
+    billNo,
+    date,
+    factory: { id: 1, code: "F01", name: "AquaSeal" },
+    batchNo: `FB-00${id}`,
+    dispatchNo: "FD-0009",
+    bottleLabel: "20L",
+    filled: cost / 60,
+    rejected: 0,
+    cost,
+    paid,
+    due,
+    status,
+    statusLabel: status === "PAID" ? "Paid" : status === "PART_PAID" ? "Part paid" : "Unpaid",
+  };
+}
+
+// Newest first, as the server sends them.
+const BILLS: FactoryBill[] = [
+  bill(12, "FR-0012", "2026-09-20", 3000, 0),
+  bill(11, "FR-0011", "2026-09-05", 6000, 1000),
+];
+
 const FACTORIES = [
   {
     id: 1,
@@ -174,6 +208,7 @@ function server() {
       if (path === "/api/factory-batches") return json(BATCHES);
       if (path === "/api/factory-balances") return json(MONTHS);
       if (path === "/api/factory-payments") return json([]);
+      if (path === "/api/factory-bills") return json(BILLS);
       if (path === "/api/factories") return json(FACTORIES);
     }
     if (path === "/api/factory-dispatches") return json(SENT, 201);
@@ -184,7 +219,7 @@ function server() {
         201,
       );
     }
-    if (path === "/api/factory-payments") return json({ id: 2, fpNo: "FP-0002" }, 201);
+    if (path === "/api/factory-payments") return json({ id: 2, fpNo: "FP-0002", bills: "FR-0011" }, 201);
     return json({ code: "NOT_FOUND", message: "Not found " + method + " " + path }, 404);
   });
 }
@@ -361,26 +396,66 @@ describe("Filling Factory", () => {
     expect(screen.queryByText("Payments made")).not.toBeInTheDocument();
   });
 
-  it("Pay factory (on the Payments page) – oldest cost first, no month to choose", async () => {
+  it("Pay factory (on the Payments page) – Bill to Bill: tick the bills, the amount fills in", async () => {
     const user = userEvent.setup();
     renderPage(
       "ADMIN",
       <FactoryPaymentDialog factories={SUMMARY.factories} today={TODAY} onClose={() => {}} />,
     );
-    const dialog = await screen.findByRole("dialog", { name: "Pay factory" });
+    const dialog = await screen.findByRole("dialog", { name: "Pay factory – Bill to Bill" });
     expect(within(dialog).getByLabelText("Factory")).toHaveDisplayValue("AquaSeal – owed Rs. 72,480.00");
-    expect(within(dialog).getByLabelText("Amount (Rs.)")).toHaveValue(72480);
-    expect(dialog).toHaveTextContent("The payment clears the oldest filling cost first.");
-    await user.type(within(dialog).getByLabelText("Bank reference"), "COM-TRF-1");
+    const bills = await within(dialog).findByTestId("fp-bills");
+    // Oldest bill first, with what is still due.
+    const rows = within(bills).getAllByRole("row").slice(1);
+    expect(rows[0]).toHaveTextContent("FR-0011");
+    expect(rows[0]).toHaveTextContent("Rs. 5,000.00");
+    expect(rows[1]).toHaveTextContent("FR-0012");
+
+    // Nothing ticked: refused.
+    await user.click(within(dialog).getByRole("button", { name: "Save payment" }));
+    expect(dialog).toHaveTextContent("Tick the bills this payment pays.");
+    expect(posted("/api/factory-payments")).toHaveLength(0);
+
+    await user.click(within(dialog).getByLabelText("Pay FR-0011"));
+    expect(within(dialog).getByLabelText("Amount (Rs.)")).toHaveValue(5000);
+    await user.click(within(dialog).getByLabelText("Tick all bills"));
+    expect(within(dialog).getByLabelText("Amount (Rs.)")).toHaveValue(8000);
+    expect(within(dialog).getByTestId("fp-ticked")).toHaveTextContent("2 bill(s) ticked");
+    await user.click(within(dialog).getByLabelText("Pay FR-0012"));
+
+    await user.type(within(dialog).getByLabelText("Transfer reference"), "COM-TRF-1");
     await user.click(within(dialog).getByRole("button", { name: "Save payment" }));
     await waitFor(() => expect(posted("/api/factory-payments")).toHaveLength(1));
     expect(posted("/api/factory-payments")[0].body).toMatchObject({
       factoryId: 1,
-      amount: 72480,
+      billIds: [11],
+      amount: 5000,
       method: "BANK_TRANSFER",
       reference: "COM-TRF-1",
     });
-    expect(posted("/api/factory-payments")[0].body).not.toHaveProperty("period");
+  });
+
+  it("Pay factory with Bill to Bill as Paid by: the reference may be left empty", async () => {
+    const user = userEvent.setup();
+    renderPage(
+      "ADMIN",
+      <FactoryPaymentDialog factories={SUMMARY.factories} today={TODAY} onClose={() => {}} />,
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Pay factory – Bill to Bill" });
+    await within(dialog).findByTestId("fp-bills");
+    await user.click(within(dialog).getByLabelText("Pay FR-0012"));
+    await user.selectOptions(within(dialog).getByLabelText("Paid by"), "BILL_TO_BILL");
+    expect(within(dialog).getByLabelText("Bill number it pays")).toHaveAttribute(
+      "placeholder",
+      "Left empty: the bills ticked",
+    );
+    await user.click(within(dialog).getByRole("button", { name: "Save payment" }));
+    await waitFor(() => expect(posted("/api/factory-payments")).toHaveLength(1));
+    expect(posted("/api/factory-payments")[0].body).toMatchObject({
+      billIds: [12],
+      amount: 3000,
+      method: "BILL_TO_BILL",
+    });
   });
 
   it("opens Send empties from a link (?send=1)", async () => {

@@ -490,12 +490,12 @@ class PurchasingIntegrationTest extends IntegrationTest {
         send(post("/supplier-payments"), pay).andExpect(jsonPath("$.details.fields.amount").value("Enter the amount paid."));
         pay.put("amount", 50000);
         send(post("/supplier-payments"), pay)
-                .andExpect(jsonPath("$.details.fields.reference").value("Enter the bank reference."));
+                .andExpect(jsonPath("$.details.fields.reference").value("Enter the transfer reference."));
         pay.put("reference", "BOC-1");
         Map<String, Object> paid = ok(send(post("/supplier-payments"), pay), 201);
         assertThat((String) paid.get("spNo")).matches("SP-\\d{4,}");
         // No purchase order to pick: the payment clears the oldest receipt first.
-        assertThat(paid).containsEntry("poNo", null).containsEntry("methodLabel", "Bank transfer");
+        assertThat(paid).containsEntry("poNo", null).containsEntry("methodLabel", "Online transfer");
         ok(send(post("/supplier-payments"), map("supplierId", supplierA, "date", today.toString(), "amount", 2000, "method", "CASH")), 201);
 
         BigDecimal owed = value.subtract(BigDecimal.valueOf(52000));

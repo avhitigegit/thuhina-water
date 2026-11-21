@@ -427,7 +427,7 @@ describe("billing rules", () => {
     expect(paymentProblem(ok)).toBeNull();
     expect(paymentProblem({ ...ok, customer: false })).toBe("Select a customer.");
     expect(paymentProblem({ ...ok, amount: 0 })).toBe("Enter the amount received.");
-    expect(paymentProblem({ ...ok, method: "BANK_TRANSFER" })).toBe("Enter the bank reference.");
+    expect(paymentProblem({ ...ok, method: "BANK_TRANSFER" })).toBe("Enter the transfer reference.");
     expect(paymentProblem({ ...ok, method: "CHEQUE", reference: " " })).toBe("Enter the cheque number.");
     expect(startOfLastMonth("2026-10-14")).toBe("2026-09-01");
     expect(startOfLastMonth("2027-01-05")).toBe("2026-12-01");

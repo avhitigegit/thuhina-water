@@ -55,7 +55,7 @@ public final class CustomerDtos {
             Integer oldBottles,
             Long oldBrandId,
             BigDecimal paid,
-            @Schema(description = "How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE") PayMethod payMethod,
+            @Schema(description = "How the money paid was received: CASH (default), CARD, BANK_TRANSFER (online transfer), CHEQUE or BILL_TO_BILL") PayMethod payMethod,
             @Schema(description = "Cheque number or bank reference (needed for those methods)")
             @Size(max = 100, message = "Reference: at most 100 characters.") String payReference,
             Boolean approveOverLimit,

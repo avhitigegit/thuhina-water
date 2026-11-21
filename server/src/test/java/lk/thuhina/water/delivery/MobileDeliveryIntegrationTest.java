@@ -70,7 +70,7 @@ class MobileDeliveryIntegrationTest extends SalesTestSupport {
         assertThat(saved.getResponse().getStatus()).as(saved.getResponse().getContentAsString()).isEqualTo(201);
         Map<String, Object> txn = (Map<String, Object>) read(saved).get("txn");
         assertThat(txn).containsEntry("date", today.toString()).containsEntry("paperBillNo", null)
-                .containsEntry("payMethod", "Bank transfer").containsEntry("payReference", "TRF-77")
+                .containsEntry("payMethod", "Online transfer").containsEntry("payReference", "TRF-77")
                 .containsEntry("createdBy", staffUser.getUsername());
         assertThat(txn).containsEntry("enteredOnPhone", true);
         assertThat(bottles(c)).containsExactly(4, 0, 0);
@@ -109,6 +109,7 @@ class MobileDeliveryIntegrationTest extends SalesTestSupport {
         Map<String, Object> money = (Map<String, Object>) day.get("money");
         assertThat(new BigDecimal(money.get("cash").toString())).isEqualByComparingTo("500");
         assertThat(new BigDecimal(money.get("bankTransfer").toString())).isEqualByComparingTo("700");
+        assertThat(new BigDecimal(money.get("card").toString())).isEqualByComparingTo("0");
         assertThat(new BigDecimal(money.get("total").toString())).isEqualByComparingTo("1200");
         assertThat((List<Map<String, Object>>) day.get("bottles")).singleElement()
                 .satisfies(b -> assertThat(b).containsEntry("bottleTypeCode", bottle).containsEntry("filled", 2).containsEntry("empties", 2));
