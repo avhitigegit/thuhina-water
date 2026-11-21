@@ -916,7 +916,7 @@
     width: 104px;
   }
   .bill-grid input.w-cust {
-    width: 260px;
+    width: 240px;
   }
   .bill-grid input.w-qty {
     width: 60px;
@@ -924,7 +924,7 @@
     font-variant-numeric: tabular-nums;
   }
   .bill-grid input.w-paid {
-    width: 96px;
+    width: 128px;
     text-align: right;
     font-variant-numeric: tabular-nums;
   }
@@ -934,13 +934,13 @@
     margin-top: 4px;
   }
   .bill-grid .paid-by select {
-    width: 96px;
+    width: 128px;
   }
   .bill-grid .paid-by input.w-paid {
     text-align: left;
   }
   .bill-grid input.w-note {
-    width: 190px;
+    width: 170px;
   }
   .bill-grid select {
     width: 118px;
