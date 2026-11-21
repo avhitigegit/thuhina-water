@@ -359,19 +359,41 @@ class ProductionIntegrationTest extends IntegrationTest {
         assertThat(f).containsEntry("atFactory", 10);
         assertThat(money(f.get("owed"))).isEqualByComparingTo("2400");
 
-        // No month to choose: a payment clears the oldest filling cost first.
+        // Bill to Bill: the payment pays the bills ticked (one bill per return).
+        ok(receive(id(b), today, 5, 0, null), 201);
+        List<Map<String, Object>> bills = getList("/factory-bills?open=true&factory=" + factoryId, accountant);
+        assertThat(bills).hasSize(2);
+        long first = id(bills.get(1));
+        long second = id(bills.get(0));
+        assertThat(money(bills.get(1).get("cost"))).isEqualByComparingTo("2400");
+        assertThat(bills.get(1)).containsEntry("status", "UNPAID").containsEntry("filled", 40);
+
         Map<String, Object> pay = map("factoryId", factoryId, "date", today.toString(), "amount", 1000, "method", "BANK_TRANSFER");
+        send(post("/factory-payments"), pay).andExpect(jsonPath("$.details.fields.billIds").value("Tick the bills this payment pays."));
+        pay.put("billIds", List.of(first));
         send(post("/factory-payments"), pay)
-                .andExpect(jsonPath("$.details.fields.reference").value("Enter the bank reference."));
+                .andExpect(jsonPath("$.details.fields.reference").value("Enter the transfer reference."));
         pay.put("reference", "COM-1");
+        pay.put("amount", 2401);
+        send(post("/factory-payments"), pay).andExpect(jsonPath("$.details.fields.amount").value(org.hamcrest.Matchers.startsWith("More than")));
+        pay.put("amount", 1000);
         Map<String, Object> paid = ok(send(post("/factory-payments"), pay), 201);
         assertThat((String) paid.get("fpNo")).matches("FP-\\d{4,}");
+        assertThat(paid).containsEntry("bills", bills.get(1).get("billNo")).containsEntry("methodLabel", "Online transfer");
         assertThat(monthRow()).containsEntry("status", "PART_PAID");
-        ok(send(post("/factory-payments"), map("factoryId", factoryId, "date", today.toString(), "amount", 1400,
-                "method", "CASH")), 201);
+        Map<String, Object> firstBill = getList("/factory-bills?factory=" + factoryId, accountant).stream().filter(x -> id(x) == first)
+                .findFirst().orElseThrow();
+        assertThat(firstBill).containsEntry("status", "PART_PAID");
+        assertThat(money(firstBill.get("due"))).isEqualByComparingTo("1400");
+
+        // Both bills, Bill to Bill without a reference: the bill numbers are the reference.
+        Map<String, Object> rest = ok(send(post("/factory-payments"), map("factoryId", factoryId, "billIds", List.of(first, second),
+                "date", today.toString(), "amount", 1700, "method", "BILL_TO_BILL")), 201);
+        assertThat((String) rest.get("reference")).contains((String) bills.get(1).get("billNo"), (String) bills.get(0).get("billNo"));
         m = monthRow();
         assertThat(m).containsEntry("status", "PAID").containsEntry("statusLabel", "Paid");
         assertThat(money(m.get("due"))).isEqualByComparingTo("0");
+        assertThat(getList("/factory-bills?open=true&factory=" + factoryId, accountant)).isEmpty();
         f = getList("/factories", admin).stream().filter(x -> id(x) == factoryId).findFirst().orElseThrow();
         assertThat(money(f.get("owed"))).isEqualByComparingTo("0");
         assertThat(getList("/factory-payments", accountant)).filteredOn(p -> ((Map<?, ?>) p.get("factory")).get("id").equals((int) factoryId))
@@ -396,7 +418,7 @@ class ProductionIntegrationTest extends IntegrationTest {
         Map<String, Object> d = ok(dispatch(today, 5), 201);
         long batchId = id(batchOf(d));
         for (String url : List.of("/production/summary", "/factory-batches", "/factory-batches/" + batchId, "/factory-dispatches/" + d.get("dispatchNo"),
-                "/factory-balances", "/factory-payments")) {
+                "/factory-balances", "/factory-bills", "/factory-payments")) {
             mvc.perform(get(url).cookie(accountant)).andExpect(status().isOk());
         }
         mvc.perform(body(post("/factory-dispatches"), accountant, map("factoryId", factoryId, "date", today.toString(), "lines", List.of())))

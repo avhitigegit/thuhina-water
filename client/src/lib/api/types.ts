@@ -200,6 +200,7 @@ export type FactoryReceiveResult = Schemas["FactoryReceiveResult"];
 export type FactoryBottleStock = Schemas["FactoryBottleStock"];
 export type FactoryOwed = Schemas["FactoryOwed"];
 export type ProductionSummary = Schemas["ProductionSummary"];
+export type FactoryBill = Schemas["FactoryBill"];
 export type FactoryMonth = Schemas["FactoryMonth"];
 export type FactoryPaymentRequest = Schemas["FactoryPaymentRequest"];
 export type FactoryPaymentRow = Schemas["FactoryPaymentRow"];
@@ -422,8 +423,10 @@ export interface MyBottles {
 }
 export interface MyMoney {
   cash: number;
+  card: number;
   bankTransfer: number;
   cheque: number;
+  billToBill: number;
   total: number;
 }
 export interface MyDay {

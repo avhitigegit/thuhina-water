@@ -7,6 +7,7 @@ import type {
   BatchView,
   DispatchRequest,
   DispatchView,
+  FactoryBill,
   FactoryMonth,
   FactoryPaymentRequest,
   FactoryPaymentRow,
@@ -35,6 +36,18 @@ export function useFactoryBalances() {
   return useQuery({
     queryKey: [...KEY, "balances"],
     queryFn: ({ signal }) => api<FactoryMonth[]>("/factory-balances", { signal }),
+  });
+}
+
+/** Filling bills (one per factory return): Bill to Bill payments pay these. {@code open}: only bills with something due. */
+export function useFactoryBills(factoryId: number | null = null, open = false) {
+  return useQuery({
+    queryKey: [...KEY, "bills", factoryId, open],
+    queryFn: ({ signal }) =>
+      api<FactoryBill[]>("/factory-bills", {
+        signal,
+        query: { ...(factoryId !== null ? { factory: factoryId } : {}), open },
+      }),
   });
 }
 

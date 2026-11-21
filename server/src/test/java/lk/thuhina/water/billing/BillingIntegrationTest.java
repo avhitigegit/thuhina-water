@@ -175,7 +175,7 @@ class BillingIntegrationTest extends SalesTestSupport {
         send("/payments", base).andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.details.fields.reference").value("Enter the cheque number."));
         base.put("method", "BANK_TRANSFER");
-        send("/payments", base).andExpect(jsonPath("$.details.fields.reference").value("Enter the bank reference."));
+        send("/payments", base).andExpect(jsonPath("$.details.fields.reference").value("Enter the transfer reference."));
         base.put("method", null);
         send("/payments", base).andExpect(jsonPath("$.details.fields.method").value("Select how the money was received."));
         base.put("method", "CASH");

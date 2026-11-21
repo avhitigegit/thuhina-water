@@ -240,8 +240,8 @@ describe("My Deliveries", () => {
     await user.click(screen.getByRole("button", { name: "Filled left – 20L – more" }));
     await waitFor(() => expect(screen.getByTestId("mob-sum")).toHaveTextContent("Rs. 1,050.00"));
     await user.click(screen.getByRole("button", { name: /This bill Rs. 1,050.00/ }));
-    await user.click(screen.getByRole("radio", { name: "Bank transfer" }));
-    await user.type(screen.getByLabelText("Bank reference"), "TRF-77");
+    await user.click(screen.getByRole("radio", { name: "Online transfer" }));
+    await user.type(screen.getByLabelText("Transfer reference"), "TRF-77");
     await user.click(screen.getByRole("button", { name: "Save delivery" }));
 
     await waitFor(() => expect(posts).toHaveLength(1));
@@ -321,7 +321,7 @@ describe("My day", () => {
       bills: 1,
       payments: 1,
       bottles: [{ bottleTypeCode: "B20", label: "20L", filled: 3, empties: 2 }],
-      money: { cash: 500, bankTransfer: 1050, cheque: 0, total: 1550 },
+      money: { cash: 500, card: 0, bankTransfer: 1050, cheque: 0, billToBill: 0, total: 1550 },
       entries: [
         {
           entry: "PAYMENT",
@@ -353,7 +353,7 @@ describe("My day", () => {
           empties: 1,
           amount: 350,
           received: 350,
-          method: "Bank transfer",
+          method: "Online transfer",
           reference: "TRF-1",
           cancelled: true,
         },
@@ -366,6 +366,6 @@ describe("My day", () => {
       "20L: 3 filled left · 2 empties collected",
     );
     expect(screen.getByText("Cancelled by office")).toBeInTheDocument();
-    expect(screen.getByText(/Bank transfer \(TRF-1\)/)).toBeInTheDocument();
+    expect(screen.getByText(/Online transfer \(TRF-1\)/)).toBeInTheDocument();
   });
 });

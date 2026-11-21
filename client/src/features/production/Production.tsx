@@ -2,7 +2,7 @@
 
 /*
  * Filling Factory (M10, prototype production/production.html, FR-23 – FR-26): actions Send empties and Receive filled
- * bottles (Admin); KPIs (empty and at factory per bottle type, owed to each factory); tabs Batches · Owed to factories.
+ * bottles (Admin); KPIs (empty and at factory per bottle type, owed to each factory); tabs Batches · Owed to factories (filling bills – Bill to Bill – and cost by month).
  * Paying a factory has one home – the Payments page (Money out).
  * ?send=1 opens Send empties (links from the Stock page and Delivery Planning). Accountant: view only.
  */
@@ -15,10 +15,10 @@ import { KpiCard, KpiGrid } from "@/components/shared/KpiCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Tabs, useHashTab } from "@/components/shared/Tabs";
 import { Can, useCan } from "@/features/auth/access";
-import type { BatchView, DispatchView, FactoryMonth } from "@/lib/api/types";
+import type { BatchView, DispatchView, FactoryBill, FactoryMonth } from "@/lib/api/types";
 import { formatDate, formatMoney, todayIso } from "@/lib/format";
 import { P } from "@/lib/permissions";
-import { useBatches, useFactoryBalances, useProductionSummary } from "./api";
+import { useBatches, useFactoryBalances, useFactoryBills, useProductionSummary } from "./api";
 import {
   DispatchSentDialog,
   openDispatchNote,
@@ -207,6 +207,18 @@ function BatchesTab({
 
 function PaymentsTab() {
   const balances = useFactoryBalances();
+  const bills = useFactoryBills();
+  const billColumns: Column<FactoryBill>[] = [
+    { key: "bill", header: "Bill", cell: (b) => <b>{b.billNo}</b> },
+    { key: "date", header: "Received", cell: (b) => formatDate(b.date) },
+    { key: "factory", header: "Factory", cell: (b) => b.factory.name },
+    { key: "batch", header: "Batch", cell: (b) => b.batchNo },
+    { key: "filled", header: "Bottles filled", align: "num", cell: (b) => `${b.filled} × ${b.bottleLabel}` },
+    { key: "cost", header: "Cost", align: "num", cell: (b) => formatMoney(b.cost) },
+    { key: "paid", header: "Paid", align: "num", cell: (b) => formatMoney(b.paid) },
+    { key: "due", header: "Due", align: "num", cell: (b) => formatMoney(b.due) },
+    { key: "status", header: "Status", cell: (b) => <StatusBadge status={b.statusLabel} /> },
+  ];
   const monthColumns: Column<FactoryMonth>[] = [
     { key: "month", header: "Month", cell: (m) => m.periodLabel },
     { key: "factory", header: "Factory", cell: (m) => m.factoryName },
@@ -217,31 +229,50 @@ function PaymentsTab() {
     { key: "status", header: "Status", cell: (m) => <StatusBadge status={m.statusLabel} /> },
   ];
   return (
-    <div className="card">
-      <div className="card-head">
-        <h2>Filling cost by month</h2>
-        <div style={{ display: "flex", gap: 8 }}>
-          <Link className="btn" href="/payments#out">
-            Payments made →
-          </Link>
-          <Can permission={P.PRODUCTION_EDIT}>
-            <Link className="btn primary" href="/payments?factory=1#out">
-              Pay factory
-            </Link>
-          </Can>
+    <>
+      <div className="card">
+        <div className="card-head">
+          <h2>Filling bills</h2>
+          <span className="small muted">Bill to Bill: each factory payment pays the bills ticked.</span>
         </div>
+        {bills.isError ? (
+          <div className="banner bad">{bills.error.message}</div>
+        ) : (
+          <DataTable
+            columns={billColumns}
+            rows={bills.data}
+            loading={bills.isPending}
+            rowKey={(b) => b.id}
+            empty="No filling bills yet."
+          />
+        )}
       </div>
-      {balances.isError ? (
-        <div className="banner bad">{balances.error.message}</div>
-      ) : (
-        <DataTable
-          columns={monthColumns}
-          rows={balances.data}
-          loading={balances.isPending}
-          rowKey={(m) => `${m.factoryId}-${m.period}`}
-          empty="No filling cost yet."
-        />
-      )}
-    </div>
+      <div className="card">
+        <div className="card-head">
+          <h2>Filling cost by month</h2>
+          <div style={{ display: "flex", gap: 8 }}>
+            <Link className="btn" href="/payments#out">
+              Payments made →
+            </Link>
+            <Can permission={P.PRODUCTION_EDIT}>
+              <Link className="btn primary" href="/payments?factory=1#out">
+                Pay factory
+              </Link>
+            </Can>
+          </div>
+        </div>
+        {balances.isError ? (
+          <div className="banner bad">{balances.error.message}</div>
+        ) : (
+          <DataTable
+            columns={monthColumns}
+            rows={balances.data}
+            loading={balances.isPending}
+            rowKey={(m) => `${m.factoryId}-${m.period}`}
+            empty="No filling cost yet."
+          />
+        )}
+      </div>
+    </>
   );
 }

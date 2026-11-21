@@ -28,7 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * My Deliveries on the phone (M17): money received without a delivery (a payment for today) and the delivery person's day –
- * what they saved today, the bottles left / collected and the money by Cash, Bank transfer and Cheque for the hand-over.
+ * what they saved today, the bottles left / collected and the money by Cash, Card, Online transfer, Cheque and Bill to Bill for the hand-over.
  * The delivery bills themselves are saved by {@code SalesService.postMobileBill}.
  */
 @Service
@@ -86,9 +86,10 @@ public class MobileDeliveryService {
                 order by b.litres, l.bottle_type_code""", p, (rs, i) -> new MyBottles(rs.getString("bottle_type_code"),
                 LedgerRules.bottleLabel(rs.getBigDecimal("litres")), rs.getInt("filled"), rs.getInt("empties")));
 
-        BigDecimal cash = Money.ZERO;
-        BigDecimal bank = Money.ZERO;
-        BigDecimal cheque = Money.ZERO;
+        java.util.EnumMap<PayMethod, BigDecimal> by = new java.util.EnumMap<>(PayMethod.class);
+        for (PayMethod m : PayMethod.values()) {
+            by.put(m, Money.ZERO);
+        }
         int bills = 0;
         int paid = 0;
         for (MyEntry e : entries) {
@@ -103,15 +104,13 @@ public class MobileDeliveryService {
             if (e.received().signum() <= 0) {
                 continue;
             }
-            if (PayMethod.CHEQUE.label().equals(e.method())) {
-                cheque = cheque.add(e.received());
-            } else if (PayMethod.BANK_TRANSFER.label().equals(e.method())) {
-                bank = bank.add(e.received());
-            } else {
-                cash = cash.add(e.received());
-            }
+            PayMethod m = java.util.Arrays.stream(PayMethod.values()).filter(x -> x.label().equals(e.method())).findFirst()
+                    .orElse(PayMethod.CASH);
+            by.merge(m, e.received(), BigDecimal::add);
         }
-        return new MyDay(d, bills, paid, bottles, new MyMoney(Money.of(cash), Money.of(bank), Money.of(cheque),
-                Money.of(cash.add(bank).add(cheque))), entries);
+        BigDecimal total = by.values().stream().reduce(Money.ZERO, BigDecimal::add);
+        return new MyDay(d, bills, paid, bottles, new MyMoney(Money.of(by.get(PayMethod.CASH)), Money.of(by.get(PayMethod.CARD)),
+                Money.of(by.get(PayMethod.BANK_TRANSFER)), Money.of(by.get(PayMethod.CHEQUE)), Money.of(by.get(PayMethod.BILL_TO_BILL)),
+                Money.of(total)), entries);
     }
 }

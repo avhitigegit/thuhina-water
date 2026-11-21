@@ -4,12 +4,12 @@
  * My Deliveries (M17) – the delivery person's phone screen, for today only. "To visit": two tabs – Today (customers due
  * today) and Missed (delivery date passed, nothing entered; red count, hidden when none) – and a search that looks in both
  * and also finds any other customer; tap one to enter the filled bottles left, the empties collected and
- * the money received (Cash, Bank transfer or Cheque with its number). With no bottles the money is saved as a payment.
+ * the money received (Cash, Card, Online transfer, Cheque or Bill to Bill, with its reference). With no bottles the money is saved as a payment.
  * "My day": what was saved today – bottles and money by method for the hand-over. A sale over the credit limit is
  * refused here; only the office can approve it. After a bill: "WhatsApp bill sent to 077…" or "Customer has no WhatsApp –
  * give a paper bill", with Send again.
  */
-import { PAY_METHODS, referenceLabel } from "@/components/shared/PaidBy";
+import { needsReference, PAY_METHODS, referenceLabel } from "@/components/shared/PaidBy";
 import { useState } from "react";
 import { KpiCard, KpiGrid } from "@/components/shared/KpiCard";
 import { Badge } from "@/components/shared/StatusBadge";
@@ -483,7 +483,7 @@ export function VisitForm({ customer: c, onDone }: { customer: DueCustomer; onDo
               ))}
             </div>
             {method !== "CASH" && (
-              <div className="field req">
+              <div className={cn("field", needsReference(method) && "req")}>
                 <label htmlFor="mob-ref">{methodInfo.ref}</label>
                 <input
                   id="mob-ref"
@@ -589,8 +589,12 @@ export function DaySummary({ day }: { day: MyDay }) {
     <>
       <KpiGrid>
         <KpiCard label="Cash to hand over" value={formatMoney(day.money.cash)} />
-        <KpiCard label="Bank transfer" value={formatMoney(day.money.bankTransfer)} />
+        <KpiCard label="Online transfer" value={formatMoney(day.money.bankTransfer)} />
         <KpiCard label="Cheques" value={formatMoney(day.money.cheque)} />
+        {(day.money.card ?? 0) > 0 && <KpiCard label="Card" value={formatMoney(day.money.card)} />}
+        {(day.money.billToBill ?? 0) > 0 && (
+          <KpiCard label="Bill to Bill" value={formatMoney(day.money.billToBill)} />
+        )}
         <KpiCard
           label="Total received"
           value={formatMoney(day.money.total)}

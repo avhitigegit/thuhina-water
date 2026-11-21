@@ -8,6 +8,7 @@ import jakarta.validation.Valid;
 import lk.thuhina.water.production.dto.ProductionDtos.BatchView;
 import lk.thuhina.water.production.dto.ProductionDtos.DispatchRequest;
 import lk.thuhina.water.production.dto.ProductionDtos.DispatchView;
+import lk.thuhina.water.production.dto.ProductionDtos.FactoryBill;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryMonth;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryPaymentRequest;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryPaymentRow;
@@ -105,6 +106,13 @@ public class ProductionController {
         return query.months();
     }
 
+    @Operation(summary = "Filling bills (one per factory return) with paid, due and status, newest first – Bill to Bill payments pay these")
+    @GetMapping("/factory-bills")
+    @PreAuthorize(VIEW)
+    public List<FactoryBill> bills(@RequestParam(required = false) Long factory, @RequestParam(defaultValue = "false") boolean open) {
+        return query.bills(factory, open);
+    }
+
     @Operation(summary = "Factory payments, newest first")
     @GetMapping("/factory-payments")
     @PreAuthorize(VIEW)
@@ -112,7 +120,7 @@ public class ProductionController {
         return query.payments();
     }
 
-    @Operation(summary = "Record a factory payment (FP-0001) for a factory and month – reference required unless cash")
+    @Operation(summary = "Record a factory payment (FP-0001) – Bill to Bill: pays the bills ticked, oldest first")
     @PostMapping("/factory-payments")
     @ResponseStatus(HttpStatus.CREATED)
     @PreAuthorize(EDIT)

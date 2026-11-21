@@ -232,7 +232,7 @@ class SalesIntegrationTest extends SalesTestSupport {
         req.put("payReference", "TRF-9");
         Map<String, Object> txn = sale("/sales/product-sale", req);
         assertThat(txn.get("customerName")).isEqualTo("Walk-in Kamal");
-        assertThat(txn.get("payMethod")).isEqualTo("Bank transfer");
+        assertThat(txn.get("payMethod")).isEqualTo("Online transfer");
         assertThat(((Number) txn.get("productCost")).doubleValue()).isEqualTo(180.0);
         assertThat(jdbc.queryForObject("select stock_qty from product where code = ?", Integer.class, code)).isEqualTo(8);
         send("/sales/product-sale", map("date", today.toString(), "items", List.of(map("productCode", code, "qty", 1)), "paid", 150))

@@ -60,6 +60,8 @@ import {
 } from "./grid";
 import { CustomerCell, PaperCheck } from "./cells";
 
+const NAMES_SHOWN = 6;
+
 const NOT_DELETABLE = "Saved bills cannot be deleted. Use Sales & Bills → Reverse.";
 
 type Info = { kind: "day"; list: DueList; listed: number } | { kind: "customer"; name: string } | null;
@@ -69,6 +71,35 @@ function byWho(bills: EnteredBill[]): string {
   const counts = new Map<string, number>();
   bills.forEach((b) => counts.set(b.enteredBy, (counts.get(b.enteredBy) ?? 0) + 1));
   return [...counts].map(([who, n]) => `${who} ${n}`).join(", ");
+}
+
+/** The day's counts for the stat strip – the same groups as the info line. */
+function dayCounts(list: DueList) {
+  const entered = list.items.filter((x) => x.entered);
+  return {
+    due: list.items.length,
+    phone: entered.filter((x) => x.enteredBills.some((b) => b.onPhone)).length,
+    office: entered.filter((x) => !x.enteredBills.some((b) => b.onPhone)).length,
+    notEntered: list.items.filter((x) => x.listed).length,
+    missed: list.items.filter((x) => x.overdue && !x.entered).length,
+  };
+}
+
+function Stat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: number | string;
+  tone?: "ok" | "warn" | "bad" | "brand";
+}) {
+  return (
+    <div className={`eb-stat${tone ? ` ${tone}` : ""}`}>
+      <div className="eb-stat-value">{value}</div>
+      <div className="eb-stat-label">{label}</div>
+    </div>
+  );
 }
 
 function DayInfo({ info, waiting, onFill }: { info: Info; waiting: number; onFill: () => void }) {
@@ -87,7 +118,12 @@ function DayInfo({ info, waiting, onFill }: { info: Info; waiting: number; onFil
   const notEntered = list.items.filter((x) => x.listed);
   const none = list.items.filter((x) => !x.entered && x.noBottles);
   const late = list.items.filter((x) => x.overdue && !x.entered);
-  const names = (xs: typeof entered) => xs.map((x) => x.name).join(", ");
+  // Up to six names, then "and N more" – a busy day lists hundreds of customers.
+  const names = (xs: typeof entered) =>
+    xs
+      .slice(0, NAMES_SHOWN)
+      .map((x) => x.name)
+      .join(", ") + (xs.length > NAMES_SHOWN ? ` and ${xs.length - NAMES_SHOWN} more` : "");
   return (
     <>
       <b>
@@ -595,59 +631,87 @@ export function EnterBills() {
           {saving ? "Saving…" : "Save bills (Ctrl+S)"}
         </button>
       </PageActions>
-      <div className="card no-print">
-        <div className="toolbar" style={{ marginBottom: 6 }}>
-          <div className="field">
-            <label htmlFor="bdate">Bill date</label>
-            <DateField id="bdate" value={billDate} onChange={changeBillDate} />
+      <div className="card eb-head no-print">
+        <div className="eb-head-top">
+          <div className="eb-date">
+            <div className="field">
+              <label htmlFor="bdate">Bill date</label>
+              <DateField id="bdate" value={billDate} onChange={changeBillDate} />
+            </div>
+            <div className="eb-date-actions">
+              <button
+                type="button"
+                className="btn"
+                title="List the customers due on the bill date again"
+                onClick={() => void loadDate(billDate)}
+              >
+                Refresh list
+              </button>
+              <button type="button" className="btn" onClick={() => addRow()}>
+                + Add row
+              </button>
+            </div>
           </div>
-          <button
-            type="button"
-            className="btn"
-            title="List the customers due on the bill date again"
-            onClick={() => void loadDate(billDate)}
-          >
-            Refresh list
-          </button>
-          <button type="button" className="btn" onClick={() => addRow()}>
-            + Add row
-          </button>
+          {info?.kind === "day" && (
+            <div className="eb-stats" data-testid="day-stats">
+              {(() => {
+                const n = dayCounts(info.list);
+                return (
+                  <>
+                    <Stat label="Customers due" value={n.due} tone="brand" />
+                    <Stat label="Entered on phone" value={n.phone} tone="ok" />
+                    <Stat label="Entered in office" value={n.office} tone="ok" />
+                    <Stat
+                      label="Not entered yet"
+                      value={n.notEntered}
+                      tone={n.notEntered ? "warn" : undefined}
+                    />
+                    <Stat label="Missed earlier" value={n.missed} tone={n.missed ? "bad" : undefined} />
+                  </>
+                );
+              })()}
+            </div>
+          )}
         </div>
-        <div className="banner info" style={{ margin: "6px 0" }} data-testid="day-info">
+        <div className="eb-info" data-testid="day-info">
           {info ? (
             <DayInfo info={info} waiting={waiting} onFill={fillNotEntered} />
           ) : (
             "Loading the customers due…"
           )}
         </div>
-        <div className="small muted keys">
-          <span>
-            <span className="kbd">Enter</span> next field
-          </span>
-          <span>
-            <span className="kbd">Enter</span> on the last field → new row
-          </span>
-          <span>
-            <span className="kbd">Ctrl</span>+<span className="kbd">S</span> save all
-          </span>
-          <span>
-            <span className="kbd">Ctrl</span>+<span className="kbd">Del</span> remove row
-          </span>
-          <span>
-            Customer: type code (e.g. <b>17</b>), phone or name
-          </span>
-          <span>
-            Type: <b>E</b> Exchange · <b>L</b> Left at door
-          </span>
-        </div>
       </div>
 
-      <div className="card" style={{ padding: 10 }}>
+      <div className="card eb-grid-card">
+        <div className="eb-grid-head">
+          <div>
+            <h2>Paper bills</h2>
+            <div className="small muted">
+              {formatDate(billDate)} · one row per paper bill · rows check themselves as you type
+            </div>
+          </div>
+          <div className="eb-chips">
+            <span className="eb-chip">
+              <b>{sum.bills}</b> bill(s)
+            </span>
+            <span className="eb-chip ok">
+              <b>{sum.saved}</b> saved
+            </span>
+            <span className="eb-chip">
+              Charged <b>{formatMoney(sum.charged)}</b>
+            </span>
+            <span className="eb-chip">
+              Received <b>{formatMoney(sum.cash)}</b>
+            </span>
+          </div>
+        </div>
         <div className="table-wrap">
           <table className="bill-grid">
             <thead>
               <tr>
-                <th rowSpan={2}>#</th>
+                <th rowSpan={2} className="idx">
+                  #
+                </th>
                 <th
                   rowSpan={2}
                   title="Number printed on the paper bill book – used to stop the same bill being entered twice"
@@ -662,8 +726,8 @@ export function EnterBills() {
                     {b.label}
                   </th>
                 ))}
-                <th rowSpan={2} className="bl">
-                  Paid
+                <th rowSpan={2} className="bl pay-head">
+                  Paid &amp; how
                 </th>
                 <th rowSpan={2} title="Left at door – customer agreed by phone">
                   Phone ✓
@@ -901,7 +965,7 @@ export function EnterBills() {
             <tfoot>
               <tr>
                 <td></td>
-                <td colSpan={4} data-testid="grid-totals">
+                <td colSpan={4} data-testid="grid-totals" className="tot-label">
                   {sum.bills} bill(s) · {sum.saved} saved
                 </td>
                 {cols.map((b) => (
@@ -917,27 +981,67 @@ export function EnterBills() {
             </tfoot>
           </table>
         </div>
+        <div className="eb-keys small muted keys">
+          <span>
+            <span className="kbd">Enter</span> next field
+          </span>
+          <span>
+            <span className="kbd">Enter</span> on the last field → new row
+          </span>
+          <span>
+            <span className="kbd">Ctrl</span>+<span className="kbd">S</span> save all
+          </span>
+          <span>
+            <span className="kbd">Ctrl</span>+<span className="kbd">Del</span> remove row
+          </span>
+          <span>
+            Customer: code (e.g. <b>17</b>), phone or name
+          </span>
+          <span>
+            Type: <span className="kbd">E</span> Exchange · <span className="kbd">L</span> Left at door
+          </span>
+        </div>
       </div>
 
       <div className="grid side" style={{ gridTemplateColumns: "minmax(0,3fr) minmax(280px,2fr)" }}>
         <ActiveCustomer row={active} view={active ? views[active.key] : null} cols={cols} />
-        <div className="card">
-          <h3>Rules</h3>
-          <ul className="small" style={{ paddingLeft: 18, margin: 0 }}>
-            <li>Exchange: the customer pays only the water price.</li>
+        <div className="card eb-rules">
+          <h3>How bills work</h3>
+          <ul>
             <li>
-              Fewer empties than filled → the difference becomes <b>bottles owed</b> (note required).
-            </li>
-            <li>More empties than filled → clears empties left at the door, then bottles owed.</li>
-            <li>
-              <b>Left at door</b>: tick the phone agreement and add a note. The empties are collected next
-              trip – not a shortage.
+              <span className="eb-dot ok" />
+              <span>
+                <b>Exchange</b>: the customer pays only the water price.
+              </span>
             </li>
             <li>
-              The system gives every bill its own number (B000…). The paper bill number is kept only to stop
-              the same paper bill being entered twice.
+              <span className="eb-dot warn" />
+              <span>
+                Fewer empties than filled → the difference becomes <b>bottles owed</b> (note required).
+              </span>
             </li>
-            <li>Saving moves the customer&apos;s next delivery date forward.</li>
+            <li>
+              <span className="eb-dot brand" />
+              <span>More empties than filled → clears empties left at the door, then bottles owed.</span>
+            </li>
+            <li>
+              <span className="eb-dot brand" />
+              <span>
+                <b>Left at door</b>: tick the phone agreement and add a note. The empties are collected next
+                trip – not a shortage.
+              </span>
+            </li>
+            <li>
+              <span className="eb-dot muted" />
+              <span>
+                The system gives every bill its own number (B000…). The paper bill number is kept only to stop
+                the same paper bill being entered twice.
+              </span>
+            </li>
+            <li>
+              <span className="eb-dot ok" />
+              <span>Saving moves the customer&apos;s next delivery date forward.</span>
+            </li>
           </ul>
         </div>
       </div>

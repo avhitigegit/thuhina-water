@@ -45,8 +45,8 @@ public final class SalesDtos {
             @Schema(description = "EXCHANGE (default) or LEFT_AT_DOOR") SalesKind kind,
             List<BillLineRequest> lines,
             BigDecimal paid,
-            @Schema(description = "How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE") PayMethod payMethod,
-            @Schema(description = "Cheque number or bank transfer reference (needed for those methods)")
+            @Schema(description = "How the money paid was received: CASH (default), CARD, BANK_TRANSFER (online transfer), CHEQUE or BILL_TO_BILL") PayMethod payMethod,
+            @Schema(description = "Cheque number, transfer reference, card slip or the bill it pays (Bill to Bill)")
             @Size(max = 100, message = "Reference: at most 100 characters.") String payReference,
             @Size(max = 500, message = MSG_NOTE) String note,
             Boolean phoneConfirmed,
@@ -63,7 +63,7 @@ public final class SalesDtos {
             Integer oldBottles,
             Long oldBrandId,
             BigDecimal paid,
-            @Schema(description = "How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE") PayMethod payMethod,
+            @Schema(description = "How the money paid was received: CASH (default), CARD, BANK_TRANSFER (online transfer), CHEQUE or BILL_TO_BILL") PayMethod payMethod,
             @Schema(description = "Cheque number or bank reference (needed for those methods)")
             @Size(max = 100, message = "Reference: at most 100 characters.") String payReference,
             @Size(max = 500, message = MSG_NOTE) String note,
@@ -81,7 +81,7 @@ public final class SalesDtos {
             Integer oldBottles,
             Long oldBrandId,
             BigDecimal paid,
-            @Schema(description = "How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE") PayMethod payMethod,
+            @Schema(description = "How the money paid was received: CASH (default), CARD, BANK_TRANSFER (online transfer), CHEQUE or BILL_TO_BILL") PayMethod payMethod,
             @Schema(description = "Cheque number or bank reference (needed for those methods)")
             @Size(max = 100, message = "Reference: at most 100 characters.") String payReference,
             @Size(max = 500, message = MSG_NOTE) String note,
@@ -110,7 +110,7 @@ public final class SalesDtos {
             @Size(max = 200, message = "Reason: at most 200 characters.") String reason,
             @Size(max = 300, message = "Note: at most 300 characters.") String note,
             BigDecimal paid,
-            @Schema(description = "How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE") PayMethod payMethod,
+            @Schema(description = "How the money paid was received: CASH (default), CARD, BANK_TRANSFER (online transfer), CHEQUE or BILL_TO_BILL") PayMethod payMethod,
             @Schema(description = "Cheque number or bank reference (needed for those methods)")
             @Size(max = 100, message = "Reference: at most 100 characters.") String payReference,
             Boolean approveOverLimit) {
@@ -125,7 +125,7 @@ public final class SalesDtos {
             Integer qty,
             SettleMethod method,
             BigDecimal paid,
-            @Schema(description = "How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE") PayMethod payMethod,
+            @Schema(description = "How the money paid was received: CASH (default), CARD, BANK_TRANSFER (online transfer), CHEQUE or BILL_TO_BILL") PayMethod payMethod,
             @Schema(description = "Cheque number or bank reference (needed for those methods)")
             @Size(max = 100, message = "Reference: at most 100 characters.") String payReference,
             @Size(max = 500, message = MSG_NOTE) String note,
@@ -136,7 +136,7 @@ public final class SalesDtos {
     public record ProductItemRequest(String productCode, Integer qty, BigDecimal unitPrice) {
     }
 
-    /** Product sale to a customer or a walk-in ({@code walkInName}); paid by Cash (default), Bank transfer or Cheque. */
+    /** Product sale to a customer or a walk-in ({@code walkInName}); paid by Cash (default), Card, Online transfer, Cheque or Bill to Bill. */
     public record ProductSaleRequest(
             Long customerId,
             @Size(max = 120, message = "Walk-in name: at most 120 characters.") String walkInName,
