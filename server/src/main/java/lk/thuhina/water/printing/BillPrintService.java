@@ -68,6 +68,11 @@ public class BillPrintService {
         List<PrintDocument.SummaryRow> summary = new ArrayList<>(List.of(
                 new PrintDocument.SummaryRow("Total", Money.format(t.amount()), true),
                 new PrintDocument.SummaryRow("Paid", Money.format(t.paid()), false)));
+        // How the money on the bill was paid (Cash, Card, Online transfer, Cheque, Bill to Bill) and its reference.
+        if (t.paid() != null && t.paid().signum() > 0 && t.payMethod() != null) {
+            summary.add(new PrintDocument.SummaryRow("Paid by",
+                    t.payMethod() + (t.payReference() == null || t.payReference().isBlank() ? "" : " – " + t.payReference()), false));
+        }
         if (t.customerId() == null) {
             party.add(t.customerName());
         } else {

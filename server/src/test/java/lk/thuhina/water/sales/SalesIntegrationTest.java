@@ -10,6 +10,8 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
+import com.lowagie.text.pdf.PdfReader;
+import com.lowagie.text.pdf.parser.PdfTextExtractor;
 import jakarta.servlet.http.Cookie;
 import lk.thuhina.water.common.BusinessDates;
 import lk.thuhina.water.delivery.rules.ScheduleRules;
@@ -155,6 +157,10 @@ class SalesIntegrationTest extends SalesTestSupport {
         Map<String, Object> byCheque = sale("/sales/extra-order", map("customerId", c, "date", today.toString(), "bottleTypeCode", bottle,
                 "filled", 1, "empties", 1, "paid", 350, "payMethod", "CHEQUE", "payReference", "100245"));
         assertThat(byCheque).containsEntry("payMethod", "Cheque").containsEntry("payReference", "100245");
+        // The printed bill says how it was paid.
+        byte[] pdf = mvc.perform(get("/print/bill/" + txnId(byCheque)).cookie(admin)).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsByteArray();
+        assertThat(new PdfTextExtractor(new PdfReader(pdf)).getTextFromPage(1).replaceAll("\\s+", " ")).contains("Paid by", "Cheque – 100245");
         filled -= 1;
         send("/sales/extra-order", map("customerId", c, "date", today.toString(), "bottleTypeCode", bottle, "filled", 2, "empties", 3))
                 .andExpect(jsonPath("$.details.fields.empties")
