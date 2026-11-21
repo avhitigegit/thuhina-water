@@ -1780,6 +1780,8 @@
 @media (max-width: 760px) {
   .shell {
     grid-template-columns: 1fr;
+    /* The menu bar only takes its own height; the page takes the rest (a short page left a dark band). */
+    grid-template-rows: auto 1fr;
   }
   .sidebar {
     position: static;
