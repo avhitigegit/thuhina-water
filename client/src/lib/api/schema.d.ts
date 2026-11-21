@@ -4,6 +4,24 @@
  */
 
 export interface paths {
+    "/whatsapp/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** WhatsApp settings; secrets are never returned, only whether each one is saved */
+        get: operations["settings"];
+        /** Change WhatsApp settings (fields left out stay as they are; empty text removes a secret / id) */
+        put: operations["update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/users/{id}": {
         parameters: {
             query?: never;
@@ -13,7 +31,7 @@ export interface paths {
         };
         get?: never;
         /** Edit name, username, role and phone */
-        put: operations["update"];
+        put: operations["update_1"];
         post?: never;
         delete?: never;
         options?: never;
@@ -30,7 +48,7 @@ export interface paths {
         };
         get?: never;
         /** Change a supplier */
-        put: operations["update_1"];
+        put: operations["update_2"];
         post?: never;
         delete?: never;
         options?: never;
@@ -65,7 +83,7 @@ export interface paths {
         /** Read a settings group: company, business or features */
         get: operations["get"];
         /** Change some keys of a settings group; returns the whole group. The company logo has its own upload */
-        put: operations["update_2"];
+        put: operations["update_3"];
         post?: never;
         delete?: never;
         options?: never;
@@ -83,7 +101,7 @@ export interface paths {
         /** A purchase order with lines, history and receipts */
         get: operations["detail"];
         /** Change a Draft: quantities and prices (qty 0 removes the line), expected date, notes */
-        put: operations["update_3"];
+        put: operations["update_4"];
         post?: never;
         delete?: never;
         options?: never;
@@ -100,7 +118,7 @@ export interface paths {
         };
         get?: never;
         /** Change name, prices or active – not the stock */
-        put: operations["update_4"];
+        put: operations["update_5"];
         post?: never;
         delete?: never;
         options?: never;
@@ -117,7 +135,7 @@ export interface paths {
         };
         get?: never;
         /** Stop accepting / accept again, or change the note or bottle type */
-        put: operations["update_5"];
+        put: operations["update_6"];
         post?: never;
         delete?: never;
         options?: never;
@@ -134,7 +152,7 @@ export interface paths {
         };
         get?: never;
         /** Change a factory; a changed charge is saved from today and applies to batches sent after saving */
-        put: operations["update_6"];
+        put: operations["update_7"];
         post?: never;
         delete?: never;
         options?: never;
@@ -152,7 +170,7 @@ export interface paths {
         /** One expense */
         get: operations["expense"];
         /** Change any field of an expense */
-        put: operations["update_7"];
+        put: operations["update_8"];
         post?: never;
         /** Delete an expense – the reason is required and kept in the audit log (soft delete) */
         delete: operations["delete"];
@@ -188,7 +206,7 @@ export interface paths {
         /** Everything for the side panel: details, balances, outstanding, delivery, water prices */
         get: operations["detail_1"];
         /** Edit a customer */
-        put: operations["update_8"];
+        put: operations["update_9"];
         post?: never;
         delete?: never;
         options?: never;
@@ -223,7 +241,7 @@ export interface paths {
         /** One quotation with lines, history, the next steps, the email text and the register pre-fill */
         get: operations["view"];
         /** Change a draft (only a draft can change) */
-        put: operations["update_9"];
+        put: operations["update_10"];
         post?: never;
         delete?: never;
         options?: never;
@@ -240,7 +258,7 @@ export interface paths {
         };
         get?: never;
         /** Change the name or active – the size cannot change */
-        put: operations["update_10"];
+        put: operations["update_11"];
         post?: never;
         delete?: never;
         options?: never;
@@ -259,6 +277,92 @@ export interface paths {
         /** Rename an area or change active */
         put: operations["updateArea"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp/webhook": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Meta subscription check: echoes hub.challenge when hub.verify_token matches */
+        get: operations["verify"];
+        put?: never;
+        /** Message status updates from Meta (signature required) */
+        post: operations["receive"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check the saved phone number ID and access token with Meta */
+        post: operations["verify_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp/test": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send Meta's hello_world test message to one number now (test mode: written to the log only) */
+        post: operations["test"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp/send-now": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send the queued messages now instead of waiting for the next minute */
+        post: operations["sendNow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp/reminders/run": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Queue today's payment due soon / overdue messages now (the job also runs daily at the chosen hour) */
+        post: operations["runReminders"];
         delete?: never;
         options?: never;
         head?: never;
@@ -411,7 +515,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The company logo image (any logged-in user – it appears on printed documents) */
+        /** The company logo image (no login needed – it appears on the login page and printed documents) */
         get: operations["logoImage"];
         put?: never;
         /** Upload the company logo (PNG or JPG, at most 1 MB); returns the company settings */
@@ -792,7 +896,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Receive goods (GRN-0001) against a Sent / Partly received PO – good items go into stock */
-        post: operations["receive"];
+        post: operations["receive_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -879,7 +983,7 @@ export interface paths {
         get: operations["payments"];
         put?: never;
         /** Receive a payment (RC-00001). Reference required for Bank transfer and Cheque; part payments and advances allowed */
-        post: operations["receive_1"];
+        post: operations["receive_2"];
         delete?: never;
         options?: never;
         head?: never;
@@ -921,6 +1025,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/factory-returns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Receive one load from a factory – split over its open batches of that bottle type, oldest first; bottles not sent back stay at the factory for a later load */
+        post: operations["receiveFromFactory"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/factory-payments": {
         parameters: {
             query?: never;
@@ -931,7 +1052,7 @@ export interface paths {
         /** Factory payments, newest first */
         get: operations["payments_1"];
         put?: never;
-        /** Record a factory payment (FP-0001) for a factory and month – reference required unless cash */
+        /** Record a factory payment (FP-0001) – Bill to Bill: pays the bills ticked, oldest first */
         post: operations["pay"];
         delete?: never;
         options?: never;
@@ -966,7 +1087,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** Receive filled bottles (FR-0001) – partial returns allowed; rejects need a reason and are written off */
-        post: operations["receive_2"];
+        post: operations["receive_3"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1021,6 +1142,75 @@ export interface paths {
         put?: never;
         /** Add an expense type */
         post: operations["createType"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/delivery/mobile/payments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Money received without a delivery – a payment (receipt) for today */
+        post: operations["payment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/delivery/mobile/bills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Save today's Exchange or Left at door bill (date is today, paper bill number optional); moves the next delivery on */
+        post: operations["bill_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/delivery/mobile/bills/{id}/whatsapp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** WhatsApp of a bill I saved on the phone: sent / no WhatsApp (give a paper bill) / failed */
+        get: operations["billStatus"];
+        put?: never;
+        /** Send the WhatsApp bill again (the customer must have opted in with a valid number) */
+        post: operations["resendBill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/delivery/mobile/bills/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Today's bill without saving: amount, bottles after, credit check and problems */
+        post: operations["billPreview_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1160,6 +1350,24 @@ export interface paths {
         put?: never;
         /** New draft (QT-2026-001); copyOf for Make a copy */
         post: operations["create_8"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/customer-quotations/{id}/whatsapp": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** WhatsApp of a quotation: last message and the number it would go to */
+        get: operations["quotationStatus"];
+        put?: never;
+        /** Send the quotation PDF on WhatsApp (a draft is marked as sent by WhatsApp); a new organisation must have agreed (agreed = true) */
+        post: operations["sendQuotation"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1339,6 +1547,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/whatsapp/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The Meta templates to create in WhatsApp Manager (name, category, header, body text, parameters) */
+        get: operations["templates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/whatsapp/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Message log, newest first, with this month's counts */
+        get: operations["messages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/supplier-balances": {
         parameters: {
             query?: never;
@@ -1433,6 +1675,23 @@ export interface paths {
         };
         /** Statement of account: brought forward, charges and payments with the running balance, aging on the to date. from default the start of last month, to default today */
         get: operations["statement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/settings/branding": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Company name and logo address for the login page and the menu (no login needed) */
+        get: operations["branding"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1806,7 +2065,7 @@ export interface paths {
             cookie?: never;
         };
         /** Bill PDF (A5) – opens in the browser to print */
-        get: operations["bill_1"];
+        get: operations["bill_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1874,7 +2133,7 @@ export interface paths {
             cookie?: never;
         };
         /** One payment */
-        get: operations["payment"];
+        get: operations["payment_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1892,6 +2151,40 @@ export interface paths {
         };
         /** Recent payments and cash collected on bills, newest first (default 15) */
         get: operations["recent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/money/out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Money out: supplier payments, factory payments and expenses (default this month) */
+        get: operations["moneyOut"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/money/in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Money in: customer payments and money paid on bills (default this month) */
+        get: operations["moneyIn"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1960,6 +2253,23 @@ export interface paths {
         };
         /** A dispatch with its batches */
         get: operations["dispatchByNo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/factory-bills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Filling bills (one per factory return) with paid, due and status, newest first – Bill to Bill payments pay these */
+        get: operations["bills"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2079,6 +2389,40 @@ export interface paths {
         };
         /** Delivery Planning (FR-58): customers due on a date (default tomorrow) or all active customers, grouped by route, with last / next / week-after deliveries, KPIs and the ready check per bottle type */
         get: operations["planning"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/delivery/mobile/day": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in user's day: bills and payments saved today, bottles left / collected and money by method */
+        get: operations["day"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/delivery/mobile/customers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Active customers matching the text (code, name, phone or address; at least 2 characters), with today's bottles, prices and bills – at most 20 */
+        get: operations["customers"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2312,6 +2656,79 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        SettingsRequest: {
+            enabled: boolean;
+            phoneNumberId: string;
+            businessAccountId: string;
+            /** @description Write-only */
+            accessToken: string;
+            /** @description Write-only */
+            appSecret: string;
+            /** @description Write-only */
+            verifyToken: string;
+            welcome: boolean;
+            quotation: boolean;
+            deliveryBill: boolean;
+            billCancelled: boolean;
+            paymentReceipt: boolean;
+            monthlyInvoice: boolean;
+            dueSoon: boolean;
+            overdue: boolean;
+            /**
+             * Format: int32
+             * @description 1 – 30
+             */
+            daysBefore: number;
+            /**
+             * Format: int32
+             * @description 1 – 30
+             */
+            daysAfter: number;
+            /**
+             * Format: int32
+             * @description 0 – 23
+             */
+            reminderHour: number;
+            /** @description Template language, e.g. en or en_US */
+            language: string;
+        };
+        SettingsView: {
+            enabled: boolean;
+            phoneNumberId: string | null;
+            businessAccountId: string | null;
+            accessTokenSaved: boolean;
+            appSecretSaved: boolean;
+            verifyTokenSaved: boolean;
+            welcome: boolean;
+            quotation: boolean;
+            deliveryBill: boolean;
+            billCancelled: boolean;
+            paymentReceipt: boolean;
+            monthlyInvoice: boolean;
+            dueSoon: boolean;
+            overdue: boolean;
+            /**
+             * Format: int32
+             * @description Payment due soon: days before the due date
+             */
+            daysBefore: number;
+            /**
+             * Format: int32
+             * @description Payment overdue: days after the due date
+             */
+            daysAfter: number;
+            /**
+             * Format: int32
+             * @description Hour of the daily reminder run, 0 – 23
+             */
+            reminderHour: number;
+            language: string;
+            /** @description LIVE or TEST */
+            mode: string;
+            modeText: string;
+            encryptionReady: boolean;
+            webhookPath: string;
+        };
         UpdateUserRequest: {
             fullName: string;
             username: string;
@@ -2616,7 +3033,7 @@ export interface components {
             billNo: string;
             amount: number;
             /** @enum {string} */
-            method: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            method: "CASH" | "CARD" | "BANK_TRANSFER" | "CHEQUE" | "BILL_TO_BILL";
             reference: string;
             /** Format: int64 */
             version: number;
@@ -2706,8 +3123,12 @@ export interface components {
             /** Format: int64 */
             oldBrandId?: number;
             paid?: number;
-            /** @enum {string} */
-            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            /**
+             * @description How the money paid was received: CASH (default), CARD, BANK_TRANSFER (online transfer), CHEQUE or BILL_TO_BILL
+             * @enum {string}
+             */
+            payMethod?: "CASH" | "CARD" | "BANK_TRANSFER" | "CHEQUE" | "BILL_TO_BILL";
+            /** @description Cheque number or bank reference (needed for those methods) */
             payReference?: string;
             approveOverLimit?: boolean;
             /** Format: int64 */
@@ -3060,6 +3481,21 @@ export interface components {
             /** Format: int64 */
             version: number;
         };
+        CheckResult: {
+            ok: boolean;
+            mode: string;
+            message: string;
+        };
+        TestRequest: {
+            to: string;
+        };
+        ReminderRunResult: {
+            /** Format: int32 */
+            queued: number;
+            /** Format: int32 */
+            skipped: number;
+            message: string;
+        };
         CreateUserRequest: {
             fullName: string;
             username: string;
@@ -3079,7 +3515,7 @@ export interface components {
             date: string;
             amount?: number;
             /** @enum {string} */
-            method?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            method?: "CASH" | "CARD" | "BANK_TRANSFER" | "CHEQUE" | "BILL_TO_BILL";
             reference?: string;
             note?: string;
         };
@@ -3194,8 +3630,12 @@ export interface components {
             /** @enum {string} */
             method?: "RETURN" | "DEPOSIT";
             paid?: number;
-            /** @enum {string} */
-            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            /**
+             * @description How the money paid was received: CASH (default), CARD, BANK_TRANSFER (online transfer), CHEQUE or BILL_TO_BILL
+             * @enum {string}
+             */
+            payMethod?: "CASH" | "CARD" | "BANK_TRANSFER" | "CHEQUE" | "BILL_TO_BILL";
+            /** @description Cheque number or bank reference (needed for those methods) */
             payReference?: string;
             note?: string;
             approveOverLimit?: boolean;
@@ -3255,7 +3695,7 @@ export interface components {
             items?: components["schemas"]["ProductItemRequest"][];
             paid?: number;
             /** @enum {string} */
-            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            payMethod?: "CASH" | "CARD" | "BANK_TRANSFER" | "CHEQUE" | "BILL_TO_BILL";
             payReference?: string;
             note?: string;
             approveOverLimit?: boolean;
@@ -3274,8 +3714,12 @@ export interface components {
             /** Format: int64 */
             oldBrandId?: number;
             paid?: number;
-            /** @enum {string} */
-            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            /**
+             * @description How the money paid was received: CASH (default), CARD, BANK_TRANSFER (online transfer), CHEQUE or BILL_TO_BILL
+             * @enum {string}
+             */
+            payMethod?: "CASH" | "CARD" | "BANK_TRANSFER" | "CHEQUE" | "BILL_TO_BILL";
+            /** @description Cheque number or bank reference (needed for those methods) */
             payReference?: string;
             note?: string;
             approveOverLimit?: boolean;
@@ -3296,8 +3740,12 @@ export interface components {
             /** Format: int64 */
             oldBrandId?: number;
             paid?: number;
-            /** @enum {string} */
-            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            /**
+             * @description How the money paid was received: CASH (default), CARD, BANK_TRANSFER (online transfer), CHEQUE or BILL_TO_BILL
+             * @enum {string}
+             */
+            payMethod?: "CASH" | "CARD" | "BANK_TRANSFER" | "CHEQUE" | "BILL_TO_BILL";
+            /** @description Cheque number or bank reference (needed for those methods) */
             payReference?: string;
             note?: string;
             approveOverLimit?: boolean;
@@ -3317,8 +3765,12 @@ export interface components {
             reason?: string;
             note?: string;
             paid?: number;
-            /** @enum {string} */
-            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            /**
+             * @description How the money paid was received: CASH (default), CARD, BANK_TRANSFER (online transfer), CHEQUE or BILL_TO_BILL
+             * @enum {string}
+             */
+            payMethod?: "CASH" | "CARD" | "BANK_TRANSFER" | "CHEQUE" | "BILL_TO_BILL";
+            /** @description Cheque number or bank reference (needed for those methods) */
             payReference?: string;
             approveOverLimit?: boolean;
         };
@@ -3354,10 +3806,10 @@ export interface components {
             lines?: components["schemas"]["BillLineRequest"][];
             paid?: number;
             /**
-             * @description How the money paid was received: CASH (default), BANK_TRANSFER or CHEQUE
+             * @description How the money paid was received: CASH (default), CARD, BANK_TRANSFER (online transfer), CHEQUE or BILL_TO_BILL
              * @enum {string}
              */
-            payMethod?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            payMethod?: "CASH" | "CARD" | "BANK_TRANSFER" | "CHEQUE" | "BILL_TO_BILL";
             /** @description Cheque number or bank transfer reference (needed for those methods) */
             payReference?: string;
             note?: string;
@@ -3540,7 +3992,7 @@ export interface components {
             date: string;
             amount?: number;
             /** @enum {string} */
-            method?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+            method?: "CASH" | "CARD" | "BANK_TRANSFER" | "CHEQUE" | "BILL_TO_BILL";
             reference?: string;
             bank?: string;
             /** Format: date */
@@ -3625,52 +4077,18 @@ export interface components {
             name: string;
             reason: string;
         };
-        FactoryPaymentRequest: {
+        FactoryReceiveRequest: {
             /** Format: int64 */
             factoryId?: number;
+            bottleTypeCode?: string;
             /** Format: date */
             date: string;
-            amount?: number;
-            /** @enum {string} */
-            method?: "CASH" | "BANK_TRANSFER" | "CHEQUE";
-            reference?: string;
-            note?: string;
-        };
-        FactoryLink: {
-            /** Format: int64 */
-            id: number;
-            code: string;
-            name: string;
-        };
-        FactoryPaymentRow: {
-            /** Format: int64 */
-            id: number;
-            fpNo: string;
-            /** Format: date */
-            date: string;
-            factory: components["schemas"]["FactoryLink"];
-            period: string | null;
-            periodLabel: string | null;
-            method: string;
-            methodLabel: string;
-            reference: string | null;
-            amount: number;
-            note: string | null;
-            createdByName: string;
-        };
-        DispatchLine: {
-            bottleTypeCode: string;
             /** Format: int32 */
-            qty: number;
-        };
-        DispatchRequest: {
-            /** Format: int64 */
-            factoryId?: number;
-            /** Format: date */
-            date: string;
-            vehicleNo?: string;
+            filled?: number;
+            /** Format: int32 */
+            rejected?: number;
+            rejectReason?: string;
             note?: string;
-            lines?: components["schemas"]["DispatchLine"][];
         };
         BatchView: {
             /** Format: int64 */
@@ -3701,6 +4119,86 @@ export interface components {
             note: string | null;
             returns: components["schemas"]["ReturnView"][];
         };
+        FactoryLink: {
+            /** Format: int64 */
+            id: number;
+            code: string;
+            name: string;
+        };
+        FactoryReceiveResult: {
+            returns: components["schemas"]["ReturnResult"][];
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            rejected: number;
+            cost: number;
+            /** Format: int32 */
+            stillAtFactory: number;
+        };
+        ReturnResult: {
+            saved: components["schemas"]["ReturnView"];
+            batch: components["schemas"]["BatchView"];
+            damageNo: string | null;
+        };
+        ReturnView: {
+            /** Format: int64 */
+            id: number;
+            returnNo: string;
+            /** Format: date */
+            date: string;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            rejected: number;
+            rejectReason: string | null;
+            cost: number;
+            note: string | null;
+            createdByName: string;
+        };
+        FactoryPaymentRequest: {
+            /** Format: int64 */
+            factoryId?: number;
+            /** @description The filling bills paid (factory return ids) – at least one */
+            billIds?: number[];
+            /** Format: date */
+            date: string;
+            amount?: number;
+            /** @enum {string} */
+            method?: "CASH" | "CARD" | "BANK_TRANSFER" | "CHEQUE" | "BILL_TO_BILL";
+            reference?: string;
+            note?: string;
+        };
+        FactoryPaymentRow: {
+            /** Format: int64 */
+            id: number;
+            fpNo: string;
+            /** Format: date */
+            date: string;
+            factory: components["schemas"]["FactoryLink"];
+            period: string | null;
+            periodLabel: string | null;
+            bills: string | null;
+            method: string;
+            methodLabel: string;
+            reference: string | null;
+            amount: number;
+            note: string | null;
+            createdByName: string;
+        };
+        DispatchLine: {
+            bottleTypeCode: string;
+            /** Format: int32 */
+            qty: number;
+        };
+        DispatchRequest: {
+            /** Format: int64 */
+            factoryId?: number;
+            /** Format: date */
+            date: string;
+            vehicleNo?: string;
+            note?: string;
+            lines?: components["schemas"]["DispatchLine"][];
+        };
         DispatchView: {
             /** Format: int64 */
             id: number;
@@ -3718,21 +4216,6 @@ export interface components {
             totalBottles: number;
             batches: components["schemas"]["BatchView"][];
         };
-        ReturnView: {
-            /** Format: int64 */
-            id: number;
-            returnNo: string;
-            /** Format: date */
-            date: string;
-            /** Format: int32 */
-            filled: number;
-            /** Format: int32 */
-            rejected: number;
-            rejectReason: string | null;
-            cost: number;
-            note: string | null;
-            createdByName: string;
-        };
         ReturnRequest: {
             /** Format: date */
             date: string;
@@ -3743,33 +4226,25 @@ export interface components {
             rejectReason?: string;
             note?: string;
         };
-        FactoryReceiveRequest: {
+        MobilePaymentRequest: {
             /** Format: int64 */
-            factoryId: number | null;
-            bottleTypeCode: string | null;
+            customerId: number;
+            amount: number;
+            /** @enum {string} */
+            method: "CASH" | "CARD" | "BANK_TRANSFER" | "CHEQUE" | "BILL_TO_BILL";
+            reference: string;
+            bank: string;
             /** Format: date */
-            date: string;
-            /** Format: int32 */
-            filled?: number | null;
-            /** Format: int32 */
-            rejected?: number | null;
-            rejectReason?: string | null;
-            note?: string | null;
+            chequeDate: string;
+            note: string;
         };
-        FactoryReceiveResult: {
-            returns: components["schemas"]["ReturnResult"][];
-            /** Format: int32 */
-            filled: number;
-            /** Format: int32 */
-            rejected: number;
-            cost: number;
-            /** Format: int32 */
-            stillAtFactory: number;
-        };
-        ReturnResult: {
-            saved: components["schemas"]["ReturnView"];
-            batch: components["schemas"]["BatchView"];
-            damageNo: string | null;
+        SendStatus: {
+            state: string;
+            text: string;
+            toNumber: string | null;
+            canSend: boolean;
+            /** Format: int64 */
+            messageId: number | null;
         };
         SetCustomerPriceRequest: {
             bottleTypeCode: string;
@@ -3833,6 +4308,10 @@ export interface components {
         CreateCustomerTypeRequest: {
             name: string;
             description?: string;
+        };
+        QuotationSendRequest: {
+            to: string;
+            agreed: boolean;
         };
         CqSendRequest: {
             via: string;
@@ -3924,6 +4403,64 @@ export interface components {
             skipped: number;
             problems: string[];
             message: string;
+        };
+        TemplateRow: {
+            type: string;
+            label: string;
+            name: string;
+            category: string;
+            document: boolean;
+            body: string;
+            params: string[];
+            switchedOn: boolean;
+        };
+        MessageListResponse: {
+            items: components["schemas"]["MessageRow"][];
+            /** Format: int32 */
+            page: number;
+            /** Format: int32 */
+            size: number;
+            /** Format: int64 */
+            total: number;
+            thisMonth: components["schemas"]["MonthCount"];
+        };
+        MessageRow: {
+            /** Format: int64 */
+            id: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: int64 */
+            customerId: number | null;
+            customerCode: string | null;
+            customerName: string | null;
+            type: string;
+            typeLabel: string;
+            toNumber: string;
+            status: string;
+            statusLabel: string;
+            testMode: boolean;
+            params: string[];
+            /** Format: int32 */
+            attempts: number;
+            /** Format: date-time */
+            sentAt: string | null;
+            /** Format: date-time */
+            statusAt: string | null;
+            error: string | null;
+            sourceType: string | null;
+            /** Format: int64 */
+            sourceId: number | null;
+        };
+        MonthCount: {
+            month: string;
+            /** Format: int64 */
+            sent: number;
+            /** Format: int64 */
+            failed: number;
+            /** Format: int64 */
+            skipped: number;
+            /** Format: int64 */
+            test: number;
         };
         SupplierBalance: {
             /** Format: int64 */
@@ -4292,6 +4829,18 @@ export interface components {
             how: string;
             amount: number;
         };
+        MoneyList: {
+            /** Format: date */
+            from: string;
+            /** Format: date */
+            to: string;
+            items: components["schemas"]["MoneyRow"][];
+            /** Format: int64 */
+            count: number;
+            total: number;
+            /** Format: int32 */
+            limit: number;
+        };
         MoneyRow: {
             kind: string;
             kindLabel: string;
@@ -4313,18 +4862,6 @@ export interface components {
             note: string | null;
             amount: number;
             enteredBy: string;
-        };
-        MoneyList: {
-            /** Format: date */
-            from: string;
-            /** Format: date */
-            to: string;
-            items: components["schemas"]["MoneyRow"][];
-            /** Format: int64 */
-            count: number;
-            total: number;
-            /** Format: int32 */
-            limit: number;
         };
         InvoiceLine: {
             /** Format: date */
@@ -4397,6 +4934,26 @@ export interface components {
         PeriodOption: {
             period: string;
             label: string;
+        };
+        FactoryBill: {
+            /** Format: int64 */
+            id: number;
+            billNo: string;
+            /** Format: date */
+            date: string;
+            factory: components["schemas"]["FactoryLink"];
+            batchNo: string;
+            dispatchNo: string;
+            bottleLabel: string;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            rejected: number;
+            cost: number;
+            paid: number;
+            due: number;
+            status: string;
+            statusLabel: string;
         };
         FactoryMonth: {
             /** Format: int64 */
@@ -4619,6 +5176,57 @@ export interface components {
             ready: boolean;
             factoryCovers: boolean;
         };
+        MyBottles: {
+            bottleTypeCode: string;
+            label: string;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            empties: number;
+        };
+        MyDay: {
+            /** Format: date */
+            date: string;
+            /** Format: int32 */
+            bills: number;
+            /** Format: int32 */
+            payments: number;
+            bottles: components["schemas"]["MyBottles"][];
+            money: components["schemas"]["MyMoney"];
+            entries: components["schemas"]["MyEntry"][];
+        };
+        MyEntry: {
+            /** @description BILL or PAYMENT */
+            entry: string;
+            /** Format: int64 */
+            id: number;
+            number: string;
+            kindLabel: string;
+            /** Format: date-time */
+            at: string;
+            /** Format: int64 */
+            customerId: number | null;
+            customerCode: string | null;
+            customerName: string;
+            /** Format: int32 */
+            filled: number;
+            /** Format: int32 */
+            empties: number;
+            /** @description Bill amount (null for a payment) */
+            amount: number | null;
+            received: number;
+            method: string | null;
+            reference: string | null;
+            cancelled: boolean;
+        };
+        MyMoney: {
+            cash: number;
+            card: number;
+            bankTransfer: number;
+            cheque: number;
+            billToBill: number;
+            total: number;
+        };
         DueBottle: {
             bottleTypeCode: string;
             label: string;
@@ -4637,18 +5245,6 @@ export interface components {
             price: number | null;
             agreedPrice: boolean;
             standardPrice: number | null;
-        };
-        DueCounts: {
-            /** Format: int32 */
-            due: number;
-            /** Format: int32 */
-            listed: number;
-            /** Format: int32 */
-            entered: number;
-            /** Format: int32 */
-            noBottles: number;
-            /** Format: int32 */
-            overdue: number;
         };
         DueCustomer: {
             /** Format: int64 */
@@ -4689,6 +5285,18 @@ export interface components {
             listed: boolean;
             enteredBills: components["schemas"]["EnteredBill"][];
             bottles: components["schemas"]["DueBottle"][];
+        };
+        DueCounts: {
+            /** Format: int32 */
+            due: number;
+            /** Format: int32 */
+            listed: number;
+            /** Format: int32 */
+            entered: number;
+            /** Format: int32 */
+            noBottles: number;
+            /** Format: int32 */
+            overdue: number;
         };
         DueList: {
             /** Format: date */
@@ -4978,7 +5586,51 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    settings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SettingsView"];
+                };
+            };
+        };
+    };
     update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SettingsView"];
+                };
+            };
+        };
+    };
+    update_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -5004,7 +5656,7 @@ export interface operations {
             };
         };
     };
-    update_1: {
+    update_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -5080,7 +5732,7 @@ export interface operations {
             };
         };
     };
-    update_2: {
+    update_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -5128,7 +5780,7 @@ export interface operations {
             };
         };
     };
-    update_3: {
+    update_4: {
         parameters: {
             query?: never;
             header?: never;
@@ -5154,7 +5806,7 @@ export interface operations {
             };
         };
     };
-    update_4: {
+    update_5: {
         parameters: {
             query?: never;
             header?: never;
@@ -5180,7 +5832,7 @@ export interface operations {
             };
         };
     };
-    update_5: {
+    update_6: {
         parameters: {
             query?: never;
             header?: never;
@@ -5206,7 +5858,7 @@ export interface operations {
             };
         };
     };
-    update_6: {
+    update_7: {
         parameters: {
             query?: never;
             header?: never;
@@ -5254,7 +5906,7 @@ export interface operations {
             };
         };
     };
-    update_7: {
+    update_8: {
         parameters: {
             query?: never;
             header?: never;
@@ -5355,7 +6007,7 @@ export interface operations {
             };
         };
     };
-    update_8: {
+    update_9: {
         parameters: {
             query?: never;
             header?: never;
@@ -5429,7 +6081,7 @@ export interface operations {
             };
         };
     };
-    update_9: {
+    update_10: {
         parameters: {
             query?: never;
             header?: never;
@@ -5455,7 +6107,7 @@ export interface operations {
             };
         };
     };
-    update_10: {
+    update_11: {
         parameters: {
             query?: never;
             header?: never;
@@ -5503,6 +6155,138 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["AreaResponse"];
+                };
+            };
+        };
+    };
+    verify: {
+        parameters: {
+            query?: {
+                "hub.mode"?: string;
+                "hub.verify_token"?: string;
+                "hub.challenge"?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    receive: {
+        parameters: {
+            query?: never;
+            header?: {
+                "X-Hub-Signature-256"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "*/*": string;
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    verify_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CheckResult"];
+                };
+            };
+        };
+    };
+    test: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TestRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["CheckResult"];
+                };
+            };
+        };
+    };
+    sendNow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReminderRunResult"];
+                };
+            };
+        };
+    };
+    runReminders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReminderRunResult"];
                 };
             };
         };
@@ -6379,7 +7163,7 @@ export interface operations {
             };
         };
     };
-    receive: {
+    receive_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -6547,7 +7331,7 @@ export interface operations {
             };
         };
     };
-    receive_1: {
+    receive_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -6639,6 +7423,30 @@ export interface operations {
             };
         };
     };
+    receiveFromFactory: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FactoryReceiveRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FactoryReceiveResult"];
+                };
+            };
+        };
+    };
     payments_1: {
         parameters: {
             query?: never;
@@ -6707,7 +7515,7 @@ export interface operations {
             };
         };
     };
-    receive_2: {
+    receive_3: {
         parameters: {
             query?: never;
             header?: never;
@@ -6865,6 +7673,122 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["ExpenseTypeView"];
+                };
+            };
+        };
+    };
+    payment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MobilePaymentRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PaymentSaved"];
+                };
+            };
+        };
+    };
+    bill_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillRequest"];
+            };
+        };
+        responses: {
+            /** @description Created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SaleResult"];
+                };
+            };
+        };
+    };
+    billStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SendStatus"];
+                };
+            };
+        };
+    };
+    resendBill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SendStatus"];
+                };
+            };
+        };
+    };
+    billPreview_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BillRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SalePreview"];
                 };
             };
         };
@@ -7120,6 +8044,54 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["CqSaved"];
+                };
+            };
+        };
+    };
+    quotationStatus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SendStatus"];
+                };
+            };
+        };
+    };
+    sendQuotation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["QuotationSendRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["SendStatus"];
                 };
             };
         };
@@ -7428,6 +8400,54 @@ export interface operations {
             };
         };
     };
+    templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TemplateRow"][];
+                };
+            };
+        };
+    };
+    messages: {
+        parameters: {
+            query?: {
+                type?: "WELCOME" | "QUOTATION" | "DELIVERY_BILL" | "BILL_CANCELLED" | "PAYMENT_RECEIPT" | "MONTHLY_INVOICE" | "PAYMENT_DUE_SOON" | "PAYMENT_OVERDUE" | "TEST";
+                status?: "QUEUED" | "SENT" | "DELIVERED" | "READ" | "FAILED" | "SKIPPED";
+                from?: string;
+                to?: string;
+                customer?: number;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MessageListResponse"];
+                };
+            };
+        };
+    };
     balances: {
         parameters: {
             query?: never;
@@ -7558,6 +8578,26 @@ export interface operations {
             };
         };
     };
+    branding: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["JsonNode"];
+                };
+            };
+        };
+    };
     list_9: {
         parameters: {
             query?: {
@@ -7566,6 +8606,7 @@ export interface operations {
                 kind?: "FIRST_PURCHASE" | "EXCHANGE" | "LEFT_AT_DOOR" | "COLLECT_EMPTIES" | "EXTRA_ORDER" | "PRODUCT_SALE" | "CUSTOMER_DAMAGE" | "OWED_SETTLEMENT" | "OPENING_BALANCE" | "REVERSAL";
                 from?: string;
                 to?: string;
+                onPhone?: boolean;
                 page?: number;
                 size?: number;
             };
@@ -8030,7 +9071,7 @@ export interface operations {
             };
         };
     };
-    bill_1: {
+    bill_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -8118,7 +9159,7 @@ export interface operations {
             };
         };
     };
-    payment: {
+    payment_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -8158,6 +9199,54 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["RecentMoney"][];
+                };
+            };
+        };
+    };
+    moneyOut: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MoneyList"];
+                };
+            };
+        };
+    };
+    moneyIn: {
+        parameters: {
+            query?: {
+                from?: string;
+                to?: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MoneyList"];
                 };
             };
         };
@@ -8247,6 +9336,29 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["DispatchView"];
+                };
+            };
+        };
+    };
+    bills: {
+        parameters: {
+            query?: {
+                factory?: number;
+                open?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["FactoryBill"][];
                 };
             };
         };
@@ -8404,6 +9516,48 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["Planning"];
+                };
+            };
+        };
+    };
+    day: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["MyDay"];
+                };
+            };
+        };
+    };
+    customers: {
+        parameters: {
+            query?: {
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["DueCustomer"][];
                 };
             };
         };

@@ -50,7 +50,8 @@ public final class MobileDtos {
     }
 
     /** Money received today by how it was paid – for handing over the cash and cheques. */
-    public record MyMoney(BigDecimal cash, BigDecimal bankTransfer, BigDecimal cheque, BigDecimal total) {
+    public record MyMoney(BigDecimal cash, BigDecimal card, BigDecimal bankTransfer, BigDecimal cheque, BigDecimal billToBill,
+                          BigDecimal total) {
     }
 
     /** The user's day: counts, bottles, money (cancelled bills left out) and every entry. */

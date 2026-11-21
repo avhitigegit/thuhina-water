@@ -18,6 +18,7 @@ import lk.thuhina.water.common.NotFoundException;
 import lk.thuhina.water.ledger.rules.LedgerRules;
 import lk.thuhina.water.production.dto.ProductionDtos.BatchView;
 import lk.thuhina.water.production.dto.ProductionDtos.DispatchView;
+import lk.thuhina.water.production.dto.ProductionDtos.FactoryBill;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryBottleStock;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryLink;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryMonth;
@@ -34,7 +35,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Filling Factory reads (FR-25, FR-26): batches with what came back, dispatches (for the dispatch note), page KPIs, filling
- * cost by factory and month, payments; and the "At factory now" / "Owed" columns of the Factories tab. Plain SQL with
+ * cost by factory and month, filling bills (Bill to Bill), payments; and the "At factory now" / "Owed" columns of the Factories tab. Plain SQL with
  * aggregates – a few batches a week.
  */
 @Service
@@ -144,50 +145,92 @@ public class ProductionQueryService {
     }
 
     /**
-     * Filling cost by factory and month of return, newest month first. Each factory's payments are spread over its months
-     * oldest first (as supplier and customer payments are), so a payment can cover several months.
+     * Filling bills (one per factory return with a cost), newest first; {@code factoryId} and {@code open} (something still
+     * to pay) optional. Paid = what Bill to Bill payments put on the bill, plus payments made before Bill to Bill spread
+     * over the factory's bills oldest first.
      */
+    @Transactional(readOnly = true)
+    public List<FactoryBill> bills(Long factoryId, boolean open) {
+        List<FactoryBill> out = new ArrayList<>(allBills().stream().filter(b -> b.cost().signum() > 0)
+                .filter(b -> factoryId == null || b.factory().id() == factoryId)
+                .filter(b -> !open || b.due().signum() > 0).toList());
+        out.sort(Comparator.comparing(FactoryBill::date).thenComparing(FactoryBill::id).reversed());
+        return out;
+    }
+
+    /** Every return as a bill, oldest first, with what was paid on it. */
+    private List<FactoryBill> allBills() {
+        Map<Long, BigDecimal> onBill = new HashMap<>();
+        jdbc.query("select return_id, sum(amount) as paid from factory_payment_bill group by return_id", rs -> {
+            onBill.put(rs.getLong("return_id"), Money.of(rs.getBigDecimal("paid")));
+        });
+        Map<Long, BigDecimal> older = new HashMap<>();
+        jdbc.query("select p.factory_id, sum(p.amount) as paid from factory_payment p where not exists "
+                + "(select 1 from factory_payment_bill pb where pb.payment_id = p.id) group by p.factory_id", rs -> {
+            older.put(rs.getLong("factory_id"), Money.of(rs.getBigDecimal("paid")));
+        });
+        List<Object[]> raw = jdbc.query("select r.id, r.return_no, r.return_date, b.factory_id, f.code, f.name, b.batch_no, d.dispatch_no, "
+                        + "t.litres, r.filled_qty, r.rejected_qty, r.cost from factory_return r join factory_batch b on b.id = r.batch_id "
+                        + "join factory_dispatch d on d.id = b.dispatch_id join factory f on f.id = b.factory_id "
+                        + "join bottle_type t on t.code = b.bottle_type_code order by r.return_date, r.id",
+                (rs, i) -> new Object[] {rs.getLong("id"), rs.getString("return_no"), rs.getDate("return_date").toLocalDate(),
+                        new FactoryLink(rs.getLong("factory_id"), rs.getString("code"), rs.getString("name")), rs.getString("batch_no"),
+                        rs.getString("dispatch_no"), LedgerRules.bottleLabel(rs.getBigDecimal("litres")), rs.getInt("filled_qty"),
+                        rs.getInt("rejected_qty"), Money.of(rs.getBigDecimal("cost"))});
+        List<FactoryBill> out = new ArrayList<>();
+        for (Object[] r : raw) {
+            long id = (long) r[0];
+            FactoryLink f = (FactoryLink) r[3];
+            BigDecimal cost = (BigDecimal) r[9];
+            BigDecimal paid = onBill.getOrDefault(id, Money.ZERO);
+            BigDecimal left = older.getOrDefault(f.id(), Money.ZERO);
+            BigDecimal take = left.min(cost.subtract(paid)).max(Money.ZERO);
+            if (take.signum() > 0) {
+                older.put(f.id(), left.subtract(take));
+                paid = paid.add(take);
+            }
+            String status = ProductionRules.paymentStatus(cost, paid);
+            out.add(new FactoryBill(id, (String) r[1], (java.time.LocalDate) r[2], f, (String) r[4], (String) r[5], (String) r[6],
+                    (int) r[7], (int) r[8], cost, Money.of(paid), Money.of(cost.subtract(paid).max(Money.ZERO)), status,
+                    ProductionRules.paymentStatusLabel(status)));
+        }
+        return out;
+    }
+
+    /** Filling cost by factory and month of return, newest month first; paid = what was paid on that month's bills. */
     @Transactional(readOnly = true)
     public List<FactoryMonth> months() {
         record Key(long factoryId, String period) {
         }
         Map<Key, Object[]> rows = new LinkedHashMap<>();
-        Map<Long, String> names = new HashMap<>();
-        jdbc.query("select id, name from factory", rs -> {
-            names.put(rs.getLong("id"), rs.getString("name"));
-        });
-        jdbc.query("select b.factory_id, to_char(r.return_date, 'YYYY-MM') as period, sum(r.filled_qty) as filled, "
-                + "sum(r.rejected_qty) as rejected, sum(r.cost) as cost from factory_return r join factory_batch b on b.id = r.batch_id "
-                + "group by b.factory_id, period", rs -> {
-            rows.put(new Key(rs.getLong("factory_id"), rs.getString("period")),
-                    new Object[] {rs.getInt("filled"), rs.getInt("rejected"), Money.of(rs.getBigDecimal("cost")), Money.ZERO});
-        });
-        Map<Long, BigDecimal> paidBy = new HashMap<>();
-        jdbc.query("select factory_id, sum(amount) as paid from factory_payment group by factory_id", rs -> {
-            paidBy.put(rs.getLong("factory_id"), Money.of(rs.getBigDecimal("paid")));
-        });
-        paidBy.forEach((factoryId, paid) -> {
-            List<Key> keys = rows.keySet().stream().filter(k -> k.factoryId() == factoryId).sorted(Comparator.comparing(Key::period)).toList();
-            List<BigDecimal> split = ProductionRules.spreadOldestFirst(keys.stream().map(k -> (BigDecimal) rows.get(k)[2]).toList(), paid);
-            for (int i = 0; i < keys.size(); i++) {
-                rows.get(keys.get(i))[3] = split.get(i);
-            }
-        });
+        for (FactoryBill b : allBills()) {
+            Key k = new Key(b.factory().id(), b.date().toString().substring(0, 7));
+            Object[] r = rows.computeIfAbsent(k, x -> new Object[] {b.factory().name(), 0, 0, Money.ZERO, Money.ZERO});
+            r[1] = (int) r[1] + b.filled();
+            r[2] = (int) r[2] + b.rejected();
+            r[3] = ((BigDecimal) r[3]).add(b.cost());
+            r[4] = ((BigDecimal) r[4]).add(b.paid());
+        }
         List<FactoryMonth> out = new ArrayList<>();
         rows.forEach((k, r) -> {
-            BigDecimal cost = (BigDecimal) r[2];
-            BigDecimal paid = (BigDecimal) r[3];
+            BigDecimal cost = Money.of((BigDecimal) r[3]);
+            BigDecimal paid = Money.of((BigDecimal) r[4]);
             String status = ProductionRules.paymentStatus(cost, paid);
-            out.add(new FactoryMonth(k.factoryId(), names.get(k.factoryId()), k.period(), ProductionRules.periodLabel(k.period()),
-                    (int) r[0], (int) r[1], cost, paid, cost.subtract(paid).max(Money.ZERO), status, ProductionRules.paymentStatusLabel(status)));
+            out.add(new FactoryMonth(k.factoryId(), (String) r[0], k.period(), ProductionRules.periodLabel(k.period()),
+                    (int) r[1], (int) r[2], cost, paid, cost.subtract(paid).max(Money.ZERO), status, ProductionRules.paymentStatusLabel(status)));
         });
         out.sort(Comparator.comparing(FactoryMonth::period).reversed().thenComparing(FactoryMonth::factoryName));
         return out;
     }
 
-    /** Factory payments, newest first. */
+    /** Factory payments, newest first, with the bills each one paid. */
     @Transactional(readOnly = true)
     public List<FactoryPaymentRow> payments() {
+        Map<Long, String> billsOf = new HashMap<>();
+        jdbc.query("select pb.payment_id, string_agg(r.return_no, ', ' order by r.return_date, r.id) as bills from factory_payment_bill pb "
+                + "join factory_return r on r.id = pb.return_id group by pb.payment_id", rs -> {
+            billsOf.put(rs.getLong("payment_id"), rs.getString("bills"));
+        });
         List<Object[]> raw = jdbc.query("select p.id, p.fp_no, p.pay_date, p.factory_id, f.code, f.name, p.period, p.method, p.reference, "
                         + "p.amount, p.note, p.created_by from factory_payment p join factory f on f.id = p.factory_id "
                         + "order by p.pay_date desc, p.id desc",
@@ -199,8 +242,8 @@ public class ProductionQueryService {
         return raw.stream().map(r -> {
             PayMethod m = (PayMethod) r[5];
             return new FactoryPaymentRow((long) r[0], (String) r[1], (java.time.LocalDate) r[2], (FactoryLink) r[3], (String) r[4],
-                    r[4] == null ? null : ProductionRules.periodLabel((String) r[4]), m.name(), m.label(), (String) r[6], Money.of((BigDecimal) r[7]),
-                    (String) r[8], names.get((String) r[9]));
+                    r[4] == null ? null : ProductionRules.periodLabel((String) r[4]), billsOf.get((long) r[0]), m.name(), m.label(),
+                    (String) r[6], Money.of((BigDecimal) r[7]), (String) r[8], names.get((String) r[9]));
         }).toList();
     }
 

@@ -80,7 +80,7 @@ class BillingRulesTest {
     @Test
     void bankTransferAndChequeNeedAReference() {
         assertThat(PaymentRules.referenceProblem(PayMethod.CASH, null)).isNull();
-        assertThat(PaymentRules.referenceProblem(PayMethod.BANK_TRANSFER, " ")).isEqualTo("Enter the bank reference.");
+        assertThat(PaymentRules.referenceProblem(PayMethod.BANK_TRANSFER, " ")).isEqualTo("Enter the transfer reference.");
         assertThat(PaymentRules.referenceProblem(PayMethod.CHEQUE, null)).isEqualTo("Enter the cheque number.");
         assertThat(PaymentRules.referenceProblem(PayMethod.CHEQUE, "330981")).isNull();
         assertThat(PaymentRules.isPartPayment(new BigDecimal("2000"), new BigDecimal("6760"))).isTrue();

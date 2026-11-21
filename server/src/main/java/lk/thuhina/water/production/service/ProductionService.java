@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -36,6 +38,7 @@ import lk.thuhina.water.partners.service.FactoryService;
 import lk.thuhina.water.production.dto.ProductionDtos.DispatchLine;
 import lk.thuhina.water.production.dto.ProductionDtos.DispatchRequest;
 import lk.thuhina.water.production.dto.ProductionDtos.DispatchView;
+import lk.thuhina.water.production.dto.ProductionDtos.FactoryBill;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryPaymentRequest;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryPaymentRow;
 import lk.thuhina.water.production.dto.ProductionDtos.FactoryReceiveRequest;
@@ -67,13 +70,14 @@ import org.springframework.transaction.annotation.Transactional;
  *       bottles kept back last time come with a later load;</li>
  *   <li>receive filled – partial returns; FACTORY −(filled + rejected), FILLED +filled, WRITTEN_OFF +rejected; rejects become a
  *       company damage record "At factory"; cost = filled × batch charge;</li>
- *   <li>pay a factory – the payment clears its oldest filling cost first.</li>
+ *   <li>pay a factory – Bill to Bill: the payment pays the filling bills ticked, oldest of them first.</li>
  * </ul>
  */
 @Service
 public class ProductionService {
 
     public static final String NO_CHARGE = "NO_CHARGE";
+    public static final String MSG_TICK_BILLS = "Tick the bills this payment pays.";
 
     private final FactoryDispatchRepository dispatches;
     private final FactoryBatchRepository batches;
@@ -291,16 +295,46 @@ public class ProductionService {
         if (r.method() == null) {
             throw new ValidationException("method", "Select the payment method.");
         }
-        String reference = r.method() == PayMethod.CASH ? null : Texts.blankToNull(r.reference());
+        // Bill to Bill: the bills ticked, oldest first; the amount may not be more than what is still due on them.
+        Set<Long> ids = r.billIds() == null ? Set.of() : new HashSet<>(r.billIds());
+        List<FactoryBill> chosen = query.bills(factory.getId(), true).stream().filter(b -> ids.contains(b.id()))
+                .sorted(Comparator.comparing(FactoryBill::date).thenComparing(FactoryBill::id)).toList();
+        if (ids.isEmpty() || chosen.size() != ids.size()) {
+            throw new ValidationException("billIds", ids.isEmpty() ? MSG_TICK_BILLS
+                    : "A bill ticked is not an unpaid bill of " + factory.getName() + ".");
+        }
+        BigDecimal amount = Money.of(r.amount());
+        BigDecimal due = chosen.stream().map(FactoryBill::due).reduce(Money.ZERO, BigDecimal::add);
+        if (amount.compareTo(due) > 0) {
+            throw new ValidationException("amount", "More than the bills ticked (" + Money.format(due) + ").");
+        }
+        String reference = r.method().keep(Texts.blankToNull(r.reference()));
+        if (reference == null && r.method() == PayMethod.BILL_TO_BILL) {
+            reference = String.join(", ", chosen.stream().map(FactoryBill::billNo).toList());
+            if (reference.length() > 100) {
+                reference = reference.substring(0, 97) + "...";
+            }
+        }
         String refProblem = r.method().referenceProblem(reference);
         if (refProblem != null) {
             throw new ValidationException("reference", refProblem);
         }
-        BigDecimal amount = Money.of(r.amount());
         FactoryPayment p = payments.saveAndFlush(new FactoryPayment(numbering.next(SequenceNames.FACTORY_PAYMENT), factory.getId(),
                 null, r.date(), amount, r.method(), reference, Texts.blankToNull(r.note())));
+        BigDecimal left = amount;
+        List<String> paidBills = new ArrayList<>();
+        for (FactoryBill b : chosen) {
+            BigDecimal take = left.min(b.due());
+            if (take.signum() <= 0) {
+                break;
+            }
+            jdbc.update("insert into factory_payment_bill (payment_id, return_id, amount) values (:p, :r, :a)",
+                    new MapSqlParameterSource("p", p.getId()).addValue("r", b.id()).addValue("a", take));
+            paidBills.add(b.billNo());
+            left = left.subtract(take);
+        }
         audit.log(AuditAction.CREATE, "Factory payment", p.getFpNo(), factory.getName() + ": " + Money.format(amount) + " by "
-                + r.method().label() + (reference == null ? "" : " (" + reference + ")"));
+                + r.method().label() + (reference == null ? "" : " (" + reference + ")") + " for " + String.join(", ", paidBills));
         return query.payment(p.getId());
     }
 

@@ -701,7 +701,7 @@ describe("CustomerDialog", () => {
     await within(dialog).findByRole("option", { name: "Maharagama" });
     expect(within(dialog).getByLabelText("Name")).toHaveValue("Divisional Secretariat – Maharagama");
     expect(within(dialog).getByLabelText("Customer type")).toHaveValue("3");
-    expect(within(dialog).getByLabelText("20L agreed price (Rs.)")).toHaveValue(300);
+    expect(within(dialog).getByLabelText("20L water price (Rs.)")).toHaveValue(300);
     expect(within(dialog).getByLabelText("Usual 20L per delivery")).toHaveValue(10);
     expect(within(dialog).getByLabelText("Reason for the agreed price")).toHaveValue(
       "Quotation QT-2026-001 accepted",

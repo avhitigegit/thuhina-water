@@ -1,5 +1,7 @@
 "use client";
 
+import type { PayMethod } from "@/components/shared/PaidBy";
+
 /* Expenses API (design 7.2 Expenses): month view, month-by-month summary, add / edit / delete, expense types. */
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api/client";
@@ -53,7 +55,7 @@ export interface ExpenseBody {
   paidTo: string;
   billNo: string;
   amount: number | null;
-  method: "CASH" | "BANK_TRANSFER" | "CHEQUE";
+  method: PayMethod;
   reference: string;
   version?: number;
 }

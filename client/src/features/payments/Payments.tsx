@@ -18,7 +18,7 @@ import { clearLinkParams, lookup } from "@/features/billing/links";
 import { PaymentSavedDialog, ReceivePaymentDialog } from "@/features/billing/PaymentDialogs";
 import { CustomerPanel } from "@/features/customers/CustomerPanel";
 import { useProductionSummary } from "@/features/production/api";
-import { FactoryPaymentDialog } from "@/features/production/ProductionDialogs";
+import { FactoryPaymentDialog } from "@/features/production/FactoryPaymentDialog";
 import type { CustomerLookupRow, MoneyRow, PaymentSaved } from "@/lib/api/types";
 import { formatDate, formatMoney, todayIso } from "@/lib/format";
 import { P } from "@/lib/permissions";

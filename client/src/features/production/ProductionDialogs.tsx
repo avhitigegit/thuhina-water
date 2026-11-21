@@ -12,13 +12,12 @@
 import { useState } from "react";
 import { DateField } from "@/components/shared/DateField";
 import { FormDialog } from "@/components/shared/FormDialog";
-import { PaidByFields, payFields, type PayMethod } from "@/components/shared/PaidBy";
 import { useFactories } from "@/features/partners/api";
 import { ApiError } from "@/lib/api/client";
-import type { BatchView, DispatchView, FactoryBottleStock, FactoryOwed } from "@/lib/api/types";
+import type { BatchView, DispatchView, FactoryBottleStock } from "@/lib/api/types";
 import { formatDate, formatMoney } from "@/lib/format";
 import { toast } from "@/lib/toast";
-import { allocate, dispatchNoteUrl, usePayFactory, useReceiveFilled, useSendEmpties } from "./api";
+import { allocate, dispatchNoteUrl, useReceiveFilled, useSendEmpties } from "./api";
 
 /** The message to show for a failed save: field messages of a 400, else the error message. */
 export function errorText(err: unknown): string {
@@ -475,113 +474,6 @@ export function ReceiveFilledDialog({
           )}
         </>
       )}
-    </FormDialog>
-  );
-}
-
-// ------------------------------------------------------------------ factory payment (FR-26)
-
-/** Pay a factory: like paying a supplier, the payment clears its oldest filling cost first – no month to choose. */
-export function FactoryPaymentDialog({
-  factories,
-  today,
-  onClose,
-}: {
-  factories: FactoryOwed[];
-  today: string;
-  onClose: () => void;
-}) {
-  const pay = usePayFactory();
-  const start = factories.find((f) => Number(f.owed) > 0) ?? factories[0];
-  const [factoryId, setFactoryId] = useState(String(start?.id ?? ""));
-  const owedOf = (id: string) => Math.max(0, Number(factories.find((f) => String(f.id) === id)?.owed ?? 0));
-  const [date, setDate] = useState<string | null>(today);
-  const [amount, setAmount] = useState(start ? String(owedOf(String(start.id))) : "");
-  const [method, setMethod] = useState<PayMethod>("BANK_TRANSFER");
-  const [reference, setReference] = useState("");
-  const [note, setNote] = useState("");
-  const [error, setError] = useState("");
-
-  function submit() {
-    setError("");
-    if (!date) {
-      setError("Enter the date.");
-      return;
-    }
-    pay.mutate(
-      {
-        factoryId: factoryId ? Number(factoryId) : undefined,
-        date,
-        amount: amount.trim() === "" ? undefined : Number(amount),
-        ...payFields(method, reference),
-        note,
-      },
-      {
-        onSuccess: (p) => {
-          toast(`Payment recorded (${p.fpNo})`, "ok");
-          onClose();
-        },
-        onError: (err) => setError(errorText(err)),
-      },
-    );
-  }
-
-  return (
-    <FormDialog
-      open
-      onOpenChange={(o) => !o && onClose()}
-      title="Pay factory"
-      onSubmit={submit}
-      submitLabel="Save payment"
-      submitting={pay.isPending}
-    >
-      {error && <div className="banner bad">{error}</div>}
-      <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
-        <div className="field req full">
-          <label htmlFor="fp-factory">Factory</label>
-          <select
-            id="fp-factory"
-            value={factoryId}
-            onChange={(e) => {
-              setFactoryId(e.target.value);
-              setAmount(String(owedOf(e.target.value)));
-            }}
-          >
-            {factories.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.name} – owed {formatMoney(f.owed)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field req">
-          <label htmlFor="fp-date">Date</label>
-          <DateField id="fp-date" value={date} onChange={setDate} today={today} />
-        </div>
-        <div className="field req">
-          <label htmlFor="fp-amount">Amount (Rs.)</label>
-          <input
-            id="fp-amount"
-            type="number"
-            min={0}
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </div>
-        <PaidByFields
-          id="fp"
-          method={method}
-          reference={reference}
-          onMethod={setMethod}
-          onReference={setReference}
-        />
-        <div className="field full">
-          <label htmlFor="fp-note">Note</label>
-          <input id="fp-note" value={note} onChange={(e) => setNote(e.target.value)} />
-        </div>
-      </div>
-      <p className="small muted">The payment clears the oldest filling cost first.</p>
     </FormDialog>
   );
 }
