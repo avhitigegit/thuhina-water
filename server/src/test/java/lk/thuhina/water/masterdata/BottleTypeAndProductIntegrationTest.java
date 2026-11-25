@@ -3,6 +3,7 @@ package lk.thuhina.water.masterdata;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.nullValue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -54,6 +55,27 @@ class BottleTypeAndProductIntegrationTest extends MasterDataTestSupport {
         } finally {
             jdbc.update("update stock_balance set qty = 0 where bottle_type_code = ?", code);
             jdbc.update("update bottle_type set active = false where code = ?", code);
+        }
+    }
+
+    @Test
+    void aBottleTypeNeverUsedCanBeDeletedWithItsPricesButAUsedOneCannot() throws Exception {
+        String unused = newBottle();
+        jdbc.update("insert into price_entry (kind, bottle_type_code, price, effective_from, reason, created_by) "
+                + "values ('DEPOSIT', ?, 700, current_date, 'setup', 'test')", unused);
+        mvc.perform(delete("/bottle-types/" + unused).cookie(admin)).andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("select count(*) from bottle_type where code = ?", Integer.class, unused)).isZero();
+        assertThat(jdbc.queryForObject("select count(*) from price_entry where bottle_type_code = ?", Integer.class, unused)).isZero();
+
+        String used = newBottle();
+        jdbc.update("update stock_balance set qty = 3 where bottle_type_code = ? and bucket = 'FILLED'", used);
+        try {
+            mvc.perform(delete("/bottle-types/" + used).cookie(admin))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.details.fields.code").value(org.hamcrest.Matchers.containsString("Set it Inactive instead.")));
+        } finally {
+            jdbc.update("update stock_balance set qty = 0 where bottle_type_code = ?", used);
+            jdbc.update("update bottle_type set active = false where code = ?", used);
         }
     }
 

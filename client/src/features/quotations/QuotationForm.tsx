@@ -190,6 +190,7 @@ export function QuotationForm({
   const total = shown.reduce((sum, s) => sum + s.amount, 0);
   const below = shown.filter((s) => s.now != null && (Number(s.price) || 0) < s.now).length;
   const typeName = activeTypes.find((t) => String(t.id) === typeId)?.name ?? "";
+  const isHousehold = /^house/i.test(typeName);
 
   function submit() {
     setError("");
@@ -201,7 +202,7 @@ export function QuotationForm({
       customerId: to === "cust" ? customer?.id : undefined,
       orgName: to === "new" ? org : undefined,
       contact,
-      designation,
+      designation: isHousehold ? "" : designation,
       address: to === "new" ? address : undefined,
       areaId: to === "new" && areaId ? Number(areaId) : undefined,
       phone: to === "new" ? phone : undefined,
@@ -316,15 +317,18 @@ export function QuotationForm({
           <label htmlFor="cq-contact">Contact person</label>
           <input id="cq-contact" value={contact} onChange={(e) => setContact(e.target.value)} />
         </div>
-        <div className="field">
-          <label htmlFor="cq-desig">Designation</label>
-          <input
-            id="cq-desig"
-            placeholder="e.g. Administrative Officer"
-            value={designation}
-            onChange={(e) => setDesignation(e.target.value)}
-          />
-        </div>
+        {/* UAT finding 21: a designation is for an office or organisation, not a household. */}
+        {!isHousehold && (
+          <div className="field">
+            <label htmlFor="cq-desig">Designation</label>
+            <input
+              id="cq-desig"
+              placeholder="e.g. Administrative Officer"
+              value={designation}
+              onChange={(e) => setDesignation(e.target.value)}
+            />
+          </div>
+        )}
         <div className="field">
           <label htmlFor="cq-email">Email</label>
           <input id="cq-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />

@@ -12,6 +12,7 @@ import lk.thuhina.water.masterdata.service.BottleTypeService;
 import lk.thuhina.water.security.Permissions;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -54,5 +55,13 @@ public class BottleTypeController {
     @PreAuthorize("hasAuthority('" + Permissions.MASTERDATA_EDIT + "')")
     public BottleTypeResponse update(@PathVariable String code, @Valid @RequestBody UpdateBottleTypeRequest request) {
         return service.update(code, request);
+    }
+
+    @Operation(summary = "Delete a bottle type that was never used (added by mistake); a used one must be set Inactive")
+    @DeleteMapping("/{code}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('" + Permissions.MASTERDATA_EDIT + "')")
+    public void delete(@PathVariable String code) {
+        service.delete(code);
     }
 }

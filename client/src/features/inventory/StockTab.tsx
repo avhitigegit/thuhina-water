@@ -67,11 +67,34 @@ function MinLevelInput({ bottle }: { bottle: BottleStock }) {
   );
 }
 
-export function StockTab({ stock }: { stock: StockOverview | undefined }) {
+export function StockTab({
+  stock,
+  onShowMovements,
+}: {
+  stock: StockOverview | undefined;
+  /** UAT finding 30: click a bottle type to see its movements. */
+  onShowMovements?: (code: string) => void;
+}) {
   const canEdit = useCan(P.STOCK_EDIT);
 
   const bottleColumns: Column<BottleStock>[] = [
-    { key: "bottle", header: "Bottle", cell: (b) => <b>{b.name}</b> },
+    {
+      key: "bottle",
+      header: "Bottle",
+      cell: (b) =>
+        onShowMovements ? (
+          <button
+            type="button"
+            className="link-btn"
+            title={`Show the movements of ${b.name}`}
+            onClick={() => onShowMovements(b.code)}
+          >
+            <b>{b.name}</b>
+          </button>
+        ) : (
+          <b>{b.name}</b>
+        ),
+    },
     ...BUCKETS.map((k): Column<BottleStock> => ({
       key: k.key,
       header: k.label,

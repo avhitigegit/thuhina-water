@@ -66,7 +66,7 @@ export function PurchaseOrdersTab({ onOpen }: { onOpen: (id: number) => void }) 
       className: "actions",
       cell: (p) => (
         <button className="btn sm primary" type="button" onClick={() => onOpen(p.id)}>
-          Open
+          {p.status === "RECEIVED" || p.status === "CANCELLED" ? "View" : "Open"}
         </button>
       ),
     },

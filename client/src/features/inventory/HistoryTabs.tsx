@@ -108,8 +108,15 @@ const movementColumns: Column<MovementRow>[] = [
 
 const PAGE_SIZE = 50;
 
-export function MovementsTab({ stock }: { stock: StockOverview | undefined }) {
-  const [item, setItem] = useState("");
+export function MovementsTab({
+  stock,
+  initialItem = "",
+}: {
+  stock: StockOverview | undefined;
+  /** UAT finding 30: opened from a bottle type in the Stock table. */
+  initialItem?: string;
+}) {
+  const [item, setItem] = useState(initialItem);
   const [search, setSearch] = useState("");
   const [q, setQ] = useState("");
   useEffect(() => {

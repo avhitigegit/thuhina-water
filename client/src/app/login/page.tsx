@@ -19,6 +19,8 @@ function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const idleParam = Number(params.get("idle"));
+  const idle = idleParam > 0 ? (idleParam >= 60 ? `${idleParam / 60} hours` : `${idleParam} minutes`) : "";
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -65,6 +67,11 @@ function LoginForm() {
           onChange={(e) => setPassword(e.target.value)}
         />
       </div>
+      {idle && !error && (
+        <div className="banner info" role="status">
+          You were logged out after {idle} without use. Please log in again.
+        </div>
+      )}
       {error && (
         <div className="banner bad" role="alert">
           {error}

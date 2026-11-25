@@ -41,10 +41,22 @@ function FactoryDialog({
 }) {
   const save = useSaveFactory();
   const [error, setError] = useState("");
+  // UAT finding 6: pick the sizes the factory fills; a charge box shows only for those. A size with a charge now
+  // stays ticked (the server keeps it – a factory charge can be changed, not removed).
+  const chargedNow = new Set((factory?.charges ?? []).map((c) => c.bottleTypeCode));
+  const [sizes, setSizes] = useState<Set<string>>(
+    () =>
+      new Set(
+        bottles.length === 1
+          ? [bottles[0].code]
+          : bottles.filter((b) => chargedNow.has(b.code)).map((b) => b.code),
+      ),
+  );
   const schema = factorySchema(bottles.map((b) => ({ code: b.code, label: sizeLabel(b) })));
   const {
     register,
     handleSubmit,
+    setValue,
     setError: setFieldError,
     formState: { errors },
   } = useForm<FactoryValues>({
@@ -72,6 +84,17 @@ function FactoryDialog({
 
   const submit = handleSubmit((v) => {
     setError("");
+    if (sizes.size === 0) {
+      setError("Tick at least one bottle size the factory fills.");
+      return;
+    }
+    const blank = bottles.filter((b) => sizes.has(b.code) && (v.charges[b.code] ?? "").trim() === "");
+    if (blank.length > 0) {
+      blank.forEach((b) =>
+        setFieldError(`charges.${b.code}`, { message: `Enter the charge per ${sizeLabel(b)} bottle.` }),
+      );
+      return;
+    }
     save.mutate(
       {
         id: factory?.id ?? null,
@@ -81,7 +104,7 @@ function FactoryDialog({
           // A blank charge is left out: the factory does not fill that size (N-05).
           charges: Object.fromEntries(
             Object.entries(v.charges)
-              .filter(([, c]) => c.trim() !== "")
+              .filter(([k, c]) => sizes.has(k) && c.trim() !== "")
               .map(([k, c]) => [k, Number(c)]),
           ),
           version: factory?.version,
@@ -169,23 +192,57 @@ function FactoryDialog({
           </select>
           {errors.termsDays && <span className="error">{errors.termsDays.message}</span>}
         </div>
-        {bottles.map((b) => {
-          const err = errors.charges?.[b.code];
-          return (
-            <div className="field" key={b.code}>
-              <label htmlFor={`fac-charge-${b.code}`}>Charge per {sizeLabel(b)} bottle (Rs.)</label>
-              <input
-                id={`fac-charge-${b.code}`}
-                type="number"
-                min="0"
-                step="0.01"
-                className={err ? "invalid num" : "num"}
-                {...register(`charges.${b.code}`)}
-              />
-              {err && <span className="error">{err.message}</span>}
-            </div>
-          );
-        })}
+        <div className="field full">
+          <span className="label">Bottle sizes this factory fills</span>
+          <div className="size-picks">
+            {bottles.map((b) => {
+              const locked = chargedNow.has(b.code);
+              return (
+                <label key={b.code} className={sizes.has(b.code) ? "size-pick on" : "size-pick"}>
+                  <input
+                    type="checkbox"
+                    checked={sizes.has(b.code)}
+                    disabled={locked}
+                    title={
+                      locked
+                        ? "This factory has a charge for this size – change the charge instead."
+                        : undefined
+                    }
+                    onChange={(e) => {
+                      const next = new Set(sizes);
+                      if (e.target.checked) next.add(b.code);
+                      else {
+                        next.delete(b.code);
+                        setValue(`charges.${b.code}`, "");
+                      }
+                      setSizes(next);
+                    }}
+                  />{" "}
+                  {sizeLabel(b)}
+                </label>
+              );
+            })}
+          </div>
+        </div>
+        {bottles
+          .filter((b) => sizes.has(b.code))
+          .map((b) => {
+            const err = errors.charges?.[b.code];
+            return (
+              <div className="field" key={b.code}>
+                <label htmlFor={`fac-charge-${b.code}`}>Charge per {sizeLabel(b)} bottle (Rs.)</label>
+                <input
+                  id={`fac-charge-${b.code}`}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  className={err ? "invalid num" : "num"}
+                  {...register(`charges.${b.code}`)}
+                />
+                {err && <span className="error">{err.message}</span>}
+              </div>
+            );
+          })}
         {factory && (
           <label className="check">
             <input type="checkbox" {...register("active")} /> Active
@@ -193,8 +250,8 @@ function FactoryDialog({
         )}
       </div>
       <p className="small muted">
-        Leave a charge empty if the factory does not fill that size. A new charge applies to batches sent
-        after saving.
+        Tick only the sizes this factory fills, then enter the charge for each. A new charge applies to
+        batches sent after saving.
       </p>
     </FormDialog>
   );
@@ -230,13 +287,22 @@ export function FactoriesTab() {
     {
       key: "charges",
       header: "Charge per bottle",
-      cell: (f) =>
-        active
-          .map((b) => {
-            const c = f.charges.find((x) => x.bottleTypeCode === b.code);
-            return `${sizeLabel(b)} ${c ? formatMoney(c.charge) : "–"}`;
-          })
-          .join(" · "),
+      // UAT finding 7: one size per line – size on the left, price on the right; sizes it does not fill are left out.
+      cell: (f) => (
+        <div className="charge-lines">
+          {active
+            .filter((b) => f.charges.some((x) => x.bottleTypeCode === b.code))
+            .map((b) => {
+              const c = f.charges.find((x) => x.bottleTypeCode === b.code)!;
+              return (
+                <div key={b.code}>
+                  <span>{sizeLabel(b)}</span>
+                  <span className="num">{formatMoney(c.charge)}</span>
+                </div>
+              );
+            })}
+        </div>
+      ),
     },
     { key: "terms", header: "Payment terms", cell: (f) => f.termsLabel },
     {
