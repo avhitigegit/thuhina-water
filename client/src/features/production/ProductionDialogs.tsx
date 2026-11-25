@@ -279,6 +279,7 @@ export function ReceiveFilledDialog({
 }) {
   const receive = useReceiveFilled();
   const start = open.find((x) => x.id === batchId) ?? open[0];
+  const fromRow = batchId != null && open.some((x) => x.id === batchId);
   const [factoryId, setFactoryId] = useState(String(start?.factory.id ?? ""));
   const [bottle, setBottle] = useState(start?.bottleTypeCode ?? "");
   const [date, setDate] = useState<string | null>(today);
@@ -369,27 +370,44 @@ export function ReceiveFilledDialog({
           <div className="form-grid">
             <div className="field req">
               <label htmlFor="fr-factory">Factory</label>
-              <select
-                id="fr-factory"
-                value={factoryId}
-                onChange={(e) => pick(e.target.value, bottlesAt(e.target.value)[0]?.[0] ?? "")}
-              >
-                {factories.map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-              </select>
+              {fromRow ? (
+                <input
+                  id="fr-factory"
+                  readOnly
+                  value={factories.find(([id]) => id === factoryId)?.[1] ?? ""}
+                />
+              ) : (
+                <select
+                  id="fr-factory"
+                  value={factoryId}
+                  onChange={(e) => pick(e.target.value, bottlesAt(e.target.value)[0]?.[0] ?? "")}
+                >
+                  {factories.map(([id, name]) => (
+                    <option key={id} value={id}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="field req">
               <label htmlFor="fr-bottle">Bottle</label>
-              <select id="fr-bottle" value={bottle} onChange={(e) => pick(factoryId, e.target.value)}>
-                {bottlesAt(factoryId).map(([code, l]) => (
-                  <option key={code} value={code}>
-                    {l}
-                  </option>
-                ))}
-              </select>
+              {/* UAT finding 13: Receive on a batch row fixes its factory and bottle; the main button lets you choose. */}
+              {fromRow ? (
+                <input
+                  id="fr-bottle"
+                  readOnly
+                  value={bottlesAt(factoryId).find(([code]) => code === bottle)?.[1] ?? ""}
+                />
+              ) : (
+                <select id="fr-bottle" value={bottle} onChange={(e) => pick(factoryId, e.target.value)}>
+                  {bottlesAt(factoryId).map(([code, l]) => (
+                    <option key={code} value={code}>
+                      {l}
+                    </option>
+                  ))}
+                </select>
+              )}
             </div>
             <div className="field req">
               <label htmlFor="fr-date">Date</label>

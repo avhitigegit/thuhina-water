@@ -69,6 +69,57 @@ public class BottleTypeService {
         return toResponse(saved, inCirculation().getOrDefault(code, 0));
     }
 
+    /** Where a bottle type counts as used (UAT finding 2): any of these rows means it must be set Inactive instead. */
+    private static final String[][] USED_IN = {
+            {"select count(*) from stock_movement where item_code = :c", "stock movements"},
+            {"select count(*) from stock_balance where bottle_type_code = :c and qty <> 0", "stock"},
+            {"select count(*) from sales_txn_line where bottle_type_code = :c", "bills"},
+            {"select count(*) from ledger_effect where bottle_type_code = :c", "bills"},
+            {"select count(*) from damage_record where bottle_type_code = :c", "damage records"},
+            {"select count(*) from customer_usual_qty where bottle_type_code = :c", "customers"},
+            {"select count(*) from customer_bottle_balance where bottle_type_code = :c and (held <> 0 or to_collect <> 0 or owed <> 0)", "customers"},
+            {"select count(*) from customer_price where bottle_type_code = :c", "customer agreed prices"},
+            {"select count(*) from factory_charge where bottle_type_code = :c", "filling factories"},
+            {"select count(*) from factory_batch where bottle_type_code = :c", "factory batches"},
+            {"select count(*) from cq_line where bottle_type_code = :c", "customer quotations"},
+            {"select count(*) from supplier_item where item_type = 'BOTTLE' and item_code = :c", "suppliers"},
+            {"select count(*) from qr_item where item_code = :c", "quotation requests"},
+            {"select count(*) from quotation_line where item_code = :c", "supplier quotations"},
+            {"select count(*) from po_line where item_code = :c", "purchase orders"},
+            {"select count(*) from grn_line where item_code = :c", "goods received"},
+            {"select count(*) from stock_adjustment where item_code = :c", "stock adjustments"},
+    };
+
+    /**
+     * Delete a bottle type added by mistake and never used (UAT finding 2). Its setup rows (prices, deposit, minimum
+     * stock, accepted old-bottle brands, empty stock rows) go with it. A used type is refused – set it Inactive.
+     */
+    @Transactional
+    public void delete(String code) {
+        BottleType b = repository.findById(code).orElseThrow(() -> new NotFoundException(ENTITY, code));
+        Map<String, Object> p = Map.of("c", code);
+        java.util.Set<String> usedBy = new java.util.LinkedHashSet<>();
+        for (String[] q : USED_IN) {
+            Integer n = jdbc.queryForObject(q[0], p, Integer.class);
+            if (n != null && n > 0) {
+                usedBy.add(q[1]);
+            }
+        }
+        if (!usedBy.isEmpty()) {
+            throw new ValidationException("code", b.getName() + " is already used (" + String.join(", ", usedBy)
+                    + ") and cannot be deleted. Set it Inactive instead.");
+        }
+        jdbc.update("delete from old_bottle_brand where bottle_type_code = :c", p);
+        jdbc.update("delete from min_stock_level where bottle_type_code = :c", p);
+        jdbc.update("delete from stock_balance where bottle_type_code = :c", p);
+        jdbc.update("delete from customer_bottle_balance where bottle_type_code = :c", p);
+        // price_entry is insert-only; V020 allows this transaction to remove the type's own prices.
+        jdbc.getJdbcTemplate().queryForObject("select set_config('app.price_cancel', 'on', true)", String.class);
+        jdbc.update("delete from price_entry where bottle_type_code = :c", p);
+        jdbc.update("delete from bottle_type where code = :c", p);
+        audit.log(AuditAction.DELETE, ENTITY, code, b.getName() + " deleted (never used)");
+    }
+
     @Transactional
     public BottleTypeResponse update(String code, UpdateBottleTypeRequest request) {
         BottleType b = repository.findById(code).orElseThrow(() -> new NotFoundException(ENTITY, code));

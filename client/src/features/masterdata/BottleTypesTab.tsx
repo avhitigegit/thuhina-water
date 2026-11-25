@@ -13,12 +13,13 @@ import { FormDialog } from "@/components/shared/FormDialog";
 import { MoneyText } from "@/components/shared/MoneyText";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Can } from "@/features/auth/access";
+import { ApiError } from "@/lib/api/client";
 import type { BottleType } from "@/lib/api/types";
 import { formatNumber } from "@/lib/format";
 import { showServerErrors } from "@/lib/forms";
 import { P } from "@/lib/permissions";
 import { toast } from "@/lib/toast";
-import { useBottleTypes, useCreateBottleType, useUpdateBottleType } from "./api";
+import { useBottleTypes, useCreateBottleType, useDeleteBottleType, useUpdateBottleType } from "./api";
 import { bottleCodeFor, bottleTypeSchema, type BottleTypeValues } from "./schemas";
 
 const FIELDS = ["name", "litres"] as const;
@@ -33,6 +34,8 @@ function BottleTypeDialog({
 }) {
   const create = useCreateBottleType();
   const update = useUpdateBottleType();
+  const remove = useDeleteBottleType();
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState("");
   const {
     register,
@@ -84,6 +87,38 @@ function BottleTypeDialog({
       title={bottle ? `Edit ${bottle.name}` : "New bottle type"}
       onSubmit={() => void submit()}
       submitting={create.isPending || update.isPending}
+      extraButtons={
+        bottle && (
+          <button
+            type="button"
+            className={confirmDelete ? "btn danger" : "btn"}
+            disabled={remove.isPending}
+            onClick={() => {
+              if (!confirmDelete) {
+                setConfirmDelete(true);
+                return;
+              }
+              setError("");
+              remove.mutate(bottle.code, {
+                onSuccess: () => {
+                  toast(`Bottle type ${bottle.code} deleted`, "ok");
+                  onClose();
+                },
+                onError: (err) => {
+                  setConfirmDelete(false);
+                  setError(
+                    err instanceof ApiError
+                      ? Object.values(err.fieldErrors).join(" ") || err.message
+                      : "Something went wrong. Please try again.",
+                  );
+                },
+              });
+            }}
+          >
+            {confirmDelete ? "Click again to delete" : "Delete"}
+          </button>
+        )
+      }
     >
       {error && <div className="banner bad">{error}</div>}
       <div className="form-grid" style={{ gridTemplateColumns: "1fr 1fr" }}>
@@ -124,6 +159,12 @@ function BottleTypeDialog({
           <input type="checkbox" {...register("active")} /> Active
         </label>
       </div>
+      {bottle && (
+        <p className="help" style={{ marginTop: 10 }}>
+          Delete works only for a bottle type that was never used (no stock, bills, customers, suppliers or
+          factories). A used one stays in the history – untick Active to hide it.
+        </p>
+      )}
     </FormDialog>
   );
 }

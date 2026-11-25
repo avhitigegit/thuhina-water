@@ -130,21 +130,19 @@ function CustomersPage() {
     },
     { key: "phone", header: "Phone", cell: (c) => <span className="nowrap">{c.phone}</span> },
     { key: "area", header: "Area", cell: (c) => c.areaName },
+    { key: "type", header: "Type", cell: (c) => c.typeName },
+    // UAT finding 22: the price is shown in its own column, not under Type.
     {
-      key: "type",
-      header: "Type",
-      cell: (c) => (
-        <>
-          {c.typeName}
-          {c.agreed && (
-            <div>
-              <span className="badge info" title={c.agreed}>
-                agreed price
-              </span>
-            </div>
-          )}
-        </>
-      ),
+      key: "price",
+      header: "Price",
+      cell: (c) =>
+        c.agreed ? (
+          <span className="badge info" title={c.agreed}>
+            Agreed
+          </span>
+        ) : (
+          <span className="small muted">Standard</span>
+        ),
     },
     {
       key: "delivery",
