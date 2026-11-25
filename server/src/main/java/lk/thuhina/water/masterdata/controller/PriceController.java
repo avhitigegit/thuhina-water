@@ -14,7 +14,9 @@ import lk.thuhina.water.security.Permissions;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -55,5 +57,13 @@ public class PriceController {
     @PreAuthorize("hasAuthority('" + Permissions.MASTERDATA_EDIT + "')")
     public PriceHistoryRow setPrice(@Valid @RequestBody SetPriceRequest request) {
         return pricing.setPrice(request);
+    }
+
+    @Operation(summary = "Cancel a scheduled price that has not started yet (entered by mistake)")
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @PreAuthorize("hasAuthority('" + Permissions.MASTERDATA_EDIT + "')")
+    public void cancelScheduled(@PathVariable long id) {
+        pricing.cancelScheduled(id);
     }
 }

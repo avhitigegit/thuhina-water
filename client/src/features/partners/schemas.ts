@@ -24,12 +24,20 @@ const email = z
   .max(100, "Email: at most 100 characters.")
   .refine((v) => v === "" || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), "Enter a valid email address.");
 
+/** Sri Lankan phone (UAT finding 5) – the same rule as customers. */
+export const MSG_PARTNER_PHONE = "Phone must be a Sri Lankan number, e.g. 077 123 4567 or 011 285 4471.";
+const PHONE_RE = /^0\d{2} ?\d{3} ?\d{4}$/;
+
 const terms = z.string().refine((v) => TERMS.some((t) => String(t.days) === v), MSG_TERMS);
 
 export const supplierSchema = z.object({
   name: z.string().trim().min(1, MSG_SUPPLIER_REQUIRED).max(100, "Name: at most 100 characters."),
   contact: z.string().trim().max(100, "Contact: at most 100 characters."),
-  phone: z.string().trim().min(1, MSG_SUPPLIER_REQUIRED).max(20, "Phone: at most 20 characters."),
+  phone: z
+    .string()
+    .trim()
+    .min(1, MSG_SUPPLIER_REQUIRED)
+    .refine((v) => v === "" || PHONE_RE.test(v), MSG_PARTNER_PHONE),
   email,
   address: z.string().trim().max(200, "Address: at most 200 characters."),
   termsDays: terms,
@@ -59,7 +67,10 @@ export function factorySchema(bottles: { code: string; label: string }[]) {
     address: z.string().trim().max(200, "Address: at most 200 characters."),
     licence: z.string().trim().max(100, "Licence: at most 100 characters."),
     contact: z.string().trim().max(100, "Contact: at most 100 characters."),
-    phone: z.string().trim().max(20, "Phone: at most 20 characters."),
+    phone: z
+      .string()
+      .trim()
+      .refine((v) => v === "" || PHONE_RE.test(v), MSG_PARTNER_PHONE),
     email,
     termsDays: terms,
     charges: z

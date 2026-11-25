@@ -101,6 +101,10 @@ export const useSetPrice = () =>
     [PRICES, BOTTLES],
   );
 
+/** Cancel a scheduled price that has not started yet (UAT finding 4). */
+export const useCancelScheduledPrice = () =>
+  useSave((id: number) => api<void>(`/prices/${id}`, { method: "DELETE" }), [PRICES, BOTTLES]);
+
 export const useCreateBrand = () =>
   useSave(
     (body: CreateOldBottleBrandRequest) =>

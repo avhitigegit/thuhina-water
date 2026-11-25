@@ -2,6 +2,7 @@ package lk.thuhina.water.masterdata;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -177,6 +178,28 @@ class PricingIntegrationTest extends MasterDataTestSupport {
         pastEntry("DEPOSIT", null, 700, today().minusDays(5));
         assertThatThrownBy(() -> jdbc.update("update price_entry set price = 1 where bottle_type_code = ?", bottle))
                 .hasMessageContaining("insert-only");
+        assertThatThrownBy(() -> jdbc.update("delete from price_entry where bottle_type_code = ?", bottle))
+                .hasMessageContaining("insert-only");
+    }
+
+    @Test
+    void aScheduledPriceCanBeCancelledButAStartedOneCannot() throws Exception {
+        LocalDate today = today();
+        pastEntry("WATER", type, 300, today);
+        mvc.perform(json(post("/prices"), admin, change("WATER", type, 325, today.plusDays(1), "typed by mistake")))
+                .andExpect(status().isCreated());
+        Long scheduled = jdbc.queryForObject("select id from price_entry where bottle_type_code = ? and price = 325", Long.class, bottle);
+        Long started = jdbc.queryForObject("select id from price_entry where bottle_type_code = ? and price = 300", Long.class, bottle);
+
+        mvc.perform(delete("/prices/" + started).cookie(admin))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fields.effectiveFrom").value(
+                        "This price has already started and cannot be cancelled. Enter a new price from today instead."));
+        mvc.perform(delete("/prices/" + scheduled).cookie(admin)).andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("select count(*) from price_entry where bottle_type_code = ?", Integer.class, bottle)).isEqualTo(1);
+        // The same date can now be used again, and the table is still insert-only outside the cancel.
+        mvc.perform(json(post("/prices"), admin, change("WATER", type, 330, today.plusDays(1), "correct price")))
+                .andExpect(status().isCreated());
         assertThatThrownBy(() -> jdbc.update("delete from price_entry where bottle_type_code = ?", bottle))
                 .hasMessageContaining("insert-only");
     }

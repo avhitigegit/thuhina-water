@@ -354,8 +354,12 @@ public class SalesService {
         SaleCalc calc = settleCalc(x, r);
         SettleMethod method = r.method() == null ? SettleMethod.RETURN : r.method();
         SaleLine l = calc.lines().getFirst();
-        String details = "Bottles owed settled – " + x.customer().getName() + ": " + l.getOwedCleared() + " × " + l.getLabel()
-                + (method == SettleMethod.DEPOSIT ? " by deposit " + Money.format(calc.amount()) : " returned");
+        // UAT finding 28: say how many were settled and how many are still owed (a part settlement is not "all settled").
+        int owedBefore = x.view().bottles(l.getBottleTypeCode()).owed();
+        int stillOwed = Math.max(0, owedBefore - l.getOwedCleared());
+        String details = "Bottles owed – " + x.customer().getName() + ": " + l.getOwedCleared() + " of " + owedBefore + " × "
+                + l.getLabel() + (method == SettleMethod.DEPOSIT ? " paid by deposit " + Money.format(calc.amount()) : " returned")
+                + (stillOwed > 0 ? " – still owes " + stillOwed : " – all settled");
         return post(new Spec(SalesKind.OWED_SETTLEMENT, x, null, r.paperBillNo(), false, calc, r.paid(), r.payMethod(), r.payReference(), r.note(), false, null,
                 method, r.approveOverLimit(), details, false));
     }
