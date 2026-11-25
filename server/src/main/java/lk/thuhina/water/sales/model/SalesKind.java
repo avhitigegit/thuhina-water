@@ -9,7 +9,7 @@ public enum SalesKind {
     EXTRA_ORDER("Extra order"),
     PRODUCT_SALE("Product sale"),
     CUSTOMER_DAMAGE("Customer damage"),
-    OWED_SETTLEMENT("Bottles owed settled"),
+    OWED_SETTLEMENT("Bottles owed – settlement"),
     OPENING_BALANCE("Opening balance"),
     REVERSAL("Reversal");
 

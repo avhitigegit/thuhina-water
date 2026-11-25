@@ -90,7 +90,7 @@ export function QuotationsTab({
           type="button"
           onClick={() => setView({ kind: "request", id: q.id })}
         >
-          Open
+          {q.status === "CLOSED" ? "View" : "Open"}
         </button>
       ),
     },

@@ -109,6 +109,7 @@ public class FactoryService {
     public FactoryResponse create(FactoryRequest request) {
         int terms = SupplierService.checkTerms(request.termsDays());
         SupplierService.checkEmail(request.email());
+        SupplierService.checkPhone(request.phone(), null);
         List<BottleType> active = bottleTypes.findByActiveTrueOrderByLitresDesc();
         Map<String, BigDecimal> newCharges = checkCharges(request.charges(), active, Set.of());
 
@@ -137,6 +138,7 @@ public class FactoryService {
         Versions.check(request.version(), f.getVersion(), ENTITY + " " + f.getCode());
         int terms = SupplierService.checkTerms(request.termsDays());
         SupplierService.checkEmail(request.email());
+        SupplierService.checkPhone(request.phone(), f.getPhone());
         List<BottleType> active = bottleTypes.findByActiveTrueOrderByLitresDesc();
         LocalDate today = today();
         List<FactoryCharge> history = charges.findByFactoryIdOrderByEffectiveFromDescIdDesc(id);

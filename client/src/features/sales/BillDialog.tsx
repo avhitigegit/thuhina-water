@@ -12,6 +12,7 @@ import { FormDialog } from "@/components/shared/FormDialog";
 import { ReasonDialog } from "@/components/shared/ReasonDialog";
 import { Badge } from "@/components/shared/StatusBadge";
 import { useCan } from "@/features/auth/access";
+import { useCustomer } from "@/features/customers/api";
 import { ApiError } from "@/lib/api/client";
 import type { TxnDetail } from "@/lib/api/types";
 import { formatDate, formatDateTime, formatMoney } from "@/lib/format";
@@ -43,6 +44,10 @@ export function BillDialog({
   const reverse = useReverseBill();
   const [asking, setAsking] = useState(false);
   const b = bill.data;
+  // UAT finding 27: after a customer damage (or bottles owed) bill, show what the customer holds now.
+  const showHolding =
+    !!b && (b.kind === "CUSTOMER_DAMAGE" || b.kind === "OWED_SETTLEMENT") && b.customerId != null;
+  const holder = useCustomer(showHolding && b ? b.customerId : null);
 
   function doReverse(reason: string) {
     if (!b) return;
@@ -137,6 +142,25 @@ export function BillDialog({
                   </div>
                 )}
               </b>
+              {showHolding && holder.data && (
+                <>
+                  <span className="muted">Customer now</span>
+                  <b>
+                    {holder.data.bottles
+                      .filter((x) => x.held || x.owed || x.toCollect)
+                      .map((x) => (
+                        <div key={x.bottleTypeCode}>
+                          Holds {x.held} × {x.label}
+                          {x.owed > 0 && <span style={{ color: "var(--bad)" }}> · still owes {x.owed}</span>}
+                          {x.toCollect > 0 && (
+                            <span className="muted"> · {x.toCollect} empties to collect</span>
+                          )}
+                        </div>
+                      ))}
+                    {!holder.data.bottles.some((x) => x.held || x.owed || x.toCollect) && "Holds no bottles"}
+                  </b>
+                </>
+              )}
               <span className="muted">Amount</span>
               <b className="num">{formatMoney(b.amount)}</b>
               <span className="muted">Paid on bill</span>

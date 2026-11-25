@@ -628,7 +628,8 @@ function CustomerForm({
                   {bottles.map((b) => {
                     const std = standard(b.code);
                     const ap = Number(agreedPrices?.[b.code] || 0);
-                    const agreed = ap > 0 && std != null && ap !== std;
+                    // No standard price for this type yet: any typed price is saved as an agreed price (UAT findings 16–17).
+                    const agreed = ap > 0 && (std == null || ap !== std);
                     return (
                       <div
                         className={agreed ? "field cu-tile cu-price agreed" : "field cu-tile cu-price"}
@@ -654,7 +655,12 @@ function CustomerForm({
                           <span className="error">{errors.agreedPrices[b.code]?.message}</span>
                         )}
                         <span className="help">
-                          {agreed ? (
+                          {agreed && std == null ? (
+                            <>
+                              <span className="cu-tag agreed">Agreed</span> No standard {typeName} price is
+                              set – this price is saved as the customer&apos;s agreed price.
+                            </>
+                          ) : agreed && std != null ? (
                             <>
                               <span className="cu-tag agreed">Agreed</span> Standard {typeName}:{" "}
                               {formatMoney(std)}
@@ -799,43 +805,50 @@ function CustomerForm({
                 </div>
                 <div className="cu-box">
                   <div className="cu-box-title">Old bottles handed in</div>
-                  <div className="cu-box-grid">
-                    {oldBrands.length > 1 && (
-                      <div className="field">
-                        <label htmlFor="cu-oldBrand">Old bottle brand</label>
-                        <select
-                          id="cu-oldBrand"
-                          value={String(oldBrandId)}
-                          onChange={(e) => setOldBrand(e.target.value)}
-                        >
-                          {oldBrands.map((b) => (
-                            <option key={b.id} value={b.id}>
-                              {b.name}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-                    <div className="field">
-                      <label htmlFor="cu-oldBottles">
-                        {oldBrands.length === 1
-                          ? `Old ${oldBrands[0].name} bottles handed in`
-                          : "Old bottles handed in"}
-                      </label>
-                      <input
-                        id="cu-oldBottles"
-                        type="number"
-                        min="0"
-                        className={errors.oldBottles ? "invalid num" : "num"}
-                        {...register("oldBottles")}
-                      />
-                      {errors.oldBottles ? (
-                        <span className="error">{errors.oldBottles.message}</span>
-                      ) : (
-                        <span className="help">No deposit is charged for these.</span>
+                  {oldBrands.length === 0 ? (
+                    <p className="help" style={{ margin: 0 }}>
+                      No old-bottle brand is accepted for this bottle yet. To take old bottles instead of a
+                      deposit, add the brand in Bottles &amp; Products › Accepted old bottles first.
+                    </p>
+                  ) : (
+                    <div className="cu-box-grid">
+                      {oldBrands.length > 1 && (
+                        <div className="field">
+                          <label htmlFor="cu-oldBrand">Old bottle brand</label>
+                          <select
+                            id="cu-oldBrand"
+                            value={String(oldBrandId)}
+                            onChange={(e) => setOldBrand(e.target.value)}
+                          >
+                            {oldBrands.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       )}
+                      <div className="field">
+                        <label htmlFor="cu-oldBottles">
+                          {oldBrands.length === 1
+                            ? `Old ${oldBrands[0].name} bottles handed in`
+                            : "Old bottles handed in"}
+                        </label>
+                        <input
+                          id="cu-oldBottles"
+                          type="number"
+                          min="0"
+                          className={errors.oldBottles ? "invalid num" : "num"}
+                          {...register("oldBottles")}
+                        />
+                        {errors.oldBottles ? (
+                          <span className="error">{errors.oldBottles.message}</span>
+                        ) : (
+                          <span className="help">No deposit is charged for these.</span>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
                 <div className="cu-box cu-box-pay">
                   <div className="cu-box-title">Money received now</div>

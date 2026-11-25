@@ -81,6 +81,7 @@ public class SupplierService {
         ItemNames names = names();
         int terms = checkTerms(request.termsDays());
         checkEmail(request.email());
+        checkPhone(request.phone(), null);
         Set<SupplierItem.Ref> items = checkItems(request.items(), Set.of(), names);
         Supplier s = new Supplier(numbering.next(SequenceNames.SUPPLIER));
         s.update(request.name().trim(), Texts.blankToNull(request.contact()), request.phone().trim(),
@@ -100,6 +101,7 @@ public class SupplierService {
         ItemNames names = names();
         int terms = checkTerms(request.termsDays());
         checkEmail(request.email());
+        checkPhone(request.phone(), s.getPhone());
         Set<SupplierItem.Ref> before = new LinkedHashSet<>(s.getItems().stream().map(SupplierItem::ref).toList());
         Set<SupplierItem.Ref> items = checkItems(request.items(), before, names);
         boolean active = request.active() == null ? s.isActive() : request.active();
@@ -143,6 +145,14 @@ public class SupplierService {
             throw new ValidationException("termsDays", PaymentTerms.MSG_CHOOSE);
         }
         return days;
+    }
+
+    /** A new or changed phone must be a Sri Lankan number (UAT finding 5); an old saved number is not re-checked. */
+    static void checkPhone(String phone, String saved) {
+        String p = Texts.blankToNull(phone);
+        if (p != null && !p.equals(saved) && !Texts.isPhoneOrEmpty(p)) {
+            throw new ValidationException("phone", Texts.MSG_PHONE);
+        }
     }
 
     static void checkEmail(String email) {

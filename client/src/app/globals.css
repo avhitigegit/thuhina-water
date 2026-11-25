@@ -366,6 +366,93 @@
     display: block;
     font-size: 13px;
   }
+  .size-picks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .size-pick {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 4px 12px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .size-pick.on {
+    border-color: var(--brand);
+    background: var(--brand-soft);
+  }
+  .charge-lines {
+    display: grid;
+    gap: 2px;
+    min-width: 120px;
+  }
+  .charge-lines > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .user-menu {
+    position: relative;
+  }
+  .user-menu .who {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: none;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    padding: 4px 8px;
+    cursor: pointer;
+    color: inherit;
+    font: inherit;
+    font-size: 12px;
+  }
+  .user-menu .who:hover,
+  .user-menu .who[aria-expanded="true"] {
+    border-color: var(--border);
+    background: var(--bg, #f4f6f8);
+  }
+  .user-menu .caret {
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .user-menu-list {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 4px);
+    min-width: 180px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+    padding: 4px;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+  }
+  .user-menu-list a,
+  .user-menu-list button {
+    display: block;
+    text-align: left;
+    padding: 8px 12px;
+    border-radius: 6px;
+    background: none;
+    border: 0;
+    font: inherit;
+    font-size: 13px;
+    color: inherit;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .user-menu-list a:hover,
+  .user-menu-list button:hover {
+    background: var(--brand-soft);
+  }
   .content {
     padding: 22px 24px 48px;
     max-width: 1400px;

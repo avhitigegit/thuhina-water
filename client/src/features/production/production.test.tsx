@@ -334,8 +334,10 @@ describe("Filling Factory", () => {
     const row = (await screen.findByText("FB-0017")).closest("tr") as HTMLElement;
     await user.click(within(row).getByRole("button", { name: "Receive" }));
     const dialog = await screen.findByRole("dialog", { name: "Receive filled bottles" });
-    expect(within(dialog).getByLabelText("Factory")).toHaveValue("1");
-    expect(within(dialog).getByLabelText("Bottle")).toHaveValue("B20");
+    expect(within(dialog).getByLabelText("Factory")).toHaveValue("AquaSeal");
+    // Opened from the 20L row: the bottle is fixed, not a list (UAT finding 13).
+    expect(within(dialog).getByLabelText("Bottle")).toHaveValue("20L");
+    expect(within(dialog).getByLabelText("Bottle")).toHaveAttribute("readonly");
     // 6 left from FB-0017 + 100 of FB-0019.
     expect(within(dialog).getByLabelText("Filled bottles received")).toHaveValue(106);
     const filled = within(dialog).getByLabelText("Filled bottles received");

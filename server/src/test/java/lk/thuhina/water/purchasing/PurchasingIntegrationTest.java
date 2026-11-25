@@ -497,6 +497,13 @@ class PurchasingIntegrationTest extends IntegrationTest {
         // No purchase order to pick: the payment clears the oldest receipt first.
         assertThat(paid).containsEntry("poNo", null).containsEntry("methodLabel", "Online transfer");
         ok(send(post("/supplier-payments"), map("supplierId", supplierA, "date", today.toString(), "amount", 2000, "method", "CASH")), 201);
+        // UAT finding 12: the same reference again, or more than is owed, is refused.
+        pay.put("amount", 100);
+        send(post("/supplier-payments"), pay).andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fields.reference").value(org.hamcrest.Matchers.startsWith("Reference BOC-1 was already used for SP-")));
+        send(post("/supplier-payments"), map("supplierId", supplierA, "date", today.toString(), "amount", 20000, "method", "CASH"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fields.amount").value(org.hamcrest.Matchers.startsWith("More than what is owed to ")));
 
         BigDecimal owed = value.subtract(BigDecimal.valueOf(52000));
         bal = getList("/supplier-balances", admin).stream().filter(b -> ((Number) b.get("supplierId")).longValue() == supplierA).findFirst()

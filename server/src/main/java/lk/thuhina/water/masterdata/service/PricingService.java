@@ -275,6 +275,28 @@ public class PricingService {
                 MasterDataRules.status(saved, withNew, today()).name());
     }
 
+    /**
+     * Cancel a price that has not started yet (UAT finding 4): a scheduled entry entered by mistake. A price that has
+     * started stays – bills may have used it; a new price from today replaces it.
+     */
+    @Transactional
+    public void cancelScheduled(long id) {
+        PriceEntry e = entries.findAllByOrderByEffectiveFromDescIdDesc().stream().filter(x -> x.getId() == id).findFirst()
+                .orElseThrow(() -> new NotFoundException("Price", id));
+        if (!e.getEffectiveFrom().isAfter(today())) {
+            throw new ValidationException("effectiveFrom",
+                    "This price has already started and cannot be cancelled. Enter a new price from today instead.");
+        }
+        String what = e.getKind() == Kind.DEPOSIT
+                ? "Deposit / " + e.getBottleTypeCode()
+                : "Water / " + e.getBottleTypeCode() + " / " + customerTypes.findById(e.getCustomerTypeId()).map(CustomerType::getName).orElse("?");
+        // The table is insert-only; V020 lets this one transaction delete a price that has not started.
+        jdbc.getJdbcTemplate().queryForObject("select set_config('app.price_cancel', 'on', true)", String.class);
+        jdbc.update("delete from price_entry where id = :id", Map.of("id", id));
+        audit.log(AuditAction.DELETE, ENTITY, what, "Scheduled " + Money.format(e.getPrice()) + " from "
+                + BusinessDates.format(e.getEffectiveFrom()) + " cancelled");
+    }
+
     // ------------------------------------------------------------------ helpers
 
     private LocalDate today() {

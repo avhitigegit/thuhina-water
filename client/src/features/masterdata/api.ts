@@ -84,6 +84,13 @@ export const useUpdateBottleType = () =>
     [BOTTLES, PRICES, BRANDS],
   );
 
+/** Delete a bottle type that was never used (UAT finding 2); the server refuses a used one. */
+export const useDeleteBottleType = () =>
+  useSave(
+    (code: string) => api<void>(`/bottle-types/${code}`, { method: "DELETE" }),
+    [BOTTLES, PRICES, BRANDS],
+  );
+
 export const useCreateProduct = () =>
   useSave((body: CreateProductRequest) => api<Product>("/products", { method: "POST", body }), [PRODUCTS]);
 
@@ -100,6 +107,10 @@ export const useSetPrice = () =>
     (body: SetPriceRequest) => api<PriceHistoryRow>("/prices", { method: "POST", body }),
     [PRICES, BOTTLES],
   );
+
+/** Cancel a scheduled price that has not started yet (UAT finding 4). */
+export const useCancelScheduledPrice = () =>
+  useSave((id: number) => api<void>(`/prices/${id}`, { method: "DELETE" }), [PRICES, BOTTLES]);
 
 export const useCreateBrand = () =>
   useSave(

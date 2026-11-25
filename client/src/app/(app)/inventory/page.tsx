@@ -21,6 +21,7 @@ export default function StockPage() {
   const [tab, setTab] = useHashTab(TABS);
   const stock = useStock();
   const [dialog, setDialog] = useState<"damage" | "adjust" | null>(null);
+  const [moveItem, setMoveItem] = useState("");
 
   return (
     <>
@@ -51,11 +52,22 @@ export default function StockPage() {
           { id: "moves", label: "Movements" },
         ]}
         value={tab}
-        onChange={setTab}
+        onChange={(t) => {
+          setMoveItem("");
+          setTab(t);
+        }}
       />
-      {tab === "stock" && <StockTab stock={stock.data} />}
+      {tab === "stock" && (
+        <StockTab
+          stock={stock.data}
+          onShowMovements={(code) => {
+            setMoveItem(code);
+            setTab("moves");
+          }}
+        />
+      )}
       {tab === "damage" && <DamagesTab />}
-      {tab === "moves" && <MovementsTab stock={stock.data} />}
+      {tab === "moves" && <MovementsTab key={moveItem} stock={stock.data} initialItem={moveItem} />}
 
       {dialog === "damage" && stock.data && (
         <DamageDialog stock={stock.data} onClose={() => setDialog(null)} />
