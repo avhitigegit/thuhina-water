@@ -17,12 +17,13 @@ import { MoneyText } from "@/components/shared/MoneyText";
 import { Badge } from "@/components/shared/StatusBadge";
 import { useCan } from "@/features/auth/access";
 import { AgreedPricesCard } from "@/features/customers/AgreedPricesCard";
+import { ApiError } from "@/lib/api/client";
 import type { PriceCell, PriceHistoryRow, PriceMatrix } from "@/lib/api/types";
 import { addDaysIso, formatDate, todayIso } from "@/lib/format";
 import { showServerErrors } from "@/lib/forms";
 import { P } from "@/lib/permissions";
 import { toast } from "@/lib/toast";
-import { usePriceHistory, usePriceMatrix, useSetPrice } from "./api";
+import { useCancelScheduledPrice, usePriceHistory, usePriceMatrix, useSetPrice } from "./api";
 import { priceChangeSchema, type PriceChangeValues } from "./schemas";
 
 /** What the change pop-up is for: the cell plus words for its title. */
@@ -58,6 +59,7 @@ function PriceChangeDialog({ target, onClose }: { target: Target; onClose: () =>
   const today = todayIso();
   const schema = priceChangeSchema(today);
   const setPrice = useSetPrice();
+  const cancelPrice = useCancelScheduledPrice();
   const [error, setError] = useState("");
   const {
     register,
@@ -114,7 +116,29 @@ function PriceChangeDialog({ target, onClose }: { target: Target; onClose: () =>
         {cell.next && (
           <>
             {" "}
-            · scheduled <MoneyText value={cell.next.price} /> from {formatDate(cell.next.effectiveFrom)}
+            · scheduled <MoneyText value={cell.next.price} /> from {formatDate(cell.next.effectiveFrom)}{" "}
+            <button
+              type="button"
+              className="link-btn"
+              disabled={cancelPrice.isPending}
+              onClick={() => {
+                setError("");
+                cancelPrice.mutate(cell.next!.entryId, {
+                  onSuccess: () => {
+                    toast("Scheduled price cancelled", "ok");
+                    onClose();
+                  },
+                  onError: (err) =>
+                    setError(
+                      err instanceof ApiError
+                        ? Object.values(err.fieldErrors).join(" ") || err.message
+                        : "Something went wrong. Please try again.",
+                    ),
+                });
+              }}
+            >
+              Cancel this scheduled price
+            </button>
           </>
         )}
       </p>

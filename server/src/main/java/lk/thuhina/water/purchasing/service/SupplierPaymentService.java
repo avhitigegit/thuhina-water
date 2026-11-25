@@ -136,6 +136,22 @@ public class SupplierPaymentService {
         }
         // Paid against what is owed, oldest receipt first – no purchase order to choose (old payments keep theirs).
         BigDecimal amount = Money.of(r.amount());
+        // UAT finding 12: not more than what is owed, and the same reference not used twice for this supplier.
+        BigDecimal owed = owedBySupplier().getOrDefault(s.getId(), BigDecimal.ZERO);
+        if (amount.compareTo(owed) > 0) {
+            throw new ValidationException("amount", owed.signum() > 0
+                    ? "More than what is owed to " + s.getName() + " (" + Money.format(owed) + ")."
+                    : "Nothing is owed to " + s.getName() + ".");
+        }
+        if (r.method() != PayMethod.CASH && reference != null) {
+            payments.findBySupplierIdOrderByPayDateDescIdDesc(s.getId()).stream()
+                    .filter(p -> reference.equalsIgnoreCase(p.getReference()))
+                    .findFirst()
+                    .ifPresent(p -> {
+                        throw new ValidationException("reference", "Reference " + reference + " was already used for "
+                                + p.getSpNo() + " on " + BusinessDates.format(p.getPayDate()) + ". Check that this is not the same payment.");
+                    });
+        }
         SupplierPayment p = payments.saveAndFlush(new SupplierPayment(numbering.next(SequenceNames.SUPPLIER_PAYMENT), s.getId(),
                 null, r.date(), amount, r.method(), r.method() == PayMethod.CASH ? null : reference, Texts.blankToNull(r.note())));
         audit.log(AuditAction.CREATE, ENTITY, p.getSpNo(), s.getName() + ": " + Money.format(amount) + " by " + r.method().label()

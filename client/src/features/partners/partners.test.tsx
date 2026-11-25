@@ -6,7 +6,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AccessProvider } from "@/features/auth/access";
 import type { MeResponse, Supplier } from "@/lib/api/types";
 import { P } from "@/lib/permissions";
-import { factorySchema, MSG_CHARGE_NONE, MSG_ITEMS, supplierSchema, TERMS } from "./schemas";
+import {
+  factorySchema,
+  MSG_CHARGE_NONE,
+  MSG_ITEMS,
+  MSG_PARTNER_PHONE,
+  supplierSchema,
+  TERMS,
+} from "./schemas";
 import { SuppliersTab } from "./SuppliersTab";
 
 const SUPPLIER: Supplier = {
@@ -101,6 +108,12 @@ describe("supplier form rules", () => {
       termsDays: "Choose the payment terms from the list.",
     });
     expect(TERMS.map((t) => t.days)).toEqual([0, 7, 14, 30, 45, 60]);
+  });
+
+  it("supplier phone must be a Sri Lankan number (UAT finding 5)", () => {
+    const bad = supplierSchema.safeParse({ ...ok, phone: "mngtdr" });
+    expect(bad.error?.issues.map((i) => i.message)).toEqual([MSG_PARTNER_PHONE]);
+    expect(supplierSchema.safeParse({ ...ok, phone: "0771234567" }).success).toBe(true);
   });
 
   it("factory needs a charge for at least one bottle type; an empty one = does not fill that size (N-05)", () => {

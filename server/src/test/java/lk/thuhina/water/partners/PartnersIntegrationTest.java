@@ -129,6 +129,11 @@ class PartnersIntegrationTest extends IntegrationTest {
         badEmail.put("email", "sales-at-maker");
         mvc.perform(json(post("/suppliers"), admin, badEmail))
                 .andExpect(jsonPath("$.details.fields.email").value("Enter a valid email address."));
+        Map<String, Object> badPhone = supplier(List.of(bottle), 30);
+        badPhone.put("phone", "mngtdr");
+        mvc.perform(json(post("/suppliers"), admin, badPhone))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.details.fields.phone").value("Phone must be a Sri Lankan number, e.g. 077 123 4567 or 011 285 4471."));
     }
 
     @Test

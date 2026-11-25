@@ -543,7 +543,7 @@ export function SettleOwedDialog(props: NewSaleProps) {
       {...props}
       kind="owed"
       title="Settle bottles owed"
-      okMessage="Bottles owed settled"
+      okMessage="Saved – bottles owed updated"
       fieldNames={["bottleTypeCode", "qty", "method"]}
       build={(ctx) => ({ bottleTypeCode: bottle, qty: int(qtyOf(ctx.customer)), method })}
       fields={(ctx) => (

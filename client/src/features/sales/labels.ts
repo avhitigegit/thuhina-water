@@ -12,7 +12,7 @@ export const KINDS: { value: string; label: string; badge: BadgeKind }[] = [
   { value: "EXTRA_ORDER", label: "Extra order", badge: "info" },
   { value: "PRODUCT_SALE", label: "Product sale", badge: "" },
   { value: "CUSTOMER_DAMAGE", label: "Customer damage", badge: "bad" },
-  { value: "OWED_SETTLEMENT", label: "Bottles owed settled", badge: "ok" },
+  { value: "OWED_SETTLEMENT", label: "Bottles owed – settlement", badge: "ok" },
   { value: "OPENING_BALANCE", label: "Opening balance", badge: "dark" },
   { value: "REVERSAL", label: "Reversal", badge: "bad" },
 ];
